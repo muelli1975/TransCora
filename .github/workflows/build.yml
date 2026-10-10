@@ -46,6 +46,8 @@ jobs:
           TRANSCORA_REQUIRE_FFMPEG: '1'
           TRANSCORA_REQUIRE_GUI: '1'
         run: python -m unittest discover -s tests -v
+      - name: Capture Windows GUI for visual review
+        run: python scripts/gui_snapshot.py
       - name: Test actual BD-3D ISO and M2TS exports
         run: python scripts/bd3d_export_test.py
       - name: Build portable application
@@ -73,5 +75,13 @@ jobs:
         with:
           name: TransCora-BD3D-Integration
           path: output/bd3d-integration/
+          if-no-files-found: warn
+          retention-days: 30
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: TransCora-GUI-Check
+          path: output/gui-check/
           if-no-files-found: warn
           retention-days: 30

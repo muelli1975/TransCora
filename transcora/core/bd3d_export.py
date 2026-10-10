@@ -47,7 +47,10 @@ class BdTools:
 
 def validate_audio(audios):
     for audio in audios:
-        if (audio.get('channels'), audio.get('channel_layout')) not in {
+        channels, layout = audio.get('channels'), audio.get('channel_layout')
+        if channels in (1, 2) and layout in (None, 'unknown', 'unspecified'):
+            continue  # Keep the one/two channels in their original order; no remapping.
+        if (channels, layout) not in {
                 (1, 'mono'), (2, 'stereo'), (6, '5.1'), (6, '5.1(side)'), (8, '7.1')}:
             raise ValueError('BD-3D: Audiospur mit nicht freigegebener Kanalbelegung; Mono, Stereo, 5.1 oder 7.1 verwenden.')
 

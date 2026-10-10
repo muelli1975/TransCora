@@ -33,24 +33,28 @@ def main():
     report = {'ok': False}
     try:
         for rate, container, title, channels in [('24', 'iso', 'Mein 3D Film – ÄÖÜ', 2),
-                                                 ('24000/1001', 'm2ts', 'Native 23.976', 6)]:
-            source = OUT/f'source-{container}_full_sbs.mkv'
+                                                 ('24000/1001', 'm2ts', 'Native 23.976', 6),
+                                                 ('24000/1001', 'm2ts', 'Native 7.1', 8)]:
+            case = container + '-' + str(channels)
+            source = OUT/f'source-{case}_full_sbs.mkv'
+            tones = '|'.join(f'0.1*sin(2*PI*{997+i*173}*t)' for i in range(channels))
+            audio_fixture = f"aevalsrc={tones}:s=48000:c="+{2:'stereo', 6:'5.1', 8:'7.1'}[channels]
             # Distinct animated eyes; include 997 Hz on every audio channel.
             capture([str(tools.ffmpeg), '-hide_banner', '-y', '-filter_complex_threads', '1',
                 '-f', 'lavfi', '-i', f'testsrc2=size=1920x1080:rate={rate}', '-f', 'lavfi', '-i',
-                'sine=frequency=997:sample_rate=48000', '-filter_complex',
+                audio_fixture, '-filter_complex',
                 '[0:v]split[a][b];[b]crop=1908:1080:12:0,pad=1920:1080:0:0:color=black[r];[a][r]hstack[v]',
                 '-map', '[v]', '-map', '1:a', '-frames:v', '48', '-t', str(48/float(Fraction(rate))),
                 '-c:v', 'ffv1', '-level', '3', '-pix_fmt', 'yuv420p', '-colorspace', 'bt709',
                 '-color_primaries', 'bt709', '-color_trc', 'bt709', '-color_range', 'tv',
-                '-c:a', 'pcm_s24le', '-ac', str(channels), str(source)], timeout=120)
+                '-c:a', 'flac', '-sample_fmt', 's32', '-bits_per_raw_sample', '24', '-ac', str(channels), str(source)], timeout=120)
             job = Job(source, Options(target='bd3d', container=container, disc_title=title))
             plan = plan_job(tools, job, OUT, set(), threading.Event(), capabilities)
             png = preview(tools, plan, threading.Event(), .5)
             if not png.startswith(b'\x89PNG'):
                 raise ValueError('BD preview failed')
             events = []
-            execute(tools, plan, threading.Event(), lambda k, v: events.append((k, v)), OUT/f'{container}.log')
+            execute(tools, plan, threading.Event(), lambda k, v: events.append((k, v)), OUT/f'{case}.log')
             if not plan.output.is_file() or not events or events[-1][1].get('percent') != 100:
                 raise ValueError('Export/progress failed')
             packed = plan.output
@@ -66,7 +70,7 @@ def main():
                     disc.extract('BDMV/STREAM/SSIF/00000.ssif', packed)
             # Independently compare each eye with the prepared source. This catches
             # a swapped/duplicated view or planar-SBS stdin error despite roundtrip equality.
-            raw = OUT/f'raw-{container}'
+            raw = OUT/f'raw-{case}'
             raw.mkdir(exist_ok=True)
             demux = raw/'demux'
             demux.mkdir()
@@ -106,7 +110,7 @@ def main():
             again = plan_job(tools, job, OUT, set(), threading.Event(), capabilities)
             if again.output == plan.output:
                 raise ValueError('Output naming collision protection failed')
-            report[container] = {'file': plan.output.name, 'size': plan.output.stat().st_size,
+            report[case] = {'file': plan.output.name, 'size': plan.output.stat().st_size,
                                 'frames': 48, 'rate': str(BD_RATE), 'channels': channels,
                                 'audio_identical': True, 'preview_ok': True}
             source.unlink()

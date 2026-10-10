@@ -53,6 +53,17 @@ class BdPreparationTests(unittest.TestCase):
                 prepare(invalid, 'half_ou')
 
 
+class AudioLayoutTests(unittest.TestCase):
+    def test_unlabelled_mono_stereo_keep_channels_but_surround_is_not_guessed(self):
+        from transcora.core.bd3d_export import validate_audio
+        validate_audio([{'channels': 1}, {'channels': 2}])
+        validate_audio([{'channels': 6, 'channel_layout': '5.1'}, {'channels': 8, 'channel_layout': '7.1'}])
+        with self.assertRaises(ValueError):
+            validate_audio([{'channels': 6}])
+        with self.assertRaises(ValueError):
+            validate_audio([{'channels': 2, 'channel_layout': '2.0(other)'}])
+
+
 class MvcMetadataTests(unittest.TestCase):
     def test_stream_rewrite_is_bounded_idempotent_and_preserves_slices(self):
         from transcora.core.mvc import annex_nals, tag_generated_stream, tag_sps

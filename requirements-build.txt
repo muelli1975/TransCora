@@ -1,2 +1,5 @@
 # Runtime conversion uses only the Python standard library and external FFmpeg.
 PyInstaller==6.22.3
+
+# CI-only screenshot verification; not imported by the application.
+Pillow==11.3.0

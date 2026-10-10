@@ -129,8 +129,8 @@ Bei **Nur Framerate ändern** mit umgekehrter Augenreihenfolge ist MKV erforderl
 st3d kann R/L nicht ausdrücken. Anaglyph-/Mono-Ausgaben erhalten keine SBS/OU-Flags.
 **Testen** zeigt die Layout-Erkennung und die geplanten Kennzeichnungen.
 
-**Kontrollbild** lädt das erste Bild automatisch und bietet einen Positionsregler und eine genaue Sekundenangabe. Beim
-Loslassen des Reglers oder mit Enter im Sekundenfeld wird das Bild an der gewählten Stelle geladen. Es zeigt
+**Kontrollbild** lädt das erste Bild automatisch und bietet einen Positionsregler und eine einzige editierbare Zeitangabe im Format mm:ss oder hh:mm:ss. Beim
+Loslassen des Reglers oder mit Enter im Zeitfeld wird das Bild an der gewählten Stelle geladen. Es zeigt
 optional einen Ausgabe-Frame derselben Filterkette: 8-Bit-Anzeige
 vor Videokompression, kein Ersatz für den Test im Zielplayer. Der Fortschrittsbalken
 kombiniert Dateifortschritt und Jobanzahl; unterschiedlich lange Videos haben gleiches
@@ -200,9 +200,9 @@ und tsMuxeR 2.6.12 bis zur UDF-2.50-ISO mit SSIF. Er kodiert einen kurzen, gepac
 24-fps-Testfilm mit 240 Bildern nach AVC/MVC mit exakt 24000/1001 fps und passend
 verlangsamtem LPCM-Ton. Er kontrolliert anschließend die ISO-Struktur, die
 Bildanzahl, Zeitstempel, Farbangaben, Ton und beide wieder dekodierten Augenbilder.
-Die experimentelle Vorbereitung ist noch kein Ziel in der Programmoberfläche.
-Ein Abspieltest auf realer Blu-ray-3D-Hardware steht zusätzlich zur technischen
-Prüfung aus.
+Die daraus entwickelte Exportstrecke ist als **BD-3D · 1080p** integriert und wird
+im Windows-Build zusätzlich als ISO und M2TS geprüft. Praktische Zielplayer-Tests
+ergänzen die technischen Prüfungen.
 
 ## Voreinstellungen und Restzeit
 
