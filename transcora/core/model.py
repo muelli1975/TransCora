@@ -15,7 +15,7 @@ TARGETS = {"half_sbs": "Half-SBS · 1080p", "half_ou": "Half-OU · 1080p",
            "anaglyph": "Anaglyph", "mono": "Mono · linkes Auge", "framerate": "Nur Framerate ändern"}
 NAMING = {"original": "Kein Layout-Zusatz", "layout": "Layout-Zusatz",
           "players": "Player-Kürzel (Kodi/Bino)"}
-PROFILES = {"quality": "Qualität · 8 Bit / 4:4:4", "quality10": "Qualität · 10 Bit / 4:4:4",
+PROFILES = {"quality": "Qualität · 8 Bit / 4:4:4", "quality10": "Hohe Farbtiefe · 10 Bit / 4:4:4",
             "compatible": "Kompatibel · 8 Bit / 4:2:0"}
 FPS_CHOICES = ("23,976", "24", "25", "29,97", "30", "50", "59,94", "60")
 
