@@ -27,6 +27,8 @@ class GuiTests(unittest.TestCase):
 
     def tearDown(self):
         if hasattr(self, 'root'):
+            for callback in self.root.tk.call('after', 'info'):
+                self.root.after_cancel(callback)
             self.root.destroy()
 
     def test_file_list_selection_and_option_scope(self):
@@ -77,7 +79,7 @@ class GuiTests(unittest.TestCase):
             capture([str(tools.ffmpeg), '-v', 'error', '-f', 'lavfi', '-i', 'testsrc2=size=128x32:rate=25',
                      '-frames:v', '3', '-c:v', 'ffv1', '-colorspace', 'bt709', '-color_trc', 'bt709',
                      '-color_primaries', 'bt709', '-color_range', 'tv', str(source)])
-            self.window.defaults = replace(Options(), target='anaglyph')
+            self.window.defaults = replace(Options(), target='anaglyph', assume_bt709=True)
             self.window.add_paths([source])
             self.window.output_var.set(str(folder/'output'))
             self.window.check(True)

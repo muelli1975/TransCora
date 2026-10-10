@@ -104,7 +104,8 @@ def color_spec(video: dict, assume: bool) -> tuple[dict, list[str]]:
     for key, value in fields.items():
         if value in (None, "unknown", "unspecified"):
             if not assume:
-                raise ValueError("Farbangaben unvollständig. Quelle prüfen oder bewusst „Fehlende Farben: BT.709“ wählen.")
+                missing = ", ".join(k for k, v in fields.items() if v in (None, "unknown", "unspecified"))
+                raise ValueError(f"Farbangaben unvollständig ({missing}). Quelle prüfen oder bewusst „Fehlende Farben: BT.709“ wählen.")
             fields[key] = defaults[key]
             warnings.append(f"Farbannahme {key}={fields[key]}")
     supported = {"matrix": {"bt709", "bt470bg", "smpte170m", "gbr"},

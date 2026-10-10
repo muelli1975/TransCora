@@ -55,7 +55,10 @@ class FFmpegTests(unittest.TestCase):
                         '-filter_complex_threads', '1', '-threads', '1', *args], timeout=90)
 
     def plan(self, options=None, source=None):
-        return plan_job(self.tools, Job(source or self.source, options or Options(target='anaglyph')),
+        # FFV1/Matroska test fixtures may omit range tags in newer FFmpeg builds.
+        # The fixture's SDR color interpretation is known; exercise the explicit override.
+        options = replace(options or Options(target='anaglyph'), assume_bt709=True)
+        return plan_job(self.tools, Job(source or self.source, options),
                         self.folder/'outputs', set(), capabilities=self.capabilities)
 
     def export(self, options):
