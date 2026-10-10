@@ -40,19 +40,19 @@ class CoreTests(unittest.TestCase):
             folder = Path(tmp).resolve()
             reserved = set()
             for key, method in methods().items():
-                options = Options(target='anaglyph', naming='players', profile='quality10')
+                options = Options(target='anaglyph', naming='players', profile='quality10', container='mkv')
                 output = reserve_output(folder/'Film.3D.HSBS-lrh.mkv', folder, options, method['suffix'], reserved)
                 self.assertEqual(output.name, f'Film_{key}.mkv')
                 output.touch()
                 again = reserve_output(folder/'Film-lr.mkv', folder, options, method['suffix'], reserved)
                 self.assertEqual(again.name, f'Film_2_{key}.mkv')
-            (folder/'CLIP_half_sbs.mkv').touch()
+            (folder/'CLIP_half_sbs.mp4').touch()
             output = reserve_output(folder/'Clip.mkv', folder, Options(), '', set())
-            self.assertEqual(output.name, 'Clip_2_half_sbs.mkv')
-            source = folder/'same.mkv'
+            self.assertEqual(output.name, 'Clip_2_half_sbs.mp4')
+            source = folder/'same.mp4'
             source.touch()
             output = reserve_output(source, folder, Options(naming='original'), '', set())
-            self.assertEqual(output.name, 'same_2.mkv')
+            self.assertEqual(output.name, 'same_2.mp4')
 
     def test_layout_hints_and_safe_windows_names(self):
         self.assertEqual(filename_layout('Film.3D.HSBS-lrh'), ('half_sbs', False))
@@ -86,12 +86,43 @@ class CoreTests(unittest.TestCase):
 
     def test_color_assumptions_and_hdr_are_explicit(self):
         with self.assertRaisesRegex(ValueError, 'unvollständig'):
-            color_spec({'pix_fmt': 'yuv420p'}, False)
-        colors, warnings = color_spec({'pix_fmt': 'yuv420p'}, True)
+            color_spec({'pix_fmt': 'yuv420p', 'width': 720, 'height': 576})
+        colors, warnings = color_spec({'pix_fmt': 'yuv420p', 'width': 1920, 'height': 1080})
         self.assertEqual(colors['transfer'], 'bt709')
         self.assertEqual(len(warnings), 4)
         with self.assertRaisesRegex(ValueError, 'HDR'):
-            color_spec({'color_transfer': 'smpte2084'}, True)
+            color_spec({'color_transfer': 'smpte2084'})
+        with self.assertRaisesRegex(ValueError, 'HDR'):
+            color_spec({'width': 3840, 'height': 2160, 'side_data_list': [
+                {'side_data_type': 'Mastering display metadata'}]})
+        with self.assertRaisesRegex(ValueError, 'Farbinterpretation'):
+            color_spec({'width': 3840, 'height': 2160, 'color_primaries': 'bt2020'})
+        with self.assertRaisesRegex(ValueError, 'unvollständig'):
+            color_spec({'width': 1920, 'height': 1080, 'color_space': 'smpte170m'})
+
+    def test_color_range_is_independent_and_existing_tags_win(self):
+        tags = {'color_space': 'bt709', 'color_primaries': 'bt709', 'color_transfer': 'bt709'}
+        colors, warnings = color_spec(dict(tags, pix_fmt='yuv420p', color_range='pc'))
+        self.assertEqual(colors['range'], 'pc')
+        self.assertFalse(warnings)
+        for pix_fmt, expected in [('gbrp16le', 'pc'), ('yuvj420p', 'pc'), ('yuv420p10le', 'tv')]:
+            with self.subTest(pix_fmt=pix_fmt):
+                colors, warnings = color_spec(dict(tags, pix_fmt=pix_fmt))
+                self.assertEqual(colors['range'], expected)
+                self.assertEqual(len(warnings), 1)
+        legacy = dict(tags, color_space='bt470bg', color_primaries='bt470bg', color_transfer='gamma28',
+                      color_range='tv', pix_fmt='yuv420p')
+        colors, warnings = color_spec(legacy)
+        self.assertEqual(colors['matrix'], 'bt470bg')
+        self.assertFalse(warnings)
+
+    def test_old_lists_keep_choices_with_automatic_colour_handling(self):
+        options = Options.from_dict({'target': 'anaglyph', 'method': 'rendepth2', 'container': 'mkv',
+                                     'swap': True, 'layout': 'full_sbs', 'assume_bt709': False})
+        self.assertEqual(options.container, 'mkv')
+        self.assertTrue(options.swap)
+        self.assertEqual(options.layout, 'full_sbs')
+        self.assertNotIn('assume_bt709', vars(options))
 
     def test_tool_inspection_supports_ffmpeg_6_and_9_listing(self):
         names = ['zscale', 'colorchannelmixer', 'lutrgb', 'blend', 'crop', 'scale',

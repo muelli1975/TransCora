@@ -10,7 +10,7 @@ import tempfile
 import threading
 import unittest
 
-from transcora.core.engine import (Cancelled, build_graph, execute, methods, plan_job,
+from transcora.core.engine import (Cancelled, build_graph, command, execute, methods, plan_job,
                                    preview, probe, capture)
 from transcora.core.model import Job, Options, app_root
 from transcora.core.toolchain import Toolchain
@@ -27,7 +27,7 @@ class FFmpegTests(unittest.TestCase):
             raise unittest.SkipTest('FFmpeg/ffprobe fehlen')
         cls.capabilities = cls.tools.inspect()
         cls.temp = tempfile.TemporaryDirectory()
-        cls.folder = Path(cls.temp.name)
+        cls.folder = Path(cls.temp.name).resolve()
         cls.source = cls.folder/'Test-lr.mkv'
         cls.ppm = cls.folder/'stereo.ppm'
         # Distinct eye colors and gradations reveal swaps and LUT/order differences.
@@ -41,9 +41,17 @@ class FFmpegTests(unittest.TestCase):
         cls.ppm.write_bytes(b'P6\n128 32\n255\n'+pixels)
         cls.run_ffmpeg('-loop', '1', '-framerate', '24000/1001', '-i', str(cls.ppm),
                        '-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=48000',
+                       '-vf', 'setparams=colorspace=gbr:color_primaries=bt709:color_trc=iec61966-2-1:range=full',
                        '-frames:v', '6', '-t', '0.26', '-c:v', 'ffv1', '-pix_fmt', 'gbrp16le',
                        '-c:a', 'aac', '-colorspace', 'rgb', '-color_primaries', 'bt709',
                        '-color_trc', 'iec61966-2-1', '-color_range', 'pc', str(cls.source))
+        # Set the known fixture interpretation on the frames themselves. FFmpeg
+        # 9 may propagate unknown frame tags over output-only codec options.
+        fixture = probe(cls.tools, cls.source)['video']
+        expected = {'color_space': 'gbr', 'color_primaries': 'bt709',
+                    'color_transfer': 'iec61966-2-1', 'color_range': 'pc'}
+        if any(fixture.get(key) != value for key, value in expected.items()):
+            raise AssertionError('Reference fixture colour tags were lost: '+json.dumps(fixture))
 
     @classmethod
     def tearDownClass(cls):
@@ -55,9 +63,7 @@ class FFmpegTests(unittest.TestCase):
                         '-filter_complex_threads', '1', '-threads', '1', *args], timeout=90)
 
     def plan(self, options=None, source=None):
-        # FFV1/Matroska test fixtures may omit range tags in newer FFmpeg builds.
-        # The fixture's SDR color interpretation is known; exercise the explicit override.
-        options = replace(options or Options(target='anaglyph'), assume_bt709=True)
+        options = options or Options(target='anaglyph')
         return plan_job(self.tools, Job(source or self.source, options),
                         self.folder/'outputs', set(), capabilities=self.capabilities)
 
@@ -130,6 +136,28 @@ class FFmpegTests(unittest.TestCase):
             self.assertEqual(plan.size, size)
             self.assertTrue(preview(self.tools, plan, threading.Event()).startswith(b'\x89PNG'))
 
+    def test_folder_outputs_and_filter_thread_equivalence(self):
+        source = self.folder/'nested'/'album'/'same-lr.mkv'
+        source.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(self.source, source)
+        job = Job(source, Options(target='anaglyph'), self.folder/'nested')
+        plan = plan_job(self.tools, job, self.folder/'mirrored', set(), capabilities=self.capabilities)
+        self.assertEqual(plan.output.parent, self.folder/'mirrored'/'album')
+        args = command(self.tools, plan, self.folder/'thread-output.mp4')
+        self.assertNotIn('-filter_complex_threads', args)
+        for method in ('dubois_lcd', 'iaian7', 'rendepth2'):
+            graph = self.plan(Options(target='anaglyph', method=method)).graph
+            # Compare the actual high-precision method result, before final
+            # YUV error diffusion can redistribute single-code-value rounding.
+            graph = graph.split(';[composite]zscale=')[0]+';[composite]format=gbrp16le[v]'
+            hashes = []
+            for threads in ('1', '0'):
+                hashes.append(capture([str(self.tools.ffmpeg), '-v', 'error', '-nostdin',
+                    '-filter_complex_threads', threads, '-i', str(self.source), '-filter_complex', graph,
+                    '-map', '[v]', '-frames:v', '3', '-c:v', 'rawvideo', '-threads', '1',
+                    '-f', 'framemd5', 'pipe:1'], timeout=30))
+            self.assertEqual(hashes[0], hashes[1], method)
+
     def test_source_changes_and_cancel_leave_no_final_file(self):
         plan = self.plan(Options(target='half_sbs'))
         cancelled = threading.Event()
@@ -160,7 +188,7 @@ class FFmpegTests(unittest.TestCase):
     def test_vfr_timestamps_are_preserved(self):
         source = self.folder/'vfr-lr.mkv'
         self.run_ffmpeg('-loop', '1', '-framerate', '25', '-i', str(self.ppm), '-frames:v', '5',
-                        '-vf', "settb=1/1000,setpts='N*N*40'", '-fps_mode', 'passthrough',
+                        '-vf', "settb=1/1000,setpts='N*N*40',setparams=colorspace=gbr:color_primaries=bt709:color_trc=iec61966-2-1:range=full", '-fps_mode', 'passthrough',
                         '-enc_time_base', '1/1000', '-c:v', 'ffv1', '-pix_fmt', 'gbrp16le',
                         '-colorspace', 'rgb', '-color_primaries', 'bt709', '-color_trc', 'iec61966-2-1',
                         '-color_range', 'pc', str(source))

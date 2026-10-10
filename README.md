@@ -1,4 +1,4 @@
-# TransCora 0.1.0
+# TransCora 0.1.1
 
 Portabler, lokaler 3D-Video-Konverter mit kompakter Python-Oberfläche und FFmpeg.
 **Erste Testversion:** Video-Konvertierung ist umgesetzt; Bild-/MPO-Werkzeuge und
@@ -19,14 +19,15 @@ Der gesamte Ordner muss zusammenbleiben und sollte beschreibbar sein.
 
 1. **Dateien hinzufügen:** einzelne oder mehrere Videos auswählen. Wiederholtes
    Hinzufügen ermöglicht Listen aus unterschiedlichen Ordnern. Alternativ
-   **Ordner hinzufügen**, optional mit Unterordnern und gespiegelter Struktur.
+   **Ordner hinzufügen**, optional mit **Unterordner mitverarbeiten**. Die relative
+   Ordnerstruktur wird automatisch unter dem Ausgabeordner erhalten.
 2. Die gewünschten Listeneinträge auswählen. Einstellungen gelten für die Auswahl
    und als Vorgabe für neue Dateien. Leere Auswahlfelder bedeuten gemischte Werte;
    eine Änderung setzt nur dieses Feld für alle ausgewählten Jobs.
 3. Für die bisherigen Workflows **Full-SBS** als Quelllayout wählen. Automatisch
    akzeptiert nur eindeutige unterstützte Dateikürzel, keine reine Auflösungsheuristik.
-4. Ziel und Container wählen. **Prüfen** zeigt technische Daten, Ausgabe und Warnungen.
-   **Starten** prüft erneut und verarbeitet alle noch offenen, gültigen Jobs.
+4. Ziel und Container wählen. **Testen** zeigt technische Daten, Ausgabe und Warnungen.
+   **Start** prüft erneut und verarbeitet alle noch offenen, gültigen Jobs.
    Blockierte Dateien erscheinen mit Fehlergrund; gültige Jobs laufen weiter.
 5. Standardausgabe: `output` im TransCora-Ordner. Ein anderer gewählter Ordner wird
    gemerkt. **Abbrechen** beendet den Prozess und verwirft dessen begonnene Ausgabe.
@@ -68,7 +69,7 @@ nummeriert, z. B. `Film_2_dubois_lcd.mkv`; auch nachträglich angelegte Ziele si
 
 ## Qualität, Timing und Farbe
 
-- Standard: **H.264 / MKV, CRF 18, slow**; alternativ MP4/H.264.
+- Standard: **H.264 / MP4, CRF 18, slow**; alternativ MKV.
 - Anaglyph-Standard: **8 Bit / 4:4:4**. Nicht alle Player/Hardwaredecoder unterstützen
   4:4:4. Optional **10 Bit / 4:4:4**, ebenfalls mit eingeschränkter Player-Unterstützung.
   Feinere Abstufungen machen eine 8-Bit-Quelle nicht zu HDR.
@@ -76,35 +77,60 @@ nummeriert, z. B. `Film_2_dubois_lcd.mkv`; auch nachträglich angelegte Ziele si
   kann die Qualität beeinträchtigen. Layout-/Mono-Ausgaben verwenden 8 Bit / 4:2:0.
 - **Erweitert:** H.265/HEVC ausschließlich in MKV sowie frei einstellbare CRF oder
   durchschnittliche Zielbitrate in Mbit/s. CRF ist codecabhängig; Zielbitrate bedeutet
-  kein garantiertes Dateigrößenlimit. Kein beliebiges Encoder-Menü.
+  kein garantiertes Dateigrößenlimit. Nur das zum gewählten Modus passende Feld ist
+  sichtbar; beide Werte bleiben beim Umschalten erhalten. Startwert der Zielbitrate:
+  **20 Mbit/s = 20.000 kbit/s**. Kein beliebiges Encoder-Menü.
 - Quell-Timing bleibt erhalten, auch variable Framerate. Keine Umstellung,
   Interpolation oder bewusste Frame-Duplikation/-Auslassung. Container können
   Zeitstempel auf ihre eigene Genauigkeit runden.
 - Unterstütztes SDR wird anhand seiner Farbkennzeichnung tatsächlich nach
   sRGB/16-Bit-RGB für die Batch-Verfahren umgerechnet und anschließend nach
   BT.709-YUV konvertiert und gekennzeichnet; keine bloße Änderung der Farb-Tags.
-- Unvollständige Farbkennzeichnungen blockieren die Vorprüfung. Nach Quellenprüfung
-  bewusst **Fehlende Farben: BT.709 SDR annehmen** einschalten; jede Annahme steht im
-  Log. HDR wird nicht automatisch umgewandelt. Interlacing, nichtquadratische Pixel,
+- Vorhandene Farbkennzeichnungen werden beachtet. Fehlende Farbangaben werden bei
+  plausiblen HD-SDR-Quellen automatisch ergänzt (BT.709 für YUV, sRGB für RGB).
+  SD/Legacy-Quellen mit unvollständigen Angaben und explizit nicht unterstützte
+  Farbräume werden mit Hinweis blockiert. Der Wertebereich wird getrennt behandelt:
+  vorhandene Angaben haben Vorrang, RGB/JPEG-YUV verwendet bei fehlender Kennzeichnung
+  Vollbereich, gewöhnliches YUV den üblichen begrenzten Videobereich. Jede Annahme
+  steht in der Vorprüfung und im Log. Eine fehlende Kennzeichnung lässt sich nicht
+  anhand der Auflösung beweisen; die Kontrollbild-/Player-Prüfung bleibt sinnvoll.
+  Erkannte HDR-Quellen werden nicht automatisch umgewandelt. Interlacing, nichtquadratische Pixel,
   Rotation und VR-Projektion werden in dieser Version mit Hinweis blockiert.
 - Audio wird kopiert. Nicht zum MP4-Profil passende Audiospuren verlangen MKV.
   Untertitel, Kapitel, Daten und Anhänge werden in 0.1 nicht übernommen. Dateisystem-
   Zeitstempel werden noch nicht übertragen; ausgewählte globale Metadaten wie
   `creation_time` und Titel werden übernommen.
 
-**Kontrollbild** zeigt optional einen Ausgabe-Frame derselben Filterkette: 8-Bit-Anzeige
+**Kontrollbild** bietet einen Positionsregler und eine genaue Sekundenangabe. Beim
+Loslassen des Reglers wird das Bild an der gewählten Stelle geladen. Es zeigt
+optional einen Ausgabe-Frame derselben Filterkette: 8-Bit-Anzeige
 vor Videokompression, kein Ersatz für den Test im Zielplayer. Der Fortschrittsbalken
 kombiniert Dateifortschritt und Jobanzahl; unterschiedlich lange Videos haben gleiches
 Gewicht. Meldungen und vollständige FFmpeg-Aufrufe stehen unter dem Ausgabeordner
 in `logs`. Logs können lokale Pfade und Metadaten enthalten. Das vorhandene Icon und
 der Windows-Abschlusssound bleiben unverändert.
 
+## Einstellungen
+
+TransCora merkt Ziel, Anaglyphenverfahren, Ausgabeprofil, Container, Codec,
+Qualitätsmodus, CRF-/Bitratenwerte, Dateinamensoption, Eingabe-/Ausgabeordner und
+Unterordneroption. Quelllayout beginnt beim nächsten Programmstart mit **Automatisch**,
+**L/R tauschen** ist dann ausgeschaltet. Joblisten behalten ihre individuellen Angaben.
+Dateiliste, Kontrollbildposition und Fenstergröße/-position werden nicht automatisch
+wiederhergestellt. Einstellungen liegen lokal in `settings.json` im Programmordner.
+
+**Standardeinstellungen** unter **Erweitert** stellt die Konvertierungsvorgaben für
+neue Dateien wieder her. Bestehende Jobs, Ordnerpfade und Unterordneroption bleiben
+erhalten. Alte Joblisten und Einstellungen aus 0.1.0 werden weiter gelesen; die
+entfallenen Farbannahme-/FFmpeg-Pfad-/Struktur-Checkboxen werden nicht übernommen.
+
 ## Entwicklung und Prüfung
 
 Python 3.10 oder neuer mit Tk; die Engine verwendet nur die Standardbibliothek.
 FFmpeg/ffprobe benötigen `libx264`, `zscale` und die geprüften Filter; `libx265` nur für
-HEVC. Beide Programme unter `tools/ffmpeg` bzw. `tools/ffmpeg/bin` ablegen oder den
-Ordner in der Oberfläche wählen. Für Entwicklung funktioniert auch die PATH-Installation.
+HEVC. Beide Programme unter `tools/ffmpeg` bzw. `tools/ffmpeg/bin` ablegen.
+Die portable EXE verwendet ausschließlich diese mitgelieferten Programme; nur beim
+Start aus Python funktioniert als Entwicklungsfallback auch die PATH-Installation.
 
 ```text
 python run_transcora.py

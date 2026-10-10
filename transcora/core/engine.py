@@ -92,29 +92,53 @@ def metadata_layout(video: dict) -> tuple[str, bool] | None:
     return None
 
 
-def color_spec(video: dict, assume: bool) -> tuple[dict, list[str]]:
+def color_spec(video: dict) -> tuple[dict, list[str]]:
     fields = {"matrix": video.get("color_space"), "primaries": video.get("color_primaries"),
               "transfer": video.get("color_transfer"), "range": video.get("color_range")}
-    if fields["transfer"] in {"smpte2084", "arib-std-b67"}:
+    hdr_side_data = ("mastering display", "content light", "dovi", "dolby vision", "hdr")
+    if fields["transfer"] in {"smpte2084", "arib-std-b67"} or any(
+            any(hint in str(side.get("side_data_type", "")).lower() for hint in hdr_side_data)
+            for side in video.get("side_data_list", [])):
         raise ValueError("HDR-Quelle: Diese Version verarbeitet geprüftes SDR, ohne automatische HDR-/SDR-Wandlung.")
     warnings = []
-    rgb = str(video.get("pix_fmt", "")).startswith(("gbr", "rgb", "bgr"))
-    defaults = {"matrix": "gbr" if rgb else "bt709", "primaries": "bt709",
-                "transfer": "bt709", "range": "pc" if rgb else "tv"}
-    for key, value in fields.items():
-        if value in (None, "unknown", "unspecified"):
-            if not assume:
-                missing = ", ".join(k for k, v in fields.items() if v in (None, "unknown", "unspecified"))
-                raise ValueError(f"Farbangaben unvollständig ({missing}). Quelle prüfen oder bewusst „Fehlende Farben: BT.709“ wählen.")
-            fields[key] = defaults[key]
-            warnings.append(f"Farbannahme {key}={fields[key]}")
     supported = {"matrix": {"bt709", "bt470bg", "smpte170m", "gbr"},
                  "primaries": {"bt709", "bt470bg", "smpte170m"},
                  "transfer": {"bt709", "smpte170m", "iec61966-2-1", "gamma22", "gamma28"},
                  "range": {"tv", "pc"}}
+    missing_values = (None, "unknown", "unspecified")
+    # Reject HDR/wide-gamut and other explicit unsupported tags before guessing
+    # any missing field. Existing values are always authoritative.
     for key, value in fields.items():
-        if value not in supported[key]:
+        if value not in missing_values and value not in supported[key]:
             raise ValueError(f"Noch nicht freigegebene Farbinterpretation: {key}={value}.")
+    pixel_format = str(video.get("pix_fmt", ""))
+    rgb = pixel_format.startswith(("gbr", "rgb", "bgr"))
+    unknown_color = [key for key in ("matrix", "primaries", "transfer") if fields[key] in missing_values]
+    if unknown_color:
+        # Resolution supports a fallback; it cannot prove a colour space. Keep
+        # PAL/NTSC and partially tagged legacy sources out of the HD fallback.
+        legacy = any(fields[key] in {"bt470bg", "smpte170m", "gamma22", "gamma28"}
+                     for key in ("matrix", "primaries", "transfer"))
+        hd = video.get("width", 0) >= 1280 and video.get("height", 0) >= 720
+        hd_hint = fields["matrix"] == "bt709" or fields["primaries"] == "bt709"
+        if legacy or not (hd or hd_hint):
+            raise ValueError("Farbangaben unvollständig; keine eindeutige HD-SDR-Annahme möglich. "
+                             "Quelle prüfen und fehlende Farbangaben vor dem Import ergänzen.")
+        defaults = {"matrix": "gbr" if rgb else "bt709", "primaries": "bt709",
+                    "transfer": "iec61966-2-1" if rgb else "bt709"}
+        for key in unknown_color:
+            fields[key] = defaults[key]
+            warnings.append(f"Farbannahme {key}={fields[key]} (fehlende HD-SDR-Angabe)")
+    if fields["range"] in missing_values:
+        if rgb or pixel_format.startswith("yuvj"):
+            fields["range"] = "pc"
+            explanation = "Vollbereich für RGB/JPEG-YUV"
+        elif pixel_format.startswith(("yuv", "nv12", "nv21", "p010", "p012", "p016")):
+            fields["range"] = "tv"
+            explanation = "üblicher begrenzter YUV-Videobereich; Quelle bei abweichendem Kontrast prüfen"
+        else:
+            raise ValueError("Helligkeitswertebereich fehlt und ist für dieses Pixelformat nicht bestimmbar.")
+        warnings.append(f"Farbannahme range={fields['range']} ({explanation})")
     return fields, warnings
 
 
@@ -142,7 +166,7 @@ class Plan:
             fps = "?"
         return (f"{video['width']} × {video['height']} · {video.get('codec_name', '?')} · "
                 f"{fps} fps ({rate}) → {self.size[0]} × {self.size[1]} · "
-                f"{self.options.codec.upper()} / {self.pixel_format} · Timing erhalten\n{self.output}")
+                f"{self.options.codec.upper()} / {self.pixel_format}\n{self.output}")
 
 
 def build_graph(video: dict, options: Options, layout: str, swap: bool, colors: dict,
@@ -220,7 +244,7 @@ def plan_job(tools: Toolchain, job: Job, output_root: Path, reserved: set[str],
     options = Options.from_dict(vars(job.options))  # Freeze decisions for execution.
     catalog = methods()
     if options.method not in catalog:
-        raise ValueError("Anaglyphverfahren nicht im geprüften Batch-Katalog.")
+        raise ValueError("Anaglyphenverfahren nicht im geprüften Batch-Katalog.")
     before = job.source.stat() if job.source.is_file() else None
     info = probe(tools, job.source, cancel)
     after = job.source.stat()
@@ -265,7 +289,7 @@ def plan_job(tools: Toolchain, job: Job, output_root: Path, reserved: set[str],
             warnings.append("Manuelle Quellinterpretation ersetzt abweichende Stereo-Metadaten.")
     if (width if layout.endswith("sbs") else height) % 2:
         raise ValueError("Das gepackte Raster lässt sich nicht in zwei gleich große Ansichten teilen.")
-    colors, color_warnings = color_spec(video, options.assume_bt709)
+    colors, color_warnings = color_spec(video)
     warnings.extend(color_warnings)
     if any(s.get("codec_type") == "subtitle" for s in info["streams"]):
         warnings.append("Untertitel werden in Version 0.1 nicht übernommen.")
@@ -303,7 +327,7 @@ def plan_job(tools: Toolchain, job: Job, output_root: Path, reserved: set[str],
 def command(tools: Toolchain, plan: Plan, temporary: Path) -> list[str]:
     options = plan.options
     args = [str(tools.ffmpeg), "-hide_banner", "-nostdin", "-n", "-loglevel", "warning",
-            "-progress", "pipe:1", "-stats_period", "0.3", "-filter_complex_threads", "1",
+            "-progress", "pipe:1", "-stats_period", "0.3",
             "-protocol_whitelist", "file,pipe", "-noautorotate", "-i", str(plan.source),
             "-filter_complex", plan.graph, "-map", "[v]", "-map", "0:a?", "-sn", "-dn",
             "-map_metadata", "-1", "-c:v", "libx264" if options.codec == "h264" else "libx265",
@@ -318,8 +342,6 @@ def command(tools: Toolchain, plan: Plan, temporary: Path) -> list[str]:
     args += ["-metadata:s:v:0", "stereo_mode=" + layout]
     if options.codec == "h264" and options.target in {"half_sbs", "half_ou"}:
         args += ["-x264-params", "frame-packing=" + ("3" if options.target == "half_sbs" else "4")]
-    if options.codec == "h265":
-        args += ["-x265-params", "pools=2:frame-threads=2"]
     if options.container == "mp4":
         args += ["-movflags", "+faststart"]
     for name in ("creation_time", "title", "artist", "copyright"):
@@ -397,6 +419,7 @@ def execute(tools: Toolchain, plan: Plan, cancel: threading.Event, emit, log_pat
                     tail.append(line.strip())
                     log.write(line)
             def read_progress():
+                fps = None
                 for line in process.stdout:
                     key, _, value = line.strip().partition("=")
                     if key == "out_time_us":
@@ -407,7 +430,9 @@ def execute(tools: Toolchain, plan: Plan, cancel: threading.Event, emit, log_pat
                         except ValueError:
                             pass
                     elif key == "speed":
-                        emit("speed", value)
+                        emit("speed", {"speed": value, "fps": fps})
+                    elif key == "fps":
+                        fps = value
             readers = [threading.Thread(target=f, daemon=True) for f in (read_errors, read_progress)]
             for reader in readers:
                 reader.start()
@@ -444,7 +469,7 @@ def preview(tools: Toolchain, plan: Plan, cancel: threading.Event, seconds: floa
         raise ValueError("Zeitstelle liegt außerhalb des Videos.")
     graph = plan.graph + ";[v]scale=640:360:force_original_aspect_ratio=decrease:flags=lanczos,format=rgb24[preview]"
     return capture([str(tools.ffmpeg), "-hide_banner", "-loglevel", "error", "-nostdin",
-                    "-filter_complex_threads", "1", "-protocol_whitelist", "file,pipe", "-noautorotate",
+                    "-protocol_whitelist", "file,pipe", "-noautorotate",
                     "-ss", str(seconds), "-i", str(plan.source), "-filter_complex", graph,
                     "-map", "[preview]", "-frames:v", "1", "-c:v", "png", "-threads", "1",
                     "-f", "image2pipe", "pipe:1"], cancel, timeout=60)
