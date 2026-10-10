@@ -1,9 +1,9 @@
 {
-  "build": "9.0.2-full_build-shared",
-  "url": "https://github.com/GyanD/codexffmpeg/releases/download/9.0.2/ffmpeg-9.0.2-full_build-shared.zip",
-  "sha256": "8d31e162f1616e37aab3fa2db991b97e1b8dbeb1c8465fd81a81be16ff91b328",
-  "size": 99899672,
-  "upstream_source_commit": "946fcce07b",
+  "build": "7.1.1-full_build-shared",
+  "url": "https://github.com/GyanD/codexffmpeg/releases/download/7.1.1/ffmpeg-7.1.1-full_build-shared.zip",
+  "sha256": "9f28727e8b472a04c1d2e520aaa425dca82721b995139b35710091130ea6e699",
+  "size": 71806900,
+  "upstream_source_commit": "db69d06eeeab4f46da15030a80d539efb4503ca8",
   "upstream_build_information": "https://www.gyan.dev/ffmpeg/builds/",
   "license_note": "This full GPL-enabled FFmpeg build is a separate executable toolchain. Preserve upstream LICENSE, docs and source/build references."
 }

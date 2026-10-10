@@ -189,6 +189,16 @@ class CoreTests(unittest.TestCase):
             with self.subTest(flags=flags), patch('transcora.core.toolchain.subprocess.run', side_effect=run):
                 self.assertTrue(Toolchain(Path('ffmpeg'), Path('ffprobe')).inspect()['h265'])
 
+    def test_setts_help_detects_prescale_and_caches_the_probe(self):
+        for text, expected in [('  -time_base <rational> output clock', ''),
+                               ('  -prescale <boolean> ...VAS..B.. convert before evaluation', ':prescale=1')]:
+            with self.subTest(help=text), patch('transcora.core.toolchain.subprocess.run',
+                                               return_value=SimpleNamespace(stdout=text, stderr='')) as run:
+                tools = Toolchain(Path('ffmpeg'), Path('ffprobe'))
+                self.assertEqual(tools.setts_prescale, expected)
+                self.assertEqual(tools.setts_prescale, expected)
+                run.assert_called_once()
+
     def test_publication_never_overwrites_and_fat_fallback_cleans(self):
         with tempfile.TemporaryDirectory() as tmp:
             a, b = Path(tmp)/'part.mkv', Path(tmp)/'final.mkv'

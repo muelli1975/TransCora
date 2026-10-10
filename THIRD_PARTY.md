@@ -5,7 +5,7 @@ licensed components. The MIT license does not replace their terms.
 
 ## FFmpeg
 
-FFmpeg 9.0.2 full shared Windows build from Gyan.dev, pinned with SHA256 in
+FFmpeg 7.1.1 full shared Windows build from Gyan.dev, pinned with SHA256 in
 `scripts/ffmpeg-windows.json`. FFmpeg and ffprobe remain external programs under
 `tools/ffmpeg/bin`; the application starts them as separate processes.
 The GPL-enabled build includes libx264, libx265, zimg and other upstream libraries.
@@ -13,8 +13,8 @@ Keep the supplied `tools/ffmpeg/LICENSE`, documentation and build manifest toget
 with the binaries. Upstream component notices and configurations are in that folder.
 
 - Build and configuration information: https://www.gyan.dev/ffmpeg/builds/
-- Exact binary release: https://github.com/GyanD/codexffmpeg/releases/tag/9.0.2
-- FFmpeg source revision: https://github.com/FFmpeg/FFmpeg/tree/946fcce07b
+- Exact binary release: https://github.com/GyanD/codexffmpeg/releases/tag/7.1.1
+- FFmpeg source revision: https://github.com/FFmpeg/FFmpeg/tree/db69d06eeeab4f46da15030a80d539efb4503ca8
 - FFmpeg licensing: https://ffmpeg.org/legal.html
 - FFmpeg source: https://ffmpeg.org/download.html
 - x264 source: https://code.videolan.org/videolan/x264

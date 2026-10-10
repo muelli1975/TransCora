@@ -24,6 +24,10 @@
 - Improved selected-row contrast and consistent Start/Testen/Abbrechen styles.
   Windows title bars follow the existing tool-family behaviour.
 - Portable archives exclude development references, tests and build sources.
+- The Windows toolchain is pinned to FFmpeg 7.1.1, with verified archive size and
+  SHA256. FFmpeg 9.0.2 failed the stereo round-trip tests because its decoder
+  attaches duplicate global Stereo3D data to H.264 frames. The pinned version
+  avoids that decoder failure without preprocessing source files.
 
 The 17 anaglyph methods, their high-precision calculations and the default
 H.264 / CRF 18 / slow quality settings are unchanged. Blu-ray 3D/MVC is planned

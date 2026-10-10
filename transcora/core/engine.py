@@ -409,7 +409,7 @@ def command(tools: Toolchain, plan: Plan, temporary: Path) -> list[str]:
     options = plan.options
     args = [str(tools.ffmpeg), "-hide_banner", "-nostdin", "-n", "-loglevel", "warning",
             "-progress", "pipe:1", "-stats_period", "0.3",
-            "-protocol_whitelist", "file,pipe", "-noautorotate", *tools.stereo_input_options, "-i", str(plan.source),
+            "-protocol_whitelist", "file,pipe", "-noautorotate", "-i", str(plan.source),
             "-filter_complex", plan.graph, "-map", "[v]", "-map", "0:a?", "-sn", "-dn",
             "-map_metadata", "-1", "-c:v", "libx264" if options.codec == "h264" else "libx265",
             "-preset", "slow", "-pix_fmt", plan.pixel_format,
@@ -590,7 +590,7 @@ def preview(tools: Toolchain, plan: Plan, cancel: threading.Event, seconds: floa
         raise ValueError("Zeitstelle liegt außerhalb des Videos.")
     graph = plan.graph + ";[v]scale=640:360:force_original_aspect_ratio=decrease:flags=lanczos,format=rgb24[preview]"
     return capture([str(tools.ffmpeg), "-hide_banner", "-loglevel", "error", "-nostdin",
-                    "-protocol_whitelist", "file,pipe", "-noautorotate", *tools.stereo_input_options,
+                    "-protocol_whitelist", "file,pipe", "-noautorotate",
                     "-ss", str(seconds), "-i", str(plan.source), "-filter_complex", graph,
                     "-map", "[preview]", "-frames:v", "1", "-c:v", "png", "-threads", "1",
                     "-f", "image2pipe", "pipe:1"], cancel, timeout=60)

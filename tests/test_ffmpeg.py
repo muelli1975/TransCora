@@ -251,7 +251,7 @@ class FFmpegTests(unittest.TestCase):
                 original_offset = float(before[0]['best_effort_timestamp_time'])-float(original_audio[0]['pts_time'])
                 copied_offset = float(after[0]['best_effort_timestamp_time'])-float(copied_audio[0]['pts_time'])
                 self.assertAlmostEqual(original_offset, copied_offset, delta=.0011)
-                raw = self.run_ffmpeg(*self.tools.stereo_input_options, '-i', str(plan.output), '-map', '0:v:0', '-vf', 'sidedata=mode=delete:type=STEREO3D',
+                raw = self.run_ffmpeg('-i', str(plan.output), '-map', '0:v:0', '-vf', 'sidedata=mode=delete:type=STEREO3D',
                                      '-fps_mode', 'passthrough', '-f', 'rawvideo', '-pix_fmt', 'yuv444p', 'pipe:1')
                 size = 128*64
                 luminance = [raw[i*size*3] for i in range(expected_count)]

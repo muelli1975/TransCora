@@ -22,22 +22,13 @@ class Toolchain:
     ffprobe: Path
 
     @cached_property
-    def stereo_input_options(self) -> list[str]:
-        result = subprocess.run([str(self.ffmpeg), "-version"], capture_output=True,
-                                encoding="utf-8", errors="replace", timeout=30, **process_options())
-        match = re.search(r"ffmpeg version (?:n)?(\d+)\.", result.stdout)
-        # FFmpeg 7+ can resolve overlapping container/bitstream Stereo3D data
-        # in the decoder, before global side data enters the filter graph.
-        return ["-side_data_prefer_packet", "stereo3d"] if match and int(match[1]) >= 7 else []
-
-    @cached_property
     def setts_prescale(self) -> str:
         result = subprocess.run([str(self.ffmpeg), "-hide_banner", "-h", "bsf=setts"],
                                 capture_output=True, encoding="utf-8", errors="replace",
                                 timeout=30, **process_options())
         # New setts versions rescale expression results unless prescale is set.
         # Our expressions already produce ticks in the requested output time base.
-        return ":prescale=1" if re.search(r"^\s*prescale\s", result.stdout + result.stderr, re.M) else ""
+        return ":prescale=1" if re.search(r"^\s*-?prescale\s", result.stdout + result.stderr, re.M) else ""
 
     @classmethod
     def find(cls) -> "Toolchain":
