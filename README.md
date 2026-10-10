@@ -6,7 +6,7 @@ Blu-ray-3D/MVC folgen später. Kein Account, Tracking oder Netzwerkzugriff im Pr
 
 ## Windows starten
 
-Der [GitHub-Build](https://github.com/muelli1975/TranscCora/actions/workflows/build.yml)
+Der [GitHub-Build](https://github.com/muelli1975/TransCora/actions/workflows/build.yml)
 testet die Anwendung und erstellt das Artefakt **TransCora-Windows** mit
 `TransCora.zip` und SHA256-Prüfsumme. Actions-Downloads verlangen eine GitHub-Anmeldung;
 das Programm selbst benötigt keine Anmeldung.
