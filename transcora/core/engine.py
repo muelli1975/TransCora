@@ -409,7 +409,7 @@ def command(tools: Toolchain, plan: Plan, temporary: Path) -> list[str]:
     options = plan.options
     args = [str(tools.ffmpeg), "-hide_banner", "-nostdin", "-n", "-loglevel", "warning",
             "-progress", "pipe:1", "-stats_period", "0.3",
-            "-protocol_whitelist", "file,pipe", "-noautorotate", "-i", str(plan.source),
+            "-protocol_whitelist", "file,pipe", "-noautorotate", *tools.stereo_input_options, "-i", str(plan.source),
             "-filter_complex", plan.graph, "-map", "[v]", "-map", "0:a?", "-sn", "-dn",
             "-map_metadata", "-1", "-c:v", "libx264" if options.codec == "h264" else "libx265",
             "-preset", "slow", "-pix_fmt", plan.pixel_format,
@@ -462,7 +462,8 @@ def verify(tools: Toolchain, plan: Plan, path: Path, cancel: threading.Event) ->
             raise ValueError("Die H.264-Frame-Packing-Kennzeichnung fehlt oder ist falsch.")
     if plan.options.target == "framerate":
         if Fraction(video.get("r_frame_rate", "0/1")) != frame_rate(plan.options.target_fps):
-            raise ValueError("Die Zielbildrate wurde nicht korrekt gespeichert.")
+            raise ValueError("Die Zielbildrate wurde nicht korrekt gespeichert: " + json.dumps({k: video.get(k) for k in (
+                'r_frame_rate', 'avg_frame_rate', 'time_base', 'start_time', 'duration', 'nb_frames')}))
         if plan.options.container == "mp4" and Fraction(video.get("avg_frame_rate", "0/1")) != frame_rate(plan.options.target_fps):
             raise ValueError("Die MP4-Bildzeiten entsprechen nicht der exakten Zielbildrate.")
         if video.get("sample_aspect_ratio", "1:1") != plan.info['video'].get("sample_aspect_ratio", "1:1"):
@@ -560,7 +561,8 @@ def execute(tools: Toolchain, plan: Plan, cancel: threading.Event, emit, log_pat
                     ticks = math.lcm(rate.numerator, Fraction(plan.info['video'].get('time_base', '1/1000')).denominator)
                     offset = plan.info['video']['_start_offset']
                     expression = lambda field: f"round(({field}*TB-{offset})*{rate.numerator}/{rate.denominator})*{ticks}*{rate.denominator}/{rate.numerator}+{offset}*{ticks}"
-                    remux += ["-bsf:v", f"setts=time_base=1/{ticks}:pts={expression('PTS')}:dts={expression('DTS')}:duration={ticks}*{rate.denominator}/{rate.numerator}"]
+                    remux += ["-bsf:v", f"setts=time_base=1/{ticks}:pts={expression('PTS')}:dts={expression('DTS')}:duration={ticks}*{rate.denominator}/{rate.numerator}" + tools.setts_prescale]
+                log.write("REMUX " + json.dumps(remux, ensure_ascii=False) + "\n")
                 capture(remux + [str(temporary)], cancel, timeout=3600)
                 packed_stereo_boxes(temporary, normalize=True)
             emit("phase", "Ausgabe prüfen")
@@ -588,7 +590,7 @@ def preview(tools: Toolchain, plan: Plan, cancel: threading.Event, seconds: floa
         raise ValueError("Zeitstelle liegt außerhalb des Videos.")
     graph = plan.graph + ";[v]scale=640:360:force_original_aspect_ratio=decrease:flags=lanczos,format=rgb24[preview]"
     return capture([str(tools.ffmpeg), "-hide_banner", "-loglevel", "error", "-nostdin",
-                    "-protocol_whitelist", "file,pipe", "-noautorotate",
+                    "-protocol_whitelist", "file,pipe", "-noautorotate", *tools.stereo_input_options,
                     "-ss", str(seconds), "-i", str(plan.source), "-filter_complex", graph,
                     "-map", "[preview]", "-frames:v", "1", "-c:v", "png", "-threads", "1",
                     "-f", "image2pipe", "pipe:1"], cancel, timeout=60)
