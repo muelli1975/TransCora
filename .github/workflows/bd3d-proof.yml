@@ -7,7 +7,8 @@ on:
       - 'scripts/bd3d*'
       - 'scripts/fetch_bd3d_tools.py'
       - '.github/workflows/bd3d-proof.yml'
-      - 'transcora/core/bd3d.py'
+      - 'transcora/core/bd3d*.py'
+      - 'transcora/core/udf.py'
       - 'transcora/core/mvc.py'
   workflow_dispatch:
 

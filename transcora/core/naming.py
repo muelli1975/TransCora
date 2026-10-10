@@ -55,7 +55,7 @@ def suffix_choices(options: Options, method_suffix: str, layout: str | None = No
     choices = {"half_sbs": ["_half_sbs", "-lrh", "-lrq", ".3D.HSBS", ".3D.HSBS-lrh"],
                "half_ou": ["_half_ou", "-tbh", "-abq", ".3D.HTAB", ".3D.HTAB-tbh"],
                "full_sbs": ["_full_sbs", "-lr"], "full_ou": ["_full_ou", "-tb", "-ab"],
-               "mono": ["_mono_l", "-2d"], "anaglyph": ["_" + method_suffix]}.get(target, [])
+               "mono": ["_mono_l", "-2d"], "bd3d": ["Keiner"], "anaglyph": ["_" + method_suffix]}.get(target, [])
     if options.target == "framerate":
         if swap:
             choices = {"half_sbs": ["-rlh", "-rlq"], "full_sbs": ["-rl"],
@@ -78,6 +78,8 @@ def effective_suffix(options: Options, method_suffix: str, source: Path | None =
                   ("full_sbs", True): "-rl", ("half_sbs", True): "-rlh",
                   ("full_ou", True): "-bt", ("half_ou", True): "-bth"}.get((layout, swap), "")
         return fps_suffix(options.target_fps) + marker
+    if options.target == "bd3d":
+        return ""
     if options.target == "anaglyph":
         return "_" + method_suffix
     if options.naming == "original":
@@ -88,7 +90,8 @@ def effective_suffix(options: Options, method_suffix: str, source: Path | None =
 
 
 def output_parts(source: Path, options: Options, method_suffix: str) -> tuple[str, str]:
-    return clean_stem(source.stem), effective_suffix(options, method_suffix, source)
+    title = options.disc_title if options.target == "bd3d" else None
+    return clean_stem(title or source.stem), effective_suffix(options, method_suffix, source)
 
 
 def reserve_output(source: Path, folder: Path, options: Options, method_suffix: str,

@@ -43,3 +43,19 @@ The method catalog comes from Christoph Müller's AnaglyphBatch repository and
 retains its attribution. The pinned Batch reference is kept in the source repository
 for development checks, not in the portable application. TransCora uses the supplied
 original icon and the existing tool-family completion sound without alteration.
+
+## FRIM and legacy tsMuxeR
+
+The portable BD-3D path starts external FRIM 1.31 x64 and tsMuxeR 2.6.12 processes.
+Archives are size/SHA256 pinned in `scripts/bd3d-tools.json` and recorded under `tools/`.
+FRIM's original manuals and release notes are retained under `tools/frim/doc`.
+The author describes FRIM as free software built on the freely distributable Intel Media SDK.
+The software SDK DLL is retained with the encoder and decoder; no HEVC plugins are shipped.
+
+- FRIM author/download/documentation: https://sites.google.com/site/videofan3d/software/frim-encoder
+- Intel Media SDK project: https://github.com/Intel-Media-SDK/MediaSDK
+- Legacy tsMuxeR download record: https://www.digital-digest.com/software/tsMuxeR.html
+- Maintained tsMuxeR project: https://github.com/justdan96/tsMuxer
+
+The legacy tsMuxeR binary is the exact tested 2.6.12 release, not a newly compiled fork.
+Its original release notes are included. Keep third-party notices with the portable tools.

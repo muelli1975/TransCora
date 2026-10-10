@@ -14,7 +14,7 @@ import threading
 import time
 import uuid
 
-from .model import Job, Options, app_root, frame_rate, LAYOUTS
+from .model import Job, Options, app_root, frame_rate, LAYOUTS, COMPATIBILITY_NOTE
 from .naming import filename_layout, reserve_output
 from .toolchain import Toolchain, process_options
 from .mp4 import packed_stereo_boxes
@@ -168,6 +168,8 @@ class Plan:
 
     @property
     def stereo_summary(self) -> str:
+        if self.options.target == "bd3d":
+            return "3D-Kennzeichnung: AVC-Basis + MVC-Zweitansicht · Linkes Auge zuerst"
         if not self.stereo:
             return "3D-Kennzeichnung: Keine SBS/OU-Kennzeichnung"
         axis, inverted = self.stereo
@@ -188,9 +190,12 @@ class Plan:
         if self.options.target == "framerate":
             target = frame_rate(self.options.target_fps)
             timing = f" → {float(target):.3f} fps ({target}) · Laufzeit unverändert"
+        if self.options.target == "bd3d":
+            timing = " → 23,976 fps (24000/1001) · Alle Bilder bleiben erhalten"
+        codec = "AVC/MVC" if self.options.target == "bd3d" else self.options.codec.upper()
         return (f"{video['width']} × {video['height']} · {video.get('codec_name', '?')} · "
                 f"{fps} fps ({rate}){timing} → {self.size[0]} × {self.size[1]} · "
-                f"{self.options.codec.upper()} / {self.pixel_format}\n{self.layout_reason}\n"
+                f"{codec} / {self.pixel_format}\n{self.layout_reason}\n"
                 f"{self.stereo_summary}\n{self.output}")
 
 
@@ -374,14 +379,24 @@ def plan_job(tools: Toolchain, job: Job, output_root: Path, reserved: set[str],
         if unsupported:
             raise ValueError("Audio passt nicht zum MP4-Kopierprofil (" + ", ".join(sorted(unsupported)) + "). MKV wählen.")
     if options.target == "anaglyph":
-        warnings.append("4:2:0: Geringere Farbauflösung kann Anaglyphenqualität beeinträchtigen."
+        warnings.append(COMPATIBILITY_NOTE
                         if options.profile == "compatible" else "4:4:4 wird nicht von allen Playern/Hardwaredecodern unterstützt.")
-    graph, size, pixel_format = build_graph(video, options, layout, swap, colors, catalog[options.method])
+    if options.target == 'bd3d':
+        from .bd3d import prepare
+        from .bd3d_export import BdTools, validate_audio
+        BdTools.find()
+        preparation = prepare(video, layout, swap)
+        validate_audio(audios)
+        warnings.extend(preparation.warnings)
+        warnings.append('BD-3D: Bildzeiten und beide Augenbilder werden beim Export vollständig geprüft. Ton wird verlustfrei als LPCM gespeichert.')
+        graph, size, pixel_format = preparation.graph, (1920, 1080), 'yuv420p'
+    else:
+        graph, size, pixel_format = build_graph(video, options, layout, swap, colors, catalog[options.method])
     output_colors = dict(colors) if options.target == "framerate" else {
         "matrix": "bt709", "primaries": "bt709", "transfer": "bt709", "range": "tv"}
     if output_colors["matrix"] == "gbr":
         output_colors["matrix"] = "bt709"
-    if capabilities:
+    if capabilities and options.target != "bd3d":
         if options.codec == "h265" and not capabilities.get("h265"):
             raise ValueError("Dieser FFmpeg-Build enthält keinen H.265-Encoder.")
         if pixel_format not in capabilities.get(options.codec + "_formats", ""):
@@ -499,6 +514,9 @@ def publish_without_overwrite(temporary: Path, destination: Path, cancel: thread
 
 
 def execute(tools: Toolchain, plan: Plan, cancel: threading.Event, emit, log_path: Path) -> None:
+    if plan.options.target == 'bd3d':
+        from .bd3d_export import export
+        return export(tools, plan, cancel, emit, log_path)
     plan.output.parent.mkdir(parents=True, exist_ok=True)
     temporary = plan.output.with_name("." + plan.output.stem + "." + uuid.uuid4().hex + ".part." + plan.options.container)
     # MKV exposes StereoMode as stream side data. A lossless remux transfers it
@@ -593,7 +611,7 @@ def execute(tools: Toolchain, plan: Plan, cancel: threading.Event, emit, log_pat
 def preview(tools: Toolchain, plan: Plan, cancel: threading.Event, seconds: float = 0) -> bytes:
     if not math.isfinite(seconds) or seconds < 0 or (plan.duration and seconds >= plan.duration):
         raise ValueError("Zeitstelle liegt außerhalb des Videos.")
-    graph = plan.graph + ";[v]scale=640:360:force_original_aspect_ratio=decrease:flags=lanczos,format=rgb24[preview]"
+    graph = plan.graph + (";[right]nullsink;[left]null[v]" if plan.options.target == "bd3d" else "") + ";[v]scale=640:360:force_original_aspect_ratio=decrease:flags=lanczos,format=rgb24[preview]"
     return capture([str(tools.ffmpeg), "-hide_banner", "-loglevel", "error", "-nostdin",
                     "-protocol_whitelist", "file,pipe", "-noautorotate",
                     "-ss", str(seconds), "-i", str(plan.source), "-filter_complex", graph,

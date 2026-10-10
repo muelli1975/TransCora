@@ -1,4 +1,4 @@
-"""Still-frame controls with a timeline and an exact seconds field."""
+"""Still-frame controls with one editable clock and a timeline."""
 from fractions import Fraction
 import math
 import tkinter as tk
@@ -19,9 +19,11 @@ class PreviewWindow:
         frame = ttk.Frame(self.dialog, padding=12)
         frame.pack(fill="both", expand=True)
         frame.columnconfigure(0, weight=1)
-        self.time_var = tk.StringVar(value="0")
-        ttk.Label(frame, text="Zeitstelle (Sekunden)").grid(row=0, column=0, sticky="w")
-        self.time_entry = ttk.Entry(frame, textvariable=self.time_var, width=12)
+        self.time_var = tk.StringVar(value="00:00")
+        self.position_seconds = 0.0
+        self.displayed_time = "00:00"
+        ttk.Label(frame, text="Zeitstelle (mm:ss / hh:mm:ss)").grid(row=0, column=0, sticky="w")
+        self.time_entry = ttk.Entry(frame, textvariable=self.time_var, width=16)
         self.time_entry.grid(row=0, column=1, padx=8)
         self.time_entry.bind("<Return>", lambda event: self.request())
         self.scale = Timeline(frame, from_=0, to=1, command=self.position_changed, state="disabled")
@@ -29,7 +31,7 @@ class PreviewWindow:
         self.scale.bind("<ButtonRelease-1>", self.slider_released)
         self.scale.bind("<KeyRelease>", self.slider_released)
         self.position_label = ttk.Label(frame, text="Videodauer wird ermittelt …")
-        self.position_label.grid(row=2, column=0, columnspan=3, sticky="w", pady=(2, 8))
+        self.position_label.grid(row=0, column=2, sticky="w")
         self.image_label = ttk.Label(frame, text="Kontrollbild wird berechnet …", background="#000000")
         self.image_label.grid(row=3, column=0, columnspan=3, pady=10)
         self.note = ttk.Label(frame, text="Gleiche Filterkette wie im Export · 8-Bit-Anzeige, ohne Videokompression",
@@ -42,18 +44,35 @@ class PreviewWindow:
 
     @staticmethod
     def time_text(seconds):
-        hours, rest = divmod(seconds, 3600)
-        minutes, seconds = divmod(rest, 60)
-        return f"{int(hours):02d}:{int(minutes):02d}:{seconds:06.3f}"
+        # One clock display; fractions retain the slider's precise position.
+        whole = int(seconds)
+        hours, rest = divmod(whole, 3600)
+        minutes, secs = divmod(rest, 60)
+        clock = f"{minutes:02d}:{secs:02d}"
+        return f"{hours:02d}:" + clock if hours else clock
+
+    @staticmethod
+    def parse_time(value):
+        parts = value.replace(",", ".").split(":")
+        if len(parts) not in (2, 3) or any(not p for p in parts):
+            raise ValueError
+        if any(not p.isdigit() for p in parts[:-1]):
+            raise ValueError
+        seconds = float(parts[-1])
+        if not math.isfinite(seconds) or not 0 <= seconds < 60:
+            raise ValueError
+        if len(parts) == 3 and int(parts[1]) >= 60:
+            raise ValueError
+        return seconds + int(parts[-2])*60 + (int(parts[0])*3600 if len(parts) == 3 else 0)
 
     def update_position_label(self, seconds):
-        total = self.time_text(self.duration) if self.duration else "Dauer unbekannt"
-        self.position_label.configure(text=f"{self.time_text(seconds)} / {total}")
+        self.position_label.configure(text="/ " + (self.time_text(self.duration) if self.duration else "Dauer unbekannt"))
 
     def position_changed(self, value):
-        seconds = float(value)
-        self.time_var.set(f"{seconds:.3f}")
-        self.update_position_label(seconds)
+        self.position_seconds = float(value)
+        self.displayed_time = self.time_text(self.position_seconds)
+        self.time_var.set(self.displayed_time)
+        self.update_position_label(self.position_seconds)
 
     def slider_released(self, event):
         if event.type == tk.EventType.KeyRelease and event.keysym not in {
@@ -65,7 +84,7 @@ class PreviewWindow:
     def request(self):
         entered = self.time_var.get()
         try:
-            seconds = float(entered.replace(",", "."))
+            seconds = self.position_seconds if entered == self.displayed_time else self.parse_time(entered)
             if not math.isfinite(seconds) or seconds < 0 or (self.duration and seconds >= self.duration):
                 raise ValueError
         except ValueError:
@@ -75,6 +94,8 @@ class PreviewWindow:
         self.scale.set(min(seconds, float(self.scale.cget("to"))))
         # Preserve exact entry values, including values beyond the slider's last frame.
         self.time_var.set(entered)
+        self.displayed_time = entered
+        self.position_seconds = seconds
         self.update_position_label(seconds)
         self.load_frame(seconds)
 
@@ -89,7 +110,9 @@ class PreviewWindow:
         # Seeking to the container's end would return no frame.
         self.scale.configure(to=max(0, self.duration - frame_time))
         entered = self.time_var.get()
-        seconds = float(entered.replace(",", "."))
+        seconds = self.position_seconds if entered == self.displayed_time else self.parse_time(entered)
         self.scale.set(min(seconds, float(self.scale.cget("to"))))
         self.time_var.set(entered)
+        self.displayed_time = entered
+        self.position_seconds = seconds
         self.update_position_label(seconds)

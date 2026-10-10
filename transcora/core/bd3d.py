@@ -1,4 +1,4 @@
-"""Experimental 1080p MVC preparation. Kept separate from released GUI targets."""
+"""Fixed, tested 1080p23.976 MVC preparation."""
 from dataclasses import dataclass
 from fractions import Fraction
 from pathlib import Path
@@ -22,7 +22,7 @@ def prepare(video: dict, layout: str, swap: bool = False) -> Preparation:
     if layout not in {'full_sbs', 'half_sbs', 'full_ou', 'half_ou'}:
         raise ValueError('BD-3D: Eindeutige SBS/OU-Quelle erforderlich.')
     if video.get('field_order') not in (None, 'unknown', 'progressive'):
-        raise ValueError('BD-3D: Interlaced-Quellen sind im Probelauf noch nicht freigegeben.')
+        raise ValueError('BD-3D: Interlaced-Quellen sind noch nicht freigegeben.')
     try:
         rate = Fraction(video['r_frame_rate'])
         average = Fraction(video['avg_frame_rate'])
@@ -32,7 +32,7 @@ def prepare(video: dict, layout: str, swap: bool = False) -> Preparation:
     if abs(rate - BD_RATE) <= BD_RATE / 1_000_000:
         rate = BD_RATE
     if rate not in {BD_RATE, Fraction(24)} or abs(average-rate) > rate/1000:
-        raise ValueError('BD-3D: Der erste Probelauf unterstützt konstante 23,976 oder 24 fps.')
+        raise ValueError('BD-3D: Diese Version unterstützt konstante 23,976 oder 24 fps.')
     colors, warnings = color_spec(video)
     w, h = video['width'], video['height']
     horizontal = layout.endswith('sbs')
@@ -98,13 +98,23 @@ def encoder_args(executable: Path, left: Path, right: Path, base: Path, dependen
                          '-VuiNalHrd', 'on', '-PicTimingSEI', 'off', '-EndOfSequence', 'off']))
 
 
-def mux_meta(base: Path, dependent: Path, audio: Path | None) -> str:
-    paths = [base, dependent] + ([audio] if audio else [])
+def mux_meta(base: Path, dependent: Path, audio: Path | None, *, disc=True, label=None, audios=None) -> str:
+    tracks = audios if audios is not None else ([(audio, 'und')] if audio else [])
+    paths = [base, dependent] + [p for p, _ in tracks]
     if any(any(c in str(p) for c in ('"', '\n', '\r')) for p in paths):
         raise ValueError('BD-3D: Ungültiger Pfad für die Multiplexer-Datei.')
-    result = 'MUXOPT --no-pcr-on-video-pid --new-audio-pes --blu-ray --vbr --vbv-len=500\n'
+    result = 'MUXOPT --no-pcr-on-video-pid --new-audio-pes --vbr --vbv-len=500'
+    if disc:
+        result += ' --blu-ray'
+        if label:
+            if any(c in label for c in ('\"', '\n', '\r')):
+                raise ValueError('BD-3D: Ungültiger Disc-Titel.')
+            result += ' --label=\"' + label + '\"'
+    result += '\n'
     result += f'V_MPEG4/ISO/AVC, "{base}", fps=23.976, insertSEI, contSPS\n'
     result += f'V_MPEG4/ISO/MVC, "{dependent}", fps=23.976, insertSEI, contSPS\n'
-    if audio:
-        result += f'A_LPCM, "{audio}", lang=deu\n'
+    for path, language in tracks:
+        if len(language) != 3 or not language.isascii() or not language.isalpha():
+            language = 'und'
+        result += f'A_LPCM, "{path}", lang={language.lower()}\n'
     return result

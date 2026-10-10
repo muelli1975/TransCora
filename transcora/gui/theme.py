@@ -38,6 +38,9 @@ def apply_theme(root):
               foreground=[("disabled", DISABLED)], bordercolor=[("disabled", BORDER), ("active", DANGER_HOVER)],
               darkcolor=[("disabled", BORDER), ("active", DANGER_HOVER)],
               lightcolor=[("disabled", BORDER), ("active", DANGER_HOVER)])
+    style.configure("TMenubutton", background=SECONDARY_BG, foreground=TEXT,
+                    bordercolor=BORDER, padding=(9, 5), arrowcolor=GOLD_LIGHT)
+    style.map("TMenubutton", background=[("active", HOVER_BG)], foreground=[("disabled", DISABLED)])
     style.configure("TCheckbutton", background=APP_BG, foreground=TEXT,
                     indicatorbackground=SECONDARY_BG, indicatorforeground=TEXT)
     style.map("TCheckbutton", background=[("disabled", APP_BG), ("active", APP_BG)],

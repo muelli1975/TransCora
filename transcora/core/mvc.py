@@ -5,6 +5,8 @@ SPS and subset SPS share seq_parameter_set_data (ITU-T H.264 7.3.2.1,
 This adapter is deliberately restricted to FRIM's generated High/Stereo High.
 """
 import re
+import os
+import uuid
 from pathlib import Path
 
 
@@ -114,21 +116,52 @@ def tag_sps(nal: bytes) -> bytes:
     return nal[:1]+escape(rbsp)
 
 
-def tag_generated_stream(path: Path) -> int:
-    data = path.read_bytes()
-    starts = list(re.finditer(b'\x00\x00\x00?\x01', data))
-    if not starts or starts[0].start() != 0:
-        raise ValueError('Expected generated Annex-B stream')
-    out = bytearray()
+def annex_nals(source, check=None, chunk_size=1024*1024):
+    """Keep at most one generated NAL plus a chunk in memory, never a whole film."""
+    buffer = b''
+    prefix = re.compile(b'\x00\x00\x00?\x01')
+    first = True
+    while True:
+        if check:
+            check()
+        chunk = source.read(chunk_size)
+        buffer += chunk
+        starts = list(prefix.finditer(buffer))
+        if first and starts:
+            if starts[0].start() != 0:
+                raise ValueError('Expected generated Annex-B stream')
+            first = False
+        for a, b in zip(starts, starts[1:]):
+            yield a.group(), buffer[a.end():b.start()]
+        if len(starts) > 1:
+            buffer = buffer[starts[-1].start():]
+        if len(buffer) > 64*1024*1024:
+            raise ValueError('Unexpected oversized generated NAL')
+        if not chunk:
+            if first:
+                raise ValueError('Expected generated Annex-B stream')
+            match = prefix.match(buffer)
+            if not match:
+                raise ValueError('Invalid generated Annex-B stream')
+            yield match.group(), buffer[match.end():]
+            break
+
+
+def tag_generated_stream(path: Path, check=None) -> int:
+    temporary = path.with_name('.'+path.name+'.'+uuid.uuid4().hex+'.tagged')
     count = 0
-    for i, match in enumerate(starts):
-        end = starts[i+1].start() if i+1 < len(starts) else len(data)
-        nal = data[match.end():end]
-        if nal and nal[0]&31 in (7, 15):
-            count += 1
-        out.extend(match.group())
-        out.extend(tag_sps(nal))
-    if not count:
-        raise ValueError('Generated stream contains no parameter set')
-    path.write_bytes(out)
-    return count
+    try:
+        with path.open('rb') as source, temporary.open('xb') as out:
+            for prefix, nal in annex_nals(source, check):
+                if nal and nal[0]&31 in (7, 15):
+                    count += 1
+                out.write(prefix)
+                out.write(tag_sps(nal))
+        if not count:
+            raise ValueError('Generated stream contains no parameter set')
+        if check:
+            check()
+        os.replace(temporary, path)
+        return count
+    finally:
+        temporary.unlink(missing_ok=True)

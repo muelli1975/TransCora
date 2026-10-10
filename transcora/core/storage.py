@@ -64,3 +64,40 @@ def delete_run_logs(output: Path) -> int:
     for path in paths:
         path.unlink()
     return len(paths)
+
+
+def preset_options(options: Options) -> dict:
+    """Conversion choices only; a film title never follows a preset."""
+    data = asdict(options)
+    data.pop('disc_title', None)
+    return data
+
+
+def load_presets(path: Path) -> dict[str, Options]:
+    if not path.exists():
+        return {}
+    if path.stat().st_size > 1_000_000:
+        raise ValueError('Voreinstellungsdatei ist zu groß.')
+    data = json.loads(path.read_text(encoding='utf-8'))
+    if not isinstance(data, dict) or data.get('schema_version') != 1:
+        raise ValueError('Unbekanntes Voreinstellungsformat.')
+    entries = data.get('presets')
+    if not isinstance(entries, dict) or len(entries) > 1000:
+        raise ValueError('Ungültige Voreinstellungen.')
+    result = {}
+    for name, options in entries.items():
+        validate_preset_name(name)
+        result[name] = Options.from_dict(options)
+        result[name].disc_title = None
+    return result
+
+
+def validate_preset_name(name: str) -> str:
+    if not isinstance(name, str) or not name.strip() or len(name) > 80 or any(ord(c) < 32 for c in name):
+        raise ValueError('Name der Voreinstellung: 1 bis 80 Zeichen, ohne Steuerzeichen.')
+    return name.strip()
+
+
+def save_presets(path: Path, presets: dict[str, Options]) -> None:
+    write_json(path, {'schema_version': 1, 'presets': {
+        validate_preset_name(name): preset_options(options) for name, options in presets.items()}})

@@ -54,6 +54,28 @@ class BdPreparationTests(unittest.TestCase):
 
 
 class MvcMetadataTests(unittest.TestCase):
+    def test_stream_rewrite_is_bounded_idempotent_and_preserves_slices(self):
+        from transcora.core.mvc import annex_nals, tag_generated_stream, tag_sps
+        import io
+        sps = bytes.fromhex('27640029ac2d140780227e5c05a8101012000007d200017701c0c0000a67540001db575ef7c140')
+        prefix = b'\x00\x00\x00\x01'
+        nal = b'\x65' + b'abcdefgh'*200
+        original = prefix+sps+prefix+nal+b'\x00\x00\x01'+sps
+        for chunk_size in (1, 2, 3, 7, 101):
+            self.assertEqual(b''.join(p+n for p, n in annex_nals(io.BytesIO(original), chunk_size=chunk_size)), original)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp)/'video.avc'
+            path.write_bytes(original)
+            self.assertEqual(tag_generated_stream(path), 2)
+            expected = prefix+tag_sps(sps)+prefix+nal+b'\x00\x00\x01'+tag_sps(sps)
+            self.assertEqual(path.read_bytes(), expected)
+            tag_generated_stream(path)
+            self.assertEqual(path.read_bytes(), expected)
+            path.write_bytes(prefix+nal)
+            with self.assertRaises(ValueError):
+                tag_generated_stream(path)
+            self.assertEqual(path.read_bytes(), prefix+nal)
+
     def test_generated_sps_and_subset_sps_keep_every_other_bit(self):
         from transcora.core.mvc import tag_sps, signal_bounds
         # Actual parameter sets from the SHA-pinned FRIM 1.31 software proof.

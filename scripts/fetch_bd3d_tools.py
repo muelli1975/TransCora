@@ -1,4 +1,4 @@
-"""Build-time downloader for the isolated Windows MVC proof; never used by the GUI."""
+"""Build-time downloader for pinned portable MVC tools; no runtime network use."""
 from pathlib import Path
 import hashlib
 import html
@@ -43,6 +43,16 @@ def main():
                 z.extractall(folder)
         print('Verified:', key, item['version'], item['sha256'], flush=True)
     shutil.copy2(ROOT/'scripts/bd3d-tools.json', DEST/'BUILD_MANIFEST.json')
+    frim = ROOT/'tools/frim'
+    muxer = ROOT/'tools/tsmuxer'
+    frim.mkdir(parents=True, exist_ok=True)
+    muxer.mkdir(parents=True, exist_ok=True)
+    for name in ('FRIMEncode64.exe', 'FRIMDecode64.exe', 'libmfxsw64.dll'):
+        shutil.copy2(DEST/'frim/x64'/name, frim/name)
+    shutil.copytree(DEST/'frim/doc', frim/'doc', dirs_exist_ok=True)
+    shutil.copy2(DEST/'tsmuxer/tsMuxeR.exe', muxer/'tsMuxeR.exe')
+    shutil.copy2(DEST/'tsmuxer/release_notes.txt', muxer/'release_notes.txt')
+    shutil.copy2(DEST/'BUILD_MANIFEST.json', ROOT/'tools/BD3D_BUILD_MANIFEST.json')
 
 
 if __name__ == '__main__':

@@ -12,11 +12,14 @@ VIDEO_EXTENSIONS = {".mp4", ".mkv", ".mk3d", ".mov", ".m2ts", ".ts", ".avi"}
 LAYOUTS = {"auto": "Automatisch", "full_sbs": "Full-SBS", "half_sbs": "Half-SBS",
            "full_ou": "Full-OU", "half_ou": "Half-OU", "mono": "Mono / 2D"}
 TARGETS = {"half_sbs": "Half-SBS · 1080p", "half_ou": "Half-OU · 1080p",
-           "anaglyph": "Anaglyph", "mono": "Mono · linkes Auge", "framerate": "Nur Framerate ändern"}
+           "anaglyph": "Anaglyph", "mono": "Mono · linkes Auge", "framerate": "Nur Framerate ändern", "bd3d": "BD-3D · 1080p"}
 NAMING = {"original": "Kein Layout-Zusatz", "layout": "Layout-Zusatz",
           "players": "Player-Kürzel (Kodi/Bino)"}
 PROFILES = {"quality": "Qualität · 8 Bit / 4:4:4", "quality10": "Hohe Farbtiefe · 10 Bit / 4:4:4",
             "compatible": "Kompatibel · 8 Bit / 4:2:0"}
+COMPATIBILITY_NOTE = ("Breitere Player-Unterstützung, jedoch mit deutlich geringerer Farbauflösung. "
+                      "Farbdetails und farbige Kanten können sichtbar leiden. "
+                      "Für hochwertige Anaglyphen wird 4:4:4 empfohlen.")
 FPS_CHOICES = ("23,976", "24", "25", "29,97", "30", "50", "59,94", "60")
 
 
@@ -49,6 +52,7 @@ class Options:
     naming: str = "layout"
     suffix: str | None = None
     target_fps: str = "30"
+    disc_title: str | None = None
     container: str = "mp4"
     codec: str = "h264"
     rate_mode: str = "crf"
@@ -74,7 +78,7 @@ class Options:
 
     def validate(self) -> None:
         for name, values in (("layout", LAYOUTS), ("target", TARGETS), ("profile", PROFILES),
-                             ("naming", NAMING), ("container", {"mp4", "mkv"}),
+                             ("naming", NAMING), ("container", {"mp4", "mkv", "iso", "m2ts"}),
                              ("codec", {"h264", "h265"}), ("rate_mode", {"crf", "abr"})):
             if getattr(self, name) not in values:
                 raise ValueError(f"Ungültige Einstellung: {name}.")
@@ -92,6 +96,15 @@ class Options:
             raise ValueError("CRF muss zwischen 1 und 51 liegen.")
         if not isinstance(self.bitrate_mbps, (int, float)) or not 0 < self.bitrate_mbps <= 1000:
             raise ValueError("Die Zielbitrate muss größer als 0 und höchstens 1000 Mbit/s sein.")
+        if self.disc_title is not None and (not isinstance(self.disc_title, str) or not self.disc_title.strip()
+                or len(self.disc_title.encode('utf-16-be')) > 124 or re.search(r'[<>:"/\\|?*\x00-\x1f]', self.disc_title)
+                or self.disc_title.endswith((" ", "."))):
+            raise ValueError("Disc-Titel: Höchstens 62 Unicode-Zeichen, ohne ungültige Dateizeichen.")
+        if self.target == "bd3d":
+            if self.container not in {"iso", "m2ts"} or self.codec != "h264":
+                raise ValueError("BD-3D benötigt ISO oder M2TS mit AVC/MVC.")
+        elif self.container not in {"mp4", "mkv"}:
+            raise ValueError("ISO/M2TS ist nur für BD-3D verfügbar.")
         if self.codec == "h265" and self.container != "mkv":
             raise ValueError("H.265 ist in dieser Version nur mit MKV freigegeben.")
 

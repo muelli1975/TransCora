@@ -8,18 +8,19 @@ import os
 import queue
 import tempfile
 import threading
+import time
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
 from transcora import __version__
 from transcora.core.engine import Cancelled, execute, methods, plan_job, preview
-from transcora.core.model import Job, LAYOUTS, PROFILES, TARGETS, Options, VIDEO_EXTENSIONS, app_root, FPS_CHOICES
-from transcora.core.naming import effective_suffix, suffix_choices, reserve_output, filename_layout, fps_suffix
-from transcora.core.storage import load_list, save_list, write_json, new_run_log, delete_run_logs
+from transcora.core.model import Job, LAYOUTS, PROFILES, TARGETS, Options, VIDEO_EXTENSIONS, app_root, FPS_CHOICES, COMPATIBILITY_NOTE
+from transcora.core.naming import effective_suffix, suffix_choices, reserve_output, filename_layout, fps_suffix, clean_stem
+from transcora.core.storage import load_list, save_list, write_json, new_run_log, delete_run_logs, load_presets, save_presets, validate_preset_name
 from transcora.core.toolchain import Toolchain
 from transcora.gui.native import dark_titlebar
 from transcora.gui.preview_window import PreviewWindow
-from transcora.gui.theme import apply_theme, GOLD_LIGHT, MUTED, TEXT, PANEL_BG, APP_BG
+from transcora.gui.theme import apply_theme, GOLD_LIGHT, MUTED, TEXT, PANEL_BG, APP_BG, SECONDARY_BG, BORDER
 
 
 STATUS = {"queued": "Wartet", "checking": "Prüfung", "ready": "Bereit", "blocked": "Prüfen!",
@@ -33,6 +34,10 @@ class Window:
         self.events = queue.Queue()
         self.cancel = threading.Event()
         self.busy = False
+        self.run_started = None
+        self.estimate_weights = []
+        self.estimated_finish = None
+        self.estimate_updated = None
         self.closing = False
         self.updating = False
         self.controls = []
@@ -44,6 +49,11 @@ class Window:
         self.recursive_value = False
         self._load_settings()
         self.last_output = str(Path(self.output_folder).expanduser().resolve())
+        self.presets = {}
+        try:
+            self.presets = load_presets(app_root()/"user-presets.json")
+        except (OSError, ValueError, TypeError) as error:
+            self.log_lines.append("Voreinstellungen: " + str(error))
         self._style()
         self._build()
         root.after_idle(lambda: dark_titlebar(root))
@@ -58,7 +68,7 @@ class Window:
             defaults = Options.from_dict(data.get("defaults", {}))
             if defaults.method not in self.catalog:
                 return
-            self.defaults = replace(defaults, layout="auto", swap=False)
+            self.defaults = replace(defaults, layout="auto", swap=False, disc_title=None)
             for key in ("input_folder", "output_folder"):
                 if isinstance(data.get(key), str):
                     setattr(self, key, data[key])
@@ -96,6 +106,12 @@ class Window:
         for text, callback in (("Dateien hinzufügen", self.add_files), ("Ordner hinzufügen", self.add_folder),
                                ("Entfernen", self.remove), ("Liste laden", self.load), ("Liste speichern", self.save)):
             self.button(toolbar, text, callback).pack(side="left", padx=(0, 5))
+        self.preset_button = ttk.Menubutton(toolbar, text="Voreinstellungen")
+        self.preset_button.pack(side="right")
+        self.controls.append((self.preset_button, "normal"))
+        self.preset_menu = self.dark_menu(self.preset_button)
+        self.preset_menu.configure(postcommand=self.refresh_preset_menu)
+        self.preset_button.configure(menu=self.preset_menu)
         holder = ttk.Frame(outer)
         holder.grid(row=2, column=0, sticky="nsew")
         holder.columnconfigure(0, weight=1)
@@ -119,12 +135,14 @@ class Window:
         self.variables = {}
         self.mappings = {"layout": LAYOUTS, "target": TARGETS, "profile": PROFILES,
                          "method": {k: m["label"] for k, m in self.catalog.items()},
-                         "container": {"mkv": "MKV", "mp4": "MP4"},
+                         "container": {"mkv": "MKV", "mp4": "MP4", "iso": "Blu-ray-ISO", "m2ts": "M2TS (AVC/MVC)"},
                          "codec": {"h264": "H.264", "h265": "H.265 / HEVC"},
                          "rate_mode": {"crf": "Qualität (CRF)", "abr": "Zielbitrate (Durchschnitt)"}}
         self.combos = {}
+        self.option_frames = {}
         def combo(parent, row, col, key, label):
             frame = ttk.Frame(parent)
+            self.option_frames[key] = frame
             frame.grid(row=row, column=col, sticky="ew", padx=(0, 8), pady=3)
             ttk.Label(frame, text=label).pack(anchor="w")
             var = tk.StringVar(value=self.mappings[key][getattr(self.defaults, key)])
@@ -154,6 +172,15 @@ class Window:
             suffix.bind(event, lambda e: self.option_changed("suffix"))
         self.combos["suffix"] = suffix
         self.controls.append((suffix, "normal"))
+        self.title_frame = ttk.Frame(fields)
+        self.title_frame.grid(row=2, column=1, sticky="ew", padx=(0, 8), pady=3)
+        ttk.Label(self.title_frame, text="Disc-Titel").pack(anchor="w")
+        self.variables['disc_title'] = tk.StringVar()
+        title_entry = ttk.Entry(self.title_frame, textvariable=self.variables['disc_title'])
+        title_entry.pack(fill="x")
+        for event in ('<FocusOut>', '<Return>'):
+            title_entry.bind(event, lambda e: self.option_changed('disc_title'))
+        self.controls.append((title_entry, 'normal'))
         self.fps_frame = ttk.Frame(fields)
         self.fps_frame.grid(row=2, column=1, sticky="ew", padx=(0, 8), pady=3)
         ttk.Label(self.fps_frame, text="Zielbildrate (fps) · Zahl oder Bruch").pack(anchor="w")
@@ -205,7 +232,8 @@ class Window:
         show_details()
         actions = ttk.Frame(outer)
         actions.grid(row=8, column=0, sticky="ew", pady=5)
-        self.button(actions, "Erweitert ▸", self.toggle_advanced).pack(side="left")
+        self.advanced_button = self.button(actions, "Erweitert ▸", self.toggle_advanced)
+        self.advanced_button.pack(side="left")
         self.button(actions, "Kontrollbild", self.show_preview).pack(side="left", padx=5)
         ttk.Button(actions, text="Log", command=self.show_log).pack(side="left")
         self.advanced = ttk.Frame(outer)
@@ -234,12 +262,21 @@ class Window:
             self.combos[key] = number
         self.button(self.advanced, "Standardeinstellungen", self.reset_defaults).grid(row=1, column=2, sticky="e", pady=5)
         self.status = tk.StringVar(value="Bereit")
-        self.status_label = ttk.Label(outer, textvariable=self.status, wraplength=800)
-        self.status_label.grid(row=10, column=0, sticky="ew", pady=(6, 3))
+        progress_info = ttk.Frame(outer)
+        progress_info.grid(row=10, column=0, sticky="ew", pady=(6, 3))
+        progress_info.columnconfigure(0, weight=1)
+        self.status_label = ttk.Label(progress_info, textvariable=self.status, wraplength=800)
+        self.status_label.grid(row=0, column=0, sticky="w")
+        self.elapsed = tk.StringVar(value="")
+        self.elapsed_time = tk.StringVar(value="")
         self.progress = ttk.Progressbar(outer, mode="determinate", maximum=100)
         self.progress.grid(row=11, column=0, sticky="ew")
+        timing = ttk.Frame(outer)
+        timing.grid(row=12, column=0, sticky="ew", pady=(3, 0))
+        ttk.Label(timing, textvariable=self.elapsed_time, foreground=MUTED).pack(side='left')
+        ttk.Label(timing, textvariable=self.elapsed, foreground=MUTED).pack(side='right')
         footer = ttk.Frame(outer)
-        footer.grid(row=12, column=0, sticky="ew", pady=(8, 0))
+        footer.grid(row=13, column=0, sticky="ew", pady=(8, 0))
         self.speed = tk.StringVar(value="")
         ttk.Label(footer, textvariable=self.speed, foreground=MUTED).pack(side="left")
         self.abort_button = ttk.Button(footer, text="Abbrechen", command=self.abort, state="disabled", style="Danger.TButton")
@@ -252,6 +289,101 @@ class Window:
         self.root.bind("<Delete>", lambda event: self.remove() if not self.busy and self.root.focus_get() == self.tree else None)
         self.root.bind("<Escape>", lambda event: self.abort() if self.busy else None)
         self.selection_changed()
+
+    def dark_menu(self, parent):
+        return tk.Menu(parent, tearoff=False, background=SECONDARY_BG, foreground=TEXT,
+            activebackground=GOLD_LIGHT, activeforeground=APP_BG, borderwidth=1,
+            relief='flat', activeborderwidth=0)
+
+    def refresh_preset_menu(self):
+        menu = self.preset_menu
+        menu.delete(0, 'end')
+        for child in menu.winfo_children():
+            child.destroy()
+        load = self.dark_menu(menu)
+        delete = self.dark_menu(menu)
+        for name in sorted(self.presets, key=str.casefold):
+            load.add_command(label=name, command=lambda n=name: self.apply_preset(n))
+            delete.add_command(label=name, command=lambda n=name: self.delete_preset(n))
+        if not self.presets:
+            load.add_command(label='Keine gespeicherten Voreinstellungen', state='disabled')
+            delete.add_command(label='Keine gespeicherten Voreinstellungen', state='disabled')
+        menu.add_cascade(label='Laden', menu=load)
+        menu.add_command(label='Speichern unter …', command=self.preset_dialog)
+        menu.add_cascade(label='Löschen', menu=delete)
+
+    def store_preset(self, name):
+        if self.busy:
+            return
+        name = validate_preset_name(name)
+        selected = self.selected_jobs()
+        options = selected[0].options if selected else self.defaults
+        if any(replace(job.options, disc_title=None) != replace(options, disc_title=None) for job in selected):
+            raise ValueError('Zum Speichern Dateien mit gleichen Einstellungen auswählen.')
+        updated = dict(self.presets, **{name: replace(options, disc_title=None)})
+        save_presets(app_root()/'user-presets.json', updated)
+        self.presets = updated
+        self.status.set('Voreinstellung gespeichert: ' + name)
+
+    def preset_dialog(self):
+        if self.busy:
+            return
+        dialog = tk.Toplevel(self.root, background=APP_BG)
+        dialog.title('Voreinstellung speichern')
+        dialog.transient(self.root)
+        dialog.after_idle(lambda: dark_titlebar(dialog))
+        frame = ttk.Frame(dialog, padding=12)
+        frame.pack(fill='both', expand=True)
+        ttk.Label(frame, text='Name der Voreinstellung').pack(anchor='w')
+        name = tk.StringVar()
+        entry = ttk.Entry(frame, textvariable=name, width=40)
+        entry.pack(fill='x', pady=8)
+        note = ttk.Label(frame, text='Ein vorhandener Name ersetzt die gespeicherte Voreinstellung.', wraplength=330)
+        note.pack(anchor='w')
+        def save(event=None):
+            try:
+                self.store_preset(name.get())
+                dialog.destroy()
+            except (OSError, ValueError) as error:
+                note.configure(text=str(error))
+        buttons = ttk.Frame(frame)
+        buttons.pack(fill='x', pady=(10, 0))
+        ttk.Button(buttons, text='Abbrechen', command=dialog.destroy).pack(side='right')
+        ttk.Button(buttons, text='Speichern', command=save, style='Primary.TButton').pack(side='right', padx=5)
+        entry.bind('<Return>', save)
+        dialog.bind('<Escape>', lambda e: dialog.destroy())
+        dialog.grab_set()
+        entry.focus_set()
+
+    def apply_preset(self, name):
+        if self.busy:
+            return
+        options = self.presets[name]
+        if options.method not in self.catalog:
+            self.status.set('Anaglyphenverfahren der Voreinstellung ist nicht verfügbar.')
+            return
+        selected = self.selected_jobs()
+        if selected:
+            for job in selected:
+                job.options = replace(options, disc_title=job.options.disc_title)
+                job.plan = None
+                job.status, job.detail = 'queued', 'Voreinstellung geladen; erneut prüfen.'
+                self.update_row(job)
+        else:
+            self.defaults = replace(options, disc_title=None)
+        self.selection_changed()
+        self.status.set('Voreinstellung geladen: ' + name)
+
+    def delete_preset(self, name):
+        if self.busy:
+            return
+        try:
+            updated = {n: o for n, o in self.presets.items() if n != name}
+            save_presets(app_root()/'user-presets.json', updated)
+            self.presets = updated
+            self.status.set('Voreinstellung gelöscht: ' + name)
+        except OSError as error:
+            self.status.set('Voreinstellungen: ' + str(error))
 
     def selected_jobs(self):
         ids = set(self.tree.selection())
@@ -280,17 +412,22 @@ class Window:
             self.updating = True
             for key, var in self.variables.items():
                 value = getattr(self.defaults, key)
+                if key == "disc_title":
+                    value = value or ""
                 if key == "suffix":
                     value = effective_suffix(self.defaults, self.catalog[self.defaults.method]["suffix"])
                     value = value or "Keiner"
                 var.set(self.mappings[key][value] if key in self.mappings else value)
             self.updating = False
             self.last_suffix_display = self.variables['suffix'].get()
+            self.last_title_display = self.variables['disc_title'].get()
             self.refresh_controls()
             return
         self.updating = True
         for key, var in self.variables.items():
             values = [getattr(job.options, key) for job in selected]
+            if key == "disc_title":
+                values = [job.options.disc_title or clean_stem(job.source.stem) for job in selected]
             if key == "suffix":
                 values = [self.display_suffix(job) for job in selected]
             value = values[0]
@@ -300,6 +437,7 @@ class Window:
                 var.set(value if all(v == value for v in values) else "")
         self.updating = False
         self.last_suffix_display = self.variables['suffix'].get()
+        self.last_title_display = self.variables['disc_title'].get()
         self.selection_text.set(f"Einstellungen für {len(selected)} ausgewählte Datei(en). Leere Auswahlfelder bedeuten gemischte Werte.")
         job = selected[0]
         self.details.set((job.plan.summary if job.plan else str(job.source)) + "\n" + job.detail)
@@ -310,8 +448,12 @@ class Window:
             return
         if key == "suffix" and self.variables[key].get() == self.last_suffix_display:
             return
+        if key == 'disc_title' and self.variables[key].get() == self.last_title_display:
+            return
         try:
             value = self.variables[key].get()
+            if key == 'disc_title':
+                value = value.strip() or None
             if key == "suffix":
                 value = "" if value == "Keiner" else value
             if key in self.mappings:
@@ -322,6 +464,10 @@ class Window:
                 result = replace(options, **{key: value})
                 if key == "target":
                     result.suffix = None
+                    if value == 'bd3d':
+                        result.container, result.codec = 'iso', 'h264'
+                    elif options.target == 'bd3d':
+                        result.container = 'mp4'
                     if value == "framerate":
                         result.swap = False
                 if key == "suffix" and value == effective_suffix(replace(options, suffix=None), self.catalog[options.method]["suffix"], source):
@@ -332,7 +478,8 @@ class Window:
                 return result
             candidates = self.selected_jobs()
             updates = [(job, changed(job.options, job.source)) for job in candidates]
-            self.defaults = changed(self.defaults, candidates[0].source if candidates else None)
+            if key != 'disc_title':
+                self.defaults = changed(self.defaults, candidates[0].source if candidates else None)
             for job, options in updates:
                 job.options = options
                 job.plan = None
@@ -340,7 +487,7 @@ class Window:
                 self.update_row(job)
             if key == "codec" and value == "h265":
                 self.variables["container"].set("MKV")
-            if key in {"target", "method", "target_fps", "layout"}:
+            if key in {"target", "method", "target_fps", "layout", "disc_title", "container"}:
                 self.selection_changed()
             self.last_suffix_display = self.variables['suffix'].get()
             self.status.set("Einstellungen übernommen. Vor dem Start wird erneut geprüft.")
@@ -359,6 +506,15 @@ class Window:
         options = selected[0].options if selected else self.defaults
         anaglyph = options.target == "anaglyph"
         framerate = options.target == "framerate"
+        bd3d = options.target == 'bd3d'
+        self.title_frame.grid() if bd3d and selected else self.title_frame.grid_remove()
+        self.option_frames['method'].grid_remove() if bd3d else self.option_frames['method'].grid()
+        self.option_frames['profile'].grid_remove() if bd3d else self.option_frames['profile'].grid()
+        self.combos['container'].configure(values=[self.mappings['container'][k] for k in
+            (('iso', 'm2ts') if bd3d else ('mp4', 'mkv'))])
+        self.advanced_button.configure(state='disabled' if bd3d else 'normal')
+        if bd3d:
+            self.advanced.grid_remove()
         self.swap_control.configure(state="disabled" if framerate else "normal")
         self.fps_frame.grid() if framerate else self.fps_frame.grid_remove()
         self.combos["method"].configure(state="readonly" if anaglyph else "disabled")
@@ -373,16 +529,20 @@ class Window:
         text = ""
         if anaglyph:
             if options.profile == "compatible":
-                text = "4:2:0: Geringere Farbauflösung. Die Anaglyphenqualität kann darunter leiden."
+                text = COMPATIBILITY_NOTE
             else:
                 text = "4:4:4: Nicht alle Player und Hardwaredecoder unterstützen dieses Format."
                 if options.profile == "quality10":
                     text += " 10 Bit: Feinere Abstufungen; kein HDR-Modus."
         if framerate:
             text = "Layout, Auflösung und Augenreihenfolge bleiben erhalten. Video wird neu kodiert; Ton wird kopiert."
+        if bd3d:
+            text = "1080p · 23,976 fps · AVC/MVC · Hohe Qualität. Konstante 23,976/24-fps-Quellen; 24 fps werden ohne Bildverlust verlangsamt."
+            if options.container == 'm2ts':
+                text += " M2TS enthält beide Augenbilder, jedoch keine Blu-ray-Disc-Struktur."
         if options.codec == "h265":
             text += " H.265: MKV, längere Rechenzeit und Zielplayer prüfen; CRF ist codecabhängig."
-        if options.rate_mode == "abr":
+        if options.rate_mode == "abr" and not bd3d:
             text += " Zielbitrate = Videodurchschnitt, kein festes Dateigrößenlimit."
         self.warning.set(text)
         self.update_output_name()
@@ -574,14 +734,48 @@ class Window:
             widget.configure(state="disabled" if value else normal)
         self.abort_button.configure(state="normal" if value else "disabled")
         if not value:
+            self.update_elapsed()
+            self.elapsed.set('Restzeit: —')
+            self.run_started = None
+            self.estimated_finish = None
             self.progress.stop()
             self.progress.configure(mode="determinate")
             self.refresh_controls()
 
-    def background(self, work, phase):
+    def update_elapsed(self):
+        if self.run_started is None:
+            return
+        now = time.monotonic()
+        self.elapsed_time.set('Vergangene Zeit: ' + PreviewWindow.time_text(max(0, now-self.run_started)))
+        if self.estimated_finish is None or now-(self.estimate_updated or now) > 15:
+            self.elapsed.set('Restzeit: Wird ermittelt …')
+        else:
+            remaining = max(1, self.estimated_finish-now)
+            self.elapsed.set('Restzeit: Ca. ' + PreviewWindow.time_text(remaining))
+
+    def estimate_remaining(self, index, count, percent):
+        if self.run_started is None or percent is None:
+            return
+        weights = self.estimate_weights if len(self.estimate_weights) == count else [1]*count
+        fraction = (sum(weights[:index-1])+weights[index-1]*percent/100)/sum(weights)
+        now = time.monotonic()
+        elapsed = now-self.run_started
+        if .01 <= fraction < 1 and elapsed >= 2:
+            predicted = now+elapsed*(1-fraction)/fraction
+            self.estimated_finish = predicted if self.estimated_finish is None else .25*predicted+.75*self.estimated_finish
+            self.estimate_updated = now
+        self.update_elapsed()
+
+    def background(self, work, phase, track_time=False):
         if self.busy:
             return
         self.cancel.clear()
+        if track_time:
+            self.run_started = time.monotonic()
+            self.estimated_finish = None
+            self.estimate_updated = None
+            self.estimate_weights = []
+            self.update_elapsed()
         self.speed.set("")
         self.set_busy(True)
         self.status.set(phase)
@@ -640,6 +834,7 @@ class Window:
             if not run:
                 self.events.put(("notice", f"Test abgeschlossen: {len(ready)} bereit · {blocked} blockiert."))
                 return
+            self.events.put(("batch", [max(1, plan.duration) for _, plan in ready]))
             if ready:
                 log_path = new_run_log(output)
             counts = {"completed": 0, "failed": 0, "cancelled": 0}
@@ -672,7 +867,7 @@ class Window:
             self.events.put(("log", summary))
             if ready and not self.cancel.is_set():
                 self.events.put(("sound", None))
-        self.background(work, "Testen")
+        self.background(work, "Testen", track_time=run)
 
     def show_preview(self):
         selected = self.selected_jobs()
@@ -704,9 +899,19 @@ class Window:
     def show_log(self):
         dialog = tk.Toplevel(self.root)
         dialog.title("TransCora · Log")
+        dialog.configure(background=APP_BG)
         dialog.after_idle(lambda: dark_titlebar(dialog))
-        text = tk.Text(dialog, background=PANEL_BG, foreground=TEXT, wrap="word", width=90, height=25)
-        text.pack(fill="both", expand=True)
+        holder = ttk.Frame(dialog, padding=8)
+        holder.pack(fill='both', expand=True)
+        holder.columnconfigure(0, weight=1)
+        holder.rowconfigure(0, weight=1)
+        text = tk.Text(holder, background=PANEL_BG, foreground=TEXT, wrap="word", width=90, height=25,
+            borderwidth=0, highlightthickness=0, insertbackground=TEXT,
+            selectbackground=GOLD_LIGHT, selectforeground=APP_BG)
+        text.grid(row=0, column=0, sticky='nsew')
+        scroll = ttk.Scrollbar(holder, orient='vertical', command=text.yview)
+        scroll.grid(row=0, column=1, sticky='ns')
+        text.configure(yscrollcommand=scroll.set)
         text.insert("1.0", "\n\n".join(self.log_lines[-150:]) or "Noch keine technischen Meldungen.")
         text.configure(state="disabled")
         button = self.button(dialog, 'Logs löschen', lambda: self.clear_logs(text))
@@ -739,6 +944,7 @@ class Window:
             self.status.set("Abbruch angefordert; laufenden Prozess beenden …")
 
     def poll(self):
+        self.update_elapsed()
         try:
             while True:
                 kind, payload = self.events.get_nowait()
@@ -759,9 +965,12 @@ class Window:
                     self.log_lines = self.log_lines[-300:]
                 elif kind == "paths":
                     self.add_paths(*payload)
+                elif kind == "batch":
+                    self.estimate_weights = payload
                 elif kind == "progress":
                     _, index, count, value = payload
                     if value["percent"] is not None:
+                        self.estimate_remaining(index, count, value["percent"])
                         self.progress.stop()
                         self.progress.configure(mode="determinate")
                         self.progress["value"] = ((index - 1) + value["percent"] / 100) / count * 100
@@ -809,7 +1018,7 @@ class Window:
     def finish_close(self):
         try:
             write_json(app_root() / "settings.json", {"schema_version": 2,
-                       "defaults": asdict(replace(self.defaults, layout="auto", swap=False)),
+                       "defaults": asdict(replace(self.defaults, layout="auto", swap=False, disc_title=None)),
                        "output_folder": str(self.output_path()), "input_folder": self.input_folder,
                        "recursive": self.recursive.get()})
         except OSError:

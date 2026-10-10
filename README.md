@@ -1,8 +1,7 @@
-# TransCora 0.1.3
+# TransCora 0.1.4
 
 Portabler, lokaler 3D-Video-Konverter mit kompakter Python-Oberfläche und FFmpeg.
-**Erste Testversion:** Video-Konvertierung ist umgesetzt; Bild-/MPO-Werkzeuge und
-Blu-ray-3D/MVC folgen später. Kein Account, Tracking oder Netzwerkzugriff im Programm.
+**Erste Testversion:** Video-Konvertierung ist umgesetzt; BD-3D-Ausgabe als ISO oder M2TS ist enthalten. Bild-/MPO-Werkzeuge folgen später. Kein Account, Tracking oder Netzwerkzugriff im Programm.
 
 ## Windows starten
 
@@ -46,6 +45,7 @@ Durchläufen erstellen. Fertige Jobs laufen erst nach bewusster Einstellungsänd
 | Half-OU | 1920 × 1080, links oben/rechts unten |
 | Anaglyph | Volle rekonstruierte Auflösung eines Auges; 17 AnaglyphBatch-Verfahren |
 | Mono | Linkes Auge; mit **L/R tauschen** das andere Auge |
+| BD-3D · 1080p | AVC/MVC, 1920 × 1080 pro Auge, 23,976 fps; ISO oder M2TS |
 | Nur Framerate ändern | Auflösung, gepacktes Layout, Augenreihenfolge und YUV-Farbaufteilung bleiben erhalten |
 
 Half-SBS/OU passen jedes Auge unter Erhalt seines Seitenverhältnisses in 1920 × 1080
@@ -82,7 +82,7 @@ nummeriert, z. B. `Film_2_dubois_lcd.mkv`; auch nachträglich angelegte Ziele si
   4:4:4. Optional **Hohe Farbtiefe · 10 Bit / 4:4:4**, ebenfalls mit eingeschränkter Player-Unterstützung.
   Feinere Abstufungen machen eine 8-Bit-Quelle nicht zu HDR.
 - **8 Bit / 4:2:0** ist der Anaglyph-Kompatibilitätsmodus. Die verringerte Farbauflösung
-  kann die Qualität beeinträchtigen. Layout-/Mono-Ausgaben verwenden 8 Bit / 4:2:0.
+  lässt Farbdetails und farbige Kanten sichtbar leiden. Für hochwertige Anaglyphen wird 4:4:4 empfohlen. Layout-/Mono-Ausgaben verwenden 8 Bit / 4:2:0.
 - **Erweitert:** H.265/HEVC ausschließlich in MKV sowie frei einstellbare CRF oder
   durchschnittliche Zielbitrate in Mbit/s. CRF ist codecabhängig; Zielbitrate bedeutet
   kein garantiertes Dateigrößenlimit. Nur das zum gewählten Modus passende Feld ist
@@ -203,3 +203,51 @@ Bildanzahl, Zeitstempel, Farbangaben, Ton und beide wieder dekodierten Augenbild
 Die experimentelle Vorbereitung ist noch kein Ziel in der Programmoberfläche.
 Ein Abspieltest auf realer Blu-ray-3D-Hardware steht zusätzlich zur technischen
 Prüfung aus.
+
+## Voreinstellungen und Restzeit
+
+**Voreinstellungen → Speichern unter …** merkt die Konvertierungseinstellungen
+unter einem eigenen Namen im portablen Programmordner. **Laden** wendet sie auf
+ausgewählte Dateien an; ohne Auswahl gelten sie für neue Dateien. **Löschen** entfernt
+eine gespeicherte Voreinstellung. Dateiliste, Ordner und Disc-Titel sind nicht enthalten.
+Ein schon vorhandener Name wird beim Speichern ersetzt.
+
+Beim Fortschrittsbalken erscheinen **Vergangene Zeit** und die **geschätzte Restzeit**. Die vergangene Zeit bleibt nach dem Ende sichtbar. Sie wird anhand des
+tatsächlichen Fortschritts und der Videolaufzeiten laufend angepasst. Vor einer
+brauchbaren Messung und bei längeren Phasen ohne Fortschrittsmeldung steht dort
+**Wird ermittelt**. Insbesondere bei unterschiedlichen Konvertierungszielen und
+BD-3D-Prüfphasen ist die Anzeige eine ungefähre Schätzung.
+
+## BD-3D-Ausgabe
+
+**BD-3D · 1080p** bietet **Blu-ray-ISO** (Standard) oder eine einzelne **M2TS (AVC/MVC)**.
+Beide enthalten zwei echte MVC-Augenansichten, kein SBS/OU-Video. ISO hat eine
+UDF-2.50-Struktur mit SSIF und startet einen Film ohne Menü. Der **Disc-Titel** wird
+vom Quellnamen abgeleitet und ist editierbar; er bestimmt auch den Ausgabenamen.
+Bei M2TS gibt es kein Disc-Dateisystem; die Titelangabe benennt dort die Datei.
+Ein Disc-Label wird je nach Player angezeigt, es ist keine eingeblendete Titelseite.
+
+Diese erste Freigabe nimmt SDR-Quellen in Full-/Half-SBS oder Full-/Half-OU mit
+**konstanten 23,976 oder exakt 24 fps** an. 23,976 bleibt unverändert; 24 fps werden
+mit allen Bildern um 0,1 % verlangsamt, der Ton wird unter Erhalt der Tonhöhe angepasst.
+Andere Bildraten, variable Bildzeiten und Bildlücken werden mit einem klaren Grund
+blockiert. Das Verfahren fügt keine Bilder hinzu und lässt keine aus.
+
+FRIM 1.31 verwendet das mitgelieferte Software-SDK; Intel-Grafik, Treiberinstallation,
+AVISynth oder Netzwerkzugang werden für diesen FFmpeg-Eingabepfad nicht benötigt.
+Der geprüfte Encoder verwendet hohe Qualität, insgesamt 28/40 Mbit/s Ziel-/Maximalrate,
+AVC/MVC Level 4.1, GOP 24, begrenztes 8-Bit-4:2:0-BT.709. Für Blu-ray-Video ist dieses
+Profil fest; das 4:4:4-Anaglyphenprofil ist davon unabhängig.
+
+Alle Audiospuren mit bekannter Mono-, Stereo-, 5.1- oder 7.1-Belegung werden als
+24-Bit-LPCM mit 48 kHz gespeichert. Es erfolgt keine stille Kanalreduktion.
+Das WAV-Zwischenformat hat derzeit ein geprüftes Limit von 4 GB pro Audiospur;
+zu lange Spuren werden vor der Kodierung blockiert. Untertitel werden noch nicht übernommen.
+
+Bildzeiten werden vollständig geprüft. Rohbilder gehen direkt durch Pipes, nicht in
+riesige Zwischenvideodateien. Beide Ansichten werden vor und nach dem Multiplexen
+dekodiert und bitgenau miteinander verglichen. Bei ISO wird der tatsächliche SSIF
+über einen begrenzten UDF-Leser geprüft; bei M2TS die tatsächliche Datei. Komprimierte
+Prüfdaten werden im Ausgabeordner temporär angelegt und bei Erfolg/Abbruch entfernt.
+Es wird ausreichend freier Platz geprüft; es gibt keine automatische Disc-Aufteilung.
+Die technische Prüfung ersetzt keine formale Blu-ray-Zertifizierung.

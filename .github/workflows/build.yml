@@ -39,11 +39,15 @@ jobs:
         run: python -m pip install -r requirements-build.txt
       - name: Download and verify pinned FFmpeg toolchain
         run: python scripts/fetch_ffmpeg.py
+      - name: Download and verify pinned BD-3D tools
+        run: python scripts/fetch_bd3d_tools.py
       - name: Test Windows codecs and GUI
         env:
           TRANSCORA_REQUIRE_FFMPEG: '1'
           TRANSCORA_REQUIRE_GUI: '1'
         run: python -m unittest discover -s tests -v
+      - name: Test actual BD-3D ISO and M2TS exports
+        run: python scripts/bd3d_export_test.py
       - name: Build portable application
         run: python scripts/build_windows.py
       - name: Smoke test frozen executable
@@ -53,7 +57,7 @@ jobs:
           $process = Start-Process -FilePath ./dist/TransCora/TransCora.exe -ArgumentList @("--self-test", "`"$report`"") -Wait -PassThru
           if ($process.ExitCode -ne 0) { throw "TransCora self-test failed" }
           $result = Get-Content $report | ConvertFrom-Json
-          if (-not $result.ok -or $result.methods -ne 17) { throw "TransCora assets/toolchain check failed" }
+          if (-not $result.ok -or $result.methods -ne 17 -or -not $result.bd3d) { throw "TransCora assets/toolchain check failed" }
           Get-Content $report
       - uses: actions/upload-artifact@v4
         with:
@@ -62,4 +66,12 @@ jobs:
             dist/TransCora.zip
             dist/TransCora.zip.sha256
           if-no-files-found: error
+          retention-days: 30
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: TransCora-BD3D-Integration
+          path: output/bd3d-integration/
+          if-no-files-found: warn
           retention-days: 30
