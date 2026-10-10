@@ -465,7 +465,9 @@ def verify(tools: Toolchain, plan: Plan, path: Path, cancel: threading.Event) ->
             raise ValueError("Die Zielbildrate wurde nicht korrekt gespeichert: " + json.dumps({k: video.get(k) for k in (
                 'r_frame_rate', 'avg_frame_rate', 'time_base', 'start_time', 'duration', 'nb_frames')}))
         if plan.options.container == "mp4" and Fraction(video.get("avg_frame_rate", "0/1")) != frame_rate(plan.options.target_fps):
-            raise ValueError("Die MP4-Bildzeiten entsprechen nicht der exakten Zielbildrate.")
+            raise ValueError("Die MP4-Bildzeiten entsprechen nicht der exakten Zielbildrate: " +
+                             json.dumps({k: video.get(k) for k in ('r_frame_rate', 'avg_frame_rate',
+                                                                  'time_base', 'duration', 'nb_frames')}))
         if video.get("sample_aspect_ratio", "1:1") != plan.info['video'].get("sample_aspect_ratio", "1:1"):
             raise ValueError("Das Pixelseitenverhältnis wurde unerwartet geändert.")
     if path.stat().st_size == 0:
@@ -501,7 +503,10 @@ def execute(tools: Toolchain, plan: Plan, cancel: threading.Event, emit, log_pat
     temporary = plan.output.with_name("." + plan.output.stem + "." + uuid.uuid4().hex + ".part." + plan.options.container)
     # MKV exposes StereoMode as stream side data. A lossless remux transfers it
     # into MP4's st3d box; metadata:s:v alone does not create that MP4 box.
-    encoded = temporary.with_suffix(".mkv") if plan.stereo and plan.options.container == "mp4" else temporary
+    # FPS exports also use this pass to set every packet's exact target duration,
+    # including the last packet in very short 2D files.
+    remux_mp4 = plan.options.container == "mp4" and (plan.stereo or plan.options.target == "framerate")
+    encoded = temporary.with_suffix(".mkv") if remux_mp4 else temporary
     args = command(tools, plan, encoded)
     log_path.parent.mkdir(parents=True, exist_ok=True)
     tail = deque(maxlen=24)
@@ -552,7 +557,7 @@ def execute(tools: Toolchain, plan: Plan, cancel: threading.Event, emit, log_pat
             if process.returncode:
                 raise ValueError("FFmpeg: " + "\n".join(tail)[-3500:])
             if encoded != temporary:
-                emit("phase", "MP4-3D-Kennzeichnung schreiben")
+                emit("phase", "MP4-3D-Kennzeichnung schreiben" if plan.stereo else "MP4-Bildzeiten schreiben")
                 remux = [str(tools.ffmpeg), "-v", "error", "-nostdin", "-n", "-i", str(encoded),
                          "-map", "0", "-c", "copy", "-strict", "unofficial", "-movflags", "+faststart"]
                 if plan.options.target == "framerate":

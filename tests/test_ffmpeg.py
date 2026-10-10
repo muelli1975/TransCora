@@ -294,7 +294,14 @@ class FFmpegTests(unittest.TestCase):
         shutil.copyfile(self.source, mono)
         plan = self.plan(Options(target='framerate', layout='mono'), mono)
         execute(self.tools, plan, threading.Event(), lambda *args: None, self.folder/'plain.log')
-        self.assertIsNone(metadata_layout(probe(self.tools, plan.output)['video']))
+        video = probe(self.tools, plan.output)['video']
+        self.assertIsNone(metadata_layout(video))
+        self.assertEqual(Fraction(video['avg_frame_rate']), Fraction(30))
+        frames = json.loads(capture([str(self.tools.ffprobe), '-v', 'error', '-select_streams', 'v:0',
+            '-show_frames', '-of', 'json', str(plan.output)]))['frames']
+        times = [float(frame['best_effort_timestamp_time']) for frame in frames]
+        for a, b in zip(times, times[1:]):
+            self.assertAlmostEqual(b-a, 1/30, delta=.000002)
 
     def test_flagged_stereo_exports_can_be_converted_again(self):
         for container in ('mp4', 'mkv'):
