@@ -218,8 +218,13 @@ def decoded_digest(bd, base, dependent, frames, cancel, log):
 
 
 def verify_mux(tools, bd, plan, movie, base, dependent, frames, expected_hash, audios, cancel, log, folder):
-    info = probe(tools, movie, cancel)
-    video = info['video']
+    info = json.loads(capture([str(tools.ffprobe), '-v', 'error', '-protocol_whitelist', 'file,pipe',
+                               '-show_streams', '-show_format', '-of', 'json', str(movie)], cancel))
+    base_tracks = [s for s in info.get('streams', []) if s.get('id') == '0x1011' and s.get('codec_name') == 'h264']
+    dependent_tracks = [s for s in info.get('streams', []) if s.get('id') == '0x1012']
+    if len(base_tracks) != 1 or len(dependent_tracks) != 1:
+        raise ValueError('BD-3D: AVC-Basis oder MVC-Zweitansicht fehlt im Multiplex.')
+    video = base_tracks[0]
     if (video.get('width'), video.get('height'), video.get('pix_fmt'), video.get('level')) != (1920, 1080, 'yuv420p', 41):
         raise ValueError('BD-3D: Ausgaberaster, Farbauflösung oder AVC-Level falsch.')
     if Fraction(video.get('r_frame_rate', '0/1')) != BD_RATE or any(video.get(key) != 'bt709' for key in

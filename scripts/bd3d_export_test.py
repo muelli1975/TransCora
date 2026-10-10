@@ -11,6 +11,7 @@ import traceback
 import shutil
 import struct
 import hashlib
+import re
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -63,6 +64,36 @@ def main():
                         raise ValueError('Unicode disc title not preserved')
                     packed = OUT/'iso-packed.ssif'
                     disc.extract('BDMV/STREAM/SSIF/00000.ssif', packed)
+            # Independently compare each eye with the prepared source. This catches
+            # a swapped/duplicated view or planar-SBS stdin error despite roundtrip equality.
+            raw = OUT/f'raw-{container}'
+            raw.mkdir(exist_ok=True)
+            demux = raw/'demux'
+            demux.mkdir()
+            meta = raw/'demux.meta'
+            meta.write_text(f'MUXOPT --demux\nV_MPEG4/ISO/AVC, "{packed}", track=4113\n'
+                            f'V_MPEG4/ISO/MVC, "{packed}", track=4114\n', encoding='utf-8')
+            subprocess.run([str(bd.muxer), str(meta), str(demux)], env=bd.environment, check=True, timeout=120)
+            avc = next(demux.glob('*.264'))
+            mvc = next(demux.glob('*.mvc'))
+            subprocess.run([str(bd.decoder), '-sw', '-i:mvc', str(avc), str(mvc), '-o',
+                            str(raw/'decoded-left.yuv'), str(raw/'decoded-right.yuv')],
+                           env=bd.environment, check=True, timeout=120)
+            args = [str(tools.ffmpeg), '-y', '-v', 'error', '-filter_complex_threads', '1',
+                    '-i', str(source), '-filter_complex', prepare(plan.info['video'], plan.layout).graph]
+            for eye in ('left', 'right'):
+                args += ['-map', '['+eye+']', '-c:v', 'rawvideo', '-pix_fmt', 'yuv420p',
+                         '-fps_mode', 'passthrough', '-f', 'rawvideo', str(raw/(eye+'.yuv'))]
+            subprocess.run(args, check=True, timeout=120)
+            for eye in ('left', 'right'):
+                result = subprocess.run([str(tools.ffmpeg), '-hide_banner', '-f', 'rawvideo', '-s', '1920x1080',
+                    '-pix_fmt', 'yuv420p', '-i', str(raw/(eye+'.yuv')), '-f', 'rawvideo', '-s', '1920x1080',
+                    '-pix_fmt', 'yuv420p', '-i', str(raw/('decoded-'+eye+'.yuv')), '-lavfi', 'psnr',
+                    '-f', 'null', '-'], capture_output=True, encoding='utf-8', timeout=120, check=True)
+                score = re.search(r'average:([0-9.]+)', result.stderr)
+                if not score or float(score[1]) < 40:
+                    raise ValueError('Source eye identity/quality failed: '+eye)
+            shutil.rmtree(raw)
             # Independently decode prepared audio to match the actual muxed LPCM.
             af = prepare(plan.info['video'], plan.layout).audio_filter+',apad,atrim=end_sample=96096'
             expected_audio = capture([str(tools.ffmpeg), '-v', 'error', '-i', str(source), '-map', '0:a:0',
