@@ -41,23 +41,17 @@ class FFmpegTests(unittest.TestCase):
         cls.ppm.write_bytes(b'P6\n128 32\n255\n'+pixels)
         cls.run_ffmpeg('-loop', '1', '-framerate', '24000/1001', '-i', str(cls.ppm),
                        '-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=48000',
-                       '-frames:v', '6', '-t', '0.26', '-c:v', 'libx264rgb', '-crf', '0',
-                       '-preset', 'ultrafast', '-pix_fmt', 'rgb24',
+                       '-vf', 'setparams=colorspace=gbr:color_primaries=bt709:color_trc=iec61966-2-1:range=full',
+                       '-frames:v', '6', '-t', '0.26', '-c:v', 'ffv1', '-pix_fmt', 'gbrp16le',
                        '-c:a', 'aac', '-colorspace', 'rgb', '-color_primaries', 'bt709',
                        '-color_trc', 'iec61966-2-1', '-color_range', 'pc', str(cls.source))
-        # FFmpeg 9's FFV1 RGB fixture does not retain the complete colour tags.
-        # Lossless H.264 RGB carries them in its VUI, independent of container
-        # metadata. The PPM's original 8-bit samples are preserved losslessly.
+        # Set the known fixture interpretation on the frames themselves. FFmpeg
+        # 9 may propagate unknown frame tags over output-only codec options.
         fixture = probe(cls.tools, cls.source)['video']
         expected = {'color_space': 'gbr', 'color_primaries': 'bt709',
                     'color_transfer': 'iec61966-2-1', 'color_range': 'pc'}
         if any(fixture.get(key) != value for key, value in expected.items()):
             raise AssertionError('Reference fixture colour tags were lost: '+json.dumps(fixture))
-        # The Batch oracle uses the original 16-bit input representation. This
-        # separates method equality from an adapter's 8-to-16-bit rounding.
-        cls.batch_source = cls.folder/'batch-reference-lr.mkv'
-        cls.run_ffmpeg('-loop', '1', '-framerate', '25', '-i', str(cls.ppm),
-                       '-frames:v', '1', '-c:v', 'ffv1', '-pix_fmt', 'gbrp16le', str(cls.batch_source))
 
     @classmethod
     def tearDownClass(cls):
@@ -94,7 +88,7 @@ class FFmpegTests(unittest.TestCase):
         templates = dict(re.findall(r'if "%MATRIXMODE%"=="(\w+)" \(\s*set "VF=(.*?)"', batch))
         definitions = re.findall(r'if "%~1"=="\d+" \((.*?)\n\)', batch, re.S)
         definitions = {dict(re.findall(r'set "([^=]+)=(.*?)"', b)).get('MATRIXNAME'): dict(re.findall(r'set "([^=]+)=(.*?)"', b)) for b in definitions}
-        video = probe(self.tools, self.batch_source)['video']
+        video = probe(self.tools, self.source)['video']
         colors = {'matrix': 'gbr', 'primaries': 'bt709', 'transfer': 'iec61966-2-1', 'range': 'pc'}
         for key, method in methods().items():
             with self.subTest(method=key):
@@ -105,9 +99,9 @@ class FFmpegTests(unittest.TestCase):
                 graph, _, _ = build_graph(video, Options(target='anaglyph', method=key), 'full_sbs', False, colors, method)
                 # Compare the sRGB composite before lossy YUV encoding against the Batch itself.
                 graph = graph.split(';[composite]zscale=')[0]+';[composite]format=rgb24[v]'
-                actual = self.run_ffmpeg('-i', str(self.batch_source), '-filter_complex', graph, '-map', '[v]',
+                actual = self.run_ffmpeg('-i', str(self.source), '-filter_complex', graph, '-map', '[v]',
                                          '-frames:v', '1', '-f', 'rawvideo', '-pix_fmt', 'rgb24', 'pipe:1')
-                expected = self.run_ffmpeg('-i', str(self.batch_source), '-filter_complex', reference+'[ref]',
+                expected = self.run_ffmpeg('-i', str(self.source), '-filter_complex', reference+'[ref]',
                                            '-map', '[ref]', '-frames:v', '1', '-f', 'rawvideo', '-pix_fmt', 'rgb24', 'pipe:1')
                 self.assertEqual(len(actual), 64*32*3)
                 self.assertEqual(actual, expected, 'Abweichung von der originalen Batch-Filterkette')
@@ -191,9 +185,8 @@ class FFmpegTests(unittest.TestCase):
     def test_vfr_timestamps_are_preserved(self):
         source = self.folder/'vfr-lr.mkv'
         self.run_ffmpeg('-loop', '1', '-framerate', '25', '-i', str(self.ppm), '-frames:v', '5',
-                        '-vf', "settb=1/1000,setpts='N*N*40'", '-fps_mode', 'passthrough',
-                        '-enc_time_base', '1/1000', '-c:v', 'libx264rgb', '-crf', '0',
-                        '-preset', 'ultrafast', '-pix_fmt', 'rgb24',
+                        '-vf', "settb=1/1000,setpts='N*N*40',setparams=colorspace=gbr:color_primaries=bt709:color_trc=iec61966-2-1:range=full", '-fps_mode', 'passthrough',
+                        '-enc_time_base', '1/1000', '-c:v', 'ffv1', '-pix_fmt', 'gbrp16le',
                         '-colorspace', 'rgb', '-color_primaries', 'bt709', '-color_trc', 'iec61966-2-1',
                         '-color_range', 'pc', str(source))
         plan = self.plan(source=source)
