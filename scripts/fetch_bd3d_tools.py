@@ -49,7 +49,9 @@ def main():
     muxer.mkdir(parents=True, exist_ok=True)
     for name in ('FRIMEncode64.exe', 'FRIMDecode64.exe', 'libmfxsw64.dll'):
         shutil.copy2(DEST/'frim/x64'/name, frim/name)
-    shutil.copytree(DEST/'frim/doc', frim/'doc', dirs_exist_ok=True)
+    (frim/'doc').mkdir(exist_ok=True)
+    for name in ('FRIMEncode_readme.pdf', 'FRIMDecode_readme.pdf', 'FRIM_setup_readme.pdf', 'FRIM_release_notes.txt'):
+        shutil.copy2(DEST/'frim/doc'/name, frim/'doc'/name)
     shutil.copy2(DEST/'tsmuxer/tsMuxeR.exe', muxer/'tsMuxeR.exe')
     shutil.copy2(DEST/'tsmuxer/release_notes.txt', muxer/'release_notes.txt')
     shutil.copy2(DEST/'BUILD_MANIFEST.json', ROOT/'tools/BD3D_BUILD_MANIFEST.json')

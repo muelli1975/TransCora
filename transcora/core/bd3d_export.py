@@ -19,7 +19,7 @@ from .model import app_root
 from .mvc import tag_generated_stream
 from .naming import clean_stem
 from .toolchain import process_options
-from .udf import Disc
+from .udf import Disc, write_label
 
 FRAME_BYTES = 1920*1080*3  # two I420 views
 
@@ -306,6 +306,7 @@ def export(tools, plan, cancel, emit, log_path):
         emit('phase', 'BD-3D: Fertige Ausgabe und beide Augenbilder prüfen')
         packed = movie
         if plan.options.container == 'iso':
+            write_label(movie, label)
             with Disc(movie) as disc:
                 if disc.label != label:
                     raise ValueError('BD-3D: Der Disc-Titel wurde nicht korrekt gespeichert.')

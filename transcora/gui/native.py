@@ -36,3 +36,17 @@ def dark_titlebar(window):
     except (OSError, AttributeError, tk.TclError):
         # Caption customization is optional on older Windows versions.
         pass
+
+
+def schedule_dark_titlebar(window):
+    """Tk can recreate/reset its native caption while mapping a new Toplevel."""
+    def apply(event=None):
+        if event is not None and event.widget is not window:
+            return
+        def ready():
+            if window.winfo_exists():
+                dark_titlebar(window)
+        window.after_idle(ready)
+        window.after(100, ready)
+    window.bind('<Map>', apply, add='+')
+    apply()

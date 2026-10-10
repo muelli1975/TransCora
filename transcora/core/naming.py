@@ -55,7 +55,7 @@ def suffix_choices(options: Options, method_suffix: str, layout: str | None = No
     choices = {"half_sbs": ["_half_sbs", "-lrh", "-lrq", ".3D.HSBS", ".3D.HSBS-lrh"],
                "half_ou": ["_half_ou", "-tbh", "-abq", ".3D.HTAB", ".3D.HTAB-tbh"],
                "full_sbs": ["_full_sbs", "-lr"], "full_ou": ["_full_ou", "-tb", "-ab"],
-               "mono": ["_mono_l", "-2d"], "bd3d": ["Keiner"], "anaglyph": ["_" + method_suffix]}.get(target, [])
+               "mono": ["_mono_l", "-2d"], "bd3d": [], "anaglyph": ["_" + method_suffix]}.get(target, [])
     if options.target == "framerate":
         if swap:
             choices = {"half_sbs": ["-rlh", "-rlq"], "full_sbs": ["-rl"],

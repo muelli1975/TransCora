@@ -18,7 +18,7 @@ from transcora.core.model import Job, LAYOUTS, PROFILES, TARGETS, Options, VIDEO
 from transcora.core.naming import effective_suffix, suffix_choices, reserve_output, filename_layout, fps_suffix, clean_stem
 from transcora.core.storage import load_list, save_list, write_json, new_run_log, delete_run_logs, load_presets, save_presets, validate_preset_name
 from transcora.core.toolchain import Toolchain
-from transcora.gui.native import dark_titlebar
+from transcora.gui.native import schedule_dark_titlebar
 from transcora.gui.preview_window import PreviewWindow
 from transcora.gui.theme import apply_theme, GOLD_LIGHT, MUTED, TEXT, PANEL_BG, APP_BG, SECONDARY_BG, BORDER
 
@@ -56,7 +56,7 @@ class Window:
             self.log_lines.append("Voreinstellungen: " + str(error))
         self._style()
         self._build()
-        root.after_idle(lambda: dark_titlebar(root))
+        schedule_dark_titlebar(root)
         root.protocol("WM_DELETE_WINDOW", self.close)
         root.after(100, self.poll)
 
@@ -331,7 +331,7 @@ class Window:
         dialog = tk.Toplevel(self.root, background=APP_BG)
         dialog.title('Voreinstellung speichern')
         dialog.transient(self.root)
-        dialog.after_idle(lambda: dark_titlebar(dialog))
+        schedule_dark_titlebar(dialog)
         frame = ttk.Frame(dialog, padding=12)
         frame.pack(fill='both', expand=True)
         ttk.Label(frame, text='Name der Voreinstellung').pack(anchor='w')
@@ -795,6 +795,9 @@ class Window:
     def check(self, run):
         if self.busy:
             return
+        self.option_changed("disc_title")
+        if self.variables["disc_title"].get() != self.last_title_display:
+            return
         self.option_changed("suffix")
         if self.variables['suffix'].get() != self.last_suffix_display:
             return
@@ -900,7 +903,7 @@ class Window:
         dialog = tk.Toplevel(self.root)
         dialog.title("TransCora · Log")
         dialog.configure(background=APP_BG)
-        dialog.after_idle(lambda: dark_titlebar(dialog))
+        schedule_dark_titlebar(dialog)
         holder = ttk.Frame(dialog, padding=8)
         holder.pack(fill='both', expand=True)
         holder.columnconfigure(0, weight=1)

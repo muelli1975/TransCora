@@ -64,6 +64,20 @@ class AudioLayoutTests(unittest.TestCase):
             validate_audio([{'channels': 2, 'channel_layout': '2.0(other)'}])
 
 
+class UdfLabelTests(unittest.TestCase):
+    def test_labels_preserve_unicode_and_short_identifiers_end_on_character_boundaries(self):
+        from transcora.core.udf import label_field, dstring
+        for value in ('Unser Film', 'ÄÖÜ', 'Mein 3D Film – ÄÖÜ', 'T'*62):
+            data = label_field(value, 128)
+            self.assertEqual(len(data), 128)
+            self.assertEqual(dstring(data[:data[-1]]), value)
+            short = label_field(value, 32, shorten=True)
+            self.assertTrue(value.startswith(dstring(short[:short[-1]])))
+            self.assertEqual(len(short), 32)
+        with self.assertRaises(ValueError):
+            label_field('T'*200, 128)
+
+
 class MvcMetadataTests(unittest.TestCase):
     def test_stream_rewrite_is_bounded_idempotent_and_preserves_slices(self):
         from transcora.core.mvc import annex_nals, tag_generated_stream, tag_sps

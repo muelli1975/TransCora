@@ -4,7 +4,7 @@ import math
 import tkinter as tk
 from tkinter import ttk
 
-from transcora.gui.native import dark_titlebar
+from transcora.gui.native import schedule_dark_titlebar
 from transcora.gui.slider import Timeline
 
 
@@ -15,7 +15,7 @@ class PreviewWindow:
         self.dialog = tk.Toplevel(parent)
         self.dialog.title("Kontrollbild · vor der Kodierung")
         self.dialog.configure(background="#181818")
-        self.dialog.after_idle(lambda: dark_titlebar(self.dialog))
+        schedule_dark_titlebar(self.dialog)
         frame = ttk.Frame(self.dialog, padding=12)
         frame.pack(fill="both", expand=True)
         frame.columnconfigure(0, weight=1)

@@ -15,7 +15,7 @@ OUT = ROOT/'output/gui-check'
 OUT.mkdir(parents=True, exist_ok=True)
 root = tk.Tk()
 window = Window(root)
-root.geometry('860x700+40+40')
+root.geometry('860x680+20+0')
 root.lift()
 root.update()
 
@@ -50,7 +50,7 @@ snap(log, 'log.png')
 log.destroy()
 viewer = PreviewWindow(root, lambda t: None)
 viewer.duration = 123.5
-viewer.scale.configure(to=123)
+viewer.scale.configure(to=123, state='normal')
 viewer.position_changed(65.5)
 viewer.dialog.update()
 snap(viewer.dialog, 'preview.png')

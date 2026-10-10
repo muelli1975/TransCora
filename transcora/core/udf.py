@@ -63,7 +63,7 @@ class Disc:
                     break
             if partition is None or logical is None or u32(logical, 212) != BLOCK or u16(logical, 240) != 0x250:
                 raise ValueError('BD-3D: UDF 2.50 fehlt.')
-            self.label = dstring(logical[84:84+logical[211]-1]) if logical[211] else ''
+            self.label = dstring(logical[84:84+logical[211]]) if logical[211] else ''
             self.partition = u32(partition, 188)
             self.partition_blocks = u32(partition, 192)
             mapping = logical[440:440+u32(logical, 264)]
@@ -215,3 +215,89 @@ class Disc:
         with destination.open('xb') as out:
             for chunk in self.chunks(self.locate(path), cancel):
                 out.write(chunk)
+
+
+def label_field(value, width, shorten=False):
+    """OSTA compressed Unicode d-string; the final byte includes compression ID."""
+    encoding = 'latin1' if all(ord(c) <= 255 for c in value) else 'utf-16-be'
+    identifier = 8 if encoding == 'latin1' else 16
+    if shorten:
+        while len(value.encode(encoding)) > width-2:
+            value = value[:-1]
+    data = bytes([identifier])+value.encode(encoding)
+    if len(data) >= width:
+        raise ValueError('BD-3D: Disc-Titel ist für das UDF-Feld zu lang.')
+    return data+b'\x00'*(width-len(data)-1)+bytes([len(data)])
+
+
+def write_label(path: Path, value: str):
+    """Normalize legacy muxer's label fields, including backup VDS and metadata.
+
+    Only descriptor label bytes/CRCs change. Stream extents and coded pictures are
+    untouched. Primary Volume Identifier is a shorter identifier; logical-volume
+    and file-set labels retain the complete user title.
+    """
+    updates = {}
+    with Disc(path) as disc:
+        anchor = disc.block(256)
+        logical = None
+        for offset in (16, 24):
+            length, start = struct.unpack_from('<II', anchor, offset)
+            if length > 1024*BLOCK:
+                raise ValueError('BD-3D: ISO-Deskriptorbereich ungültig.')
+            for position in range(start, start+(length+BLOCK-1)//BLOCK):
+                data = disc.block(position)
+                kind = tag(data)
+                if kind == 8:
+                    break
+                if kind == 1:
+                    updates[position] = (24, label_field(value, 32, shorten=True))
+                elif kind == 4 and data[21:33] == b'*UDF LV Info':
+                    updates[position] = (116, label_field(value, 128))
+                elif kind == 6:
+                    updates[position] = (84, label_field(value, 128))
+                    logical = data
+        if logical is None:
+            raise ValueError('BD-3D: ISO-Beschriftungsstruktur fehlt.')
+        fsd_position, fsd_partition = u32(logical, 252), u16(logical, 256)
+        updates[disc.physical(fsd_partition, fsd_position)] = (112, label_field(value, 128))
+        # The metadata mirror repeats the file-set descriptor. Update that copy too.
+        maps = logical[440:440+u32(logical, 264)]
+        index = 0
+        while maps:
+            length = maps[1]
+            entry = maps[:length]
+            if index == fsd_partition and entry[0] == 2:
+                mirror_location = u32(entry, 44)
+                if mirror_location != 0xffffffff:
+                    mirror = disc.block(disc.partition+mirror_location)
+                    _, extents = disc.allocations(mirror, 0)
+                    offset = fsd_position
+                    for count, block, part, mode in extents:
+                        if part != 0 or mode != 0:
+                            raise ValueError('BD-3D: UDF-Metadatenspiegel ungültig.')
+                        if offset < (count+BLOCK-1)//BLOCK:
+                            position = disc.partition+block+offset
+                            tag(disc.block(position), 256)
+                            updates[position] = (112, label_field(value, 128))
+                            break
+                        offset -= (count+BLOCK-1)//BLOCK
+                    else:
+                        raise ValueError('BD-3D: UDF-Metadatenspiegel unvollständig.')
+            maps = maps[length:]
+            index += 1
+        # Read and validate before changing any descriptor.
+        descriptors = {}
+        for position, (offset, field) in updates.items():
+            data = bytearray(disc.block(position))
+            tag(data)
+            data[offset:offset+len(field)] = field
+            crc_length = u16(data, 10)
+            struct.pack_into('<H', data, 8, binascii.crc_hqx(data[16:16+crc_length], 0))
+            data[4] = (sum(data[:16])-data[4]) % 256
+            tag(data)
+            descriptors[position] = data
+    with path.open('r+b') as out:
+        for position, data in descriptors.items():
+            out.seek(position*BLOCK)
+            out.write(data)
