@@ -150,11 +150,11 @@ lädt keine Tools/Updates aus dem Netz. Siehe `requirements-build.txt` und
 
 ## Grundlagen
 
-- [Konzept](docs/TransCora-Konzept.md)
-- [FFBatch-Auswertung](docs/ffmpeg-Parameter-Auswertung.md)
-- [Workflow, Player-Namen und Oberflächenplanung](docs/Video-Workflow-und-Oberflaeche.md)
-- [Originale Parameter](reference/FFBatch-Presets.txt)
-- [Unveränderte Batch-Referenz](reference/AnaglyphBatch_DE.bat)
+- [Konzept](https://github.com/muelli1975/TransCora/blob/main/docs/TransCora-Konzept.md)
+- [FFBatch-Auswertung](https://github.com/muelli1975/TransCora/blob/main/docs/ffmpeg-Parameter-Auswertung.md)
+- [Workflow, Player-Namen und Oberflächenplanung](https://github.com/muelli1975/TransCora/blob/main/docs/Video-Workflow-und-Oberflaeche.md)
+- [Originale Parameter](https://github.com/muelli1975/TransCora/blob/main/reference/FFBatch-Presets.txt)
+- [Unveränderte Batch-Referenz](https://github.com/muelli1975/TransCora/blob/main/reference/AnaglyphBatch_DE.bat)
 - [Methodenkatalog](presets/anaglyph_methods.reference.json)
 
 Projektlizenz: [MIT](LICENSE). Das Repository enthält keine externen Binärtools;

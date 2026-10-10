@@ -25,10 +25,8 @@ def dark_titlebar(window):
         if result != 0:
             # Earlier Windows 10 builds used attribute 19 for dark captions.
             dwm.DwmSetWindowAttribute(hwnd, 19, ctypes.byref(enabled), ctypes.sizeof(enabled))
-        # Windows 11 permits explicit caption/text colors, even in a light OS theme.
-        for attribute, color in ((35, 0x000000), (36, 0xF2F2F2)):
-            value = wintypes.DWORD(color)
-            dwm.DwmSetWindowAttribute(hwnd, attribute, ctypes.byref(value), ctypes.sizeof(value))
+        # Match the other Stereo tools (CustomTkinter dark appearance): request
+        # Windows' dark frame, leaving caption and text colors to the system.
         user32.SetWindowPos.argtypes = (
             wintypes.HWND, wintypes.HWND, ctypes.c_int, ctypes.c_int,
             ctypes.c_int, ctypes.c_int, wintypes.UINT)

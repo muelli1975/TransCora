@@ -39,6 +39,7 @@ see https://pyinstaller.org/en/stable/license.html.
 
 ## AnaglyphBatch and assets
 
-The method catalog and pinned Batch reference come from Christoph Müller's
-AnaglyphBatch repository. They retain their attribution. TransCora uses the supplied
+The method catalog comes from Christoph Müller's AnaglyphBatch repository and
+retains its attribution. The pinned Batch reference is kept in the source repository
+for development checks, not in the portable application. TransCora uses the supplied
 original icon and the existing tool-family completion sound without alteration.
