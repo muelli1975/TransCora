@@ -35,3 +35,32 @@ def load_list(path: Path) -> tuple[list[Job], Path | None]:
     if output is not None and not isinstance(output, str):
         raise ValueError("Ungültiger Ausgabeordner.")
     return [Job.from_dict(d) for d in entries], Path(output).expanduser().resolve() if output else None
+
+
+def run_logs(folder: Path) -> list[Path]:
+    import re
+    if not folder.is_dir():
+        return []
+    return sorted(p for p in folder.iterdir() if p.is_file() and not p.is_symlink()
+                  and re.fullmatch(r'\d{8}-\d{6}(?:-\d{6})?\.log', p.name))
+
+
+def new_run_log(output: Path) -> Path:
+    from datetime import datetime
+    folder = output/'logs'
+    folder.mkdir(parents=True, exist_ok=True)
+    path = folder/(datetime.now().strftime('%Y%m%d-%H%M%S-%f')+'.log')
+    with path.open('x', encoding='utf-8') as log:
+        log.write('TransCora: Laufprotokoll\n')
+    # Delete only TransCora's own dated logs. Always preserve this running log.
+    previous = [p for p in run_logs(folder) if p != path]
+    for old in previous[:-9]:
+        old.unlink()
+    return path
+
+
+def delete_run_logs(output: Path) -> int:
+    paths = run_logs(output/'logs')
+    for path in paths:
+        path.unlink()
+    return len(paths)

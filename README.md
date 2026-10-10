@@ -1,4 +1,4 @@
-# TransCora 0.1.2
+# TransCora 0.1.3
 
 Portabler, lokaler 3D-Video-Konverter mit kompakter Python-Oberfläche und FFmpeg.
 **Erste Testversion:** Video-Konvertierung ist umgesetzt; Bild-/MPO-Werkzeuge und
@@ -63,7 +63,7 @@ Frame-sequential und getrennte Videospuren sind keine unterstützten Quellen.
 | Half-OU | `_half_ou`, `-tbh`, `-abq`, `.3D.HTAB`, `.3D.HTAB-tbh` |
 | Anaglyph | Zusatz des gewählten Batch-Verfahrens, etwa `_dubois_lcd` |
 | Mono | `_mono_l`, `-2d` |
-| Nur Framerate ändern | Standard etwa `_fps30-tbh`; passende Layout-Kürzel und eigene Zusätze |
+| Nur Framerate ändern | Standard etwa `_30fps-tbh`; passende Layout-Kürzel und eigene Zusätze |
 
 Erkannte alte Stereo-Kürzel werden entfernt, unbekannte Zusätze bleiben erhalten.
 Auch TransCoras eigene `_full_sbs`, `_half_sbs`, `_full_ou` und `_half_ou` werden
@@ -79,7 +79,7 @@ nummeriert, z. B. `Film_2_dubois_lcd.mkv`; auch nachträglich angelegte Ziele si
 
 - Standard: **H.264 / MP4, CRF 18, slow**; alternativ MKV.
 - Anaglyph-Standard: **8 Bit / 4:4:4**. Nicht alle Player/Hardwaredecoder unterstützen
-  4:4:4. Optional **10 Bit / 4:4:4**, ebenfalls mit eingeschränkter Player-Unterstützung.
+  4:4:4. Optional **Hohe Farbtiefe · 10 Bit / 4:4:4**, ebenfalls mit eingeschränkter Player-Unterstützung.
   Feinere Abstufungen machen eine 8-Bit-Quelle nicht zu HDR.
 - **8 Bit / 4:2:0** ist der Anaglyph-Kompatibilitätsmodus. Die verringerte Farbauflösung
   kann die Qualität beeinträchtigen. Layout-/Mono-Ausgaben verwenden 8 Bit / 4:2:0.
@@ -187,3 +187,19 @@ lädt keine Tools/Updates aus dem Netz. Siehe `requirements-build.txt` und
 
 Projektlizenz: [MIT](LICENSE). Das Repository enthält keine externen Binärtools;
 mitgelieferte Tools behalten ihre eigenen Lizenzen und Dokumente.
+
+## Laufprotokolle und BD-3D-Probelauf
+
+Gespeicherte Laufprotokolle stehen im gewählten Ausgabeordner unter `logs`.
+Beim Start eines neuen Laufs bleiben die letzten zehn TransCora-Protokolle erhalten.
+**Logs löschen** im Logfenster löscht diese Protokolle und die angezeigten Meldungen;
+die Schaltfläche ist während laufender Arbeit deaktiviert.
+
+Der separate Workflow `Windows BD3D proof` prüft FRIM 1.31 x64 im Softwaremodus
+und tsMuxeR 2.6.12 bis zur UDF-2.50-ISO mit SSIF. Er kodiert einen kurzen, gepackten
+24-fps-Testfilm mit 240 Bildern nach AVC/MVC mit exakt 24000/1001 fps und passend
+verlangsamtem LPCM-Ton. Er kontrolliert anschließend die ISO-Struktur, die
+Bildanzahl, Zeitstempel, Farbangaben, Ton und beide wieder dekodierten Augenbilder.
+Die experimentelle Vorbereitung ist noch kein Ziel in der Programmoberfläche.
+Ein Abspieltest auf realer Blu-ray-3D-Hardware steht zusätzlich zur technischen
+Prüfung aus.

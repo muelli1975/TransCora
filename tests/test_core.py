@@ -88,8 +88,11 @@ class CoreTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     replace(options, suffix=suffix).validate()
             output = reserve_output(folder/'Film-tbh.mp4', folder, Options(target='framerate', layout='half_ou'), '', set())
-            self.assertEqual(output.name, 'Film_fps30-tbh.mp4')
+            self.assertEqual(output.name, 'Film_30fps-tbh.mp4')
             self.assertEqual(filename_layout(output.stem), ('half_ou', False))
+            output = reserve_output(folder/'Film_30fps-tbh.mp4', folder,
+                Options(target='framerate', layout='half_ou', target_fps='24000/1001'), '', set())
+            self.assertEqual(output.name, 'Film_23.976fps-tbh.mp4')
 
     def test_mp4_normalization_keeps_media_and_offsets_unchanged(self):
         def box(kind, content):

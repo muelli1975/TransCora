@@ -81,8 +81,8 @@ def check_cadence(timestamps: list[float], rate: Fraction, time_base: str) -> No
     """Reject VFR and broken gaps instead of silently dropping/repeating source frames."""
     if len(timestamps) < 2:
         raise ValueError('BD-3D: Zu wenige Bilder für eine verlässliche Timing-Prüfung.')
-    tolerance = max(float(Fraction(time_base))*1.1, 0.00001)
     period = float(1/rate)
+    tolerance = min(period/8, max(float(Fraction(time_base))*1.1, 0.00001))
     if any(not math.isfinite(t) for t in timestamps) or any(
             abs((b-a)-period) > tolerance for a, b in zip(timestamps, timestamps[1:])):
         raise ValueError('BD-3D: Variable Bildzeiten oder Bildlücken sind noch nicht freigegeben.')

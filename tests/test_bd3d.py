@@ -51,3 +51,25 @@ class BdPreparationTests(unittest.TestCase):
             invalid = dict(info, r_frame_rate='25/1', avg_frame_rate='25/1')
             with self.assertRaises(ValueError):
                 prepare(invalid, 'half_ou')
+
+
+class MvcMetadataTests(unittest.TestCase):
+    def test_generated_sps_and_subset_sps_keep_every_other_bit(self):
+        from transcora.core.mvc import tag_sps, signal_bounds
+        # Actual parameter sets from the SHA-pinned FRIM 1.31 software proof.
+        fixtures = [
+            '27640029ac2d140780227e5c05a8101012000007d200017701c0c0000a67540001db575ef7c140',
+            '2f8000294b0b4501e0089f97016a040404800001f480005dc0703000022ade8000630f57bdf0554b5ca61522',
+        ]
+        for fixture in fixtures:
+            original = bytes.fromhex(fixture)
+            tagged = tag_sps(original)
+            before, start, end = signal_bounds(original[1:])
+            after, new_start, new_end = signal_bounds(tagged[1:])
+            self.assertEqual(before.bits[:start], after.bits[:new_start])
+            self.assertEqual(before.bits[end:].rstrip('0'), after.bits[new_end:].rstrip('0'))
+            self.assertEqual(after.bits[new_start:new_end], '110101'+'00000001'*3)
+            self.assertEqual(tag_sps(tagged), tagged)
+        # Coded pictures and view-extension NALs must remain exactly identical.
+        for nal in [b'\x65\x00\x00\x03\x00\x12', b'\x74\x81\x23\x45']:
+            self.assertEqual(tag_sps(nal), nal)

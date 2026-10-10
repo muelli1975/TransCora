@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import asdict, replace
-from datetime import datetime
 from pathlib import Path
 import base64
 import json
@@ -15,8 +14,8 @@ from tkinter import filedialog, messagebox, ttk
 from transcora import __version__
 from transcora.core.engine import Cancelled, execute, methods, plan_job, preview
 from transcora.core.model import Job, LAYOUTS, PROFILES, TARGETS, Options, VIDEO_EXTENSIONS, app_root, FPS_CHOICES
-from transcora.core.naming import effective_suffix, suffix_choices, reserve_output, filename_layout
-from transcora.core.storage import load_list, save_list, write_json
+from transcora.core.naming import effective_suffix, suffix_choices, reserve_output, filename_layout, fps_suffix
+from transcora.core.storage import load_list, save_list, write_json, new_run_log, delete_run_logs
 from transcora.core.toolchain import Toolchain
 from transcora.gui.native import dark_titlebar
 from transcora.gui.preview_window import PreviewWindow
@@ -395,7 +394,7 @@ class Window:
         try:
             return effective_suffix(options, self.catalog[options.method]["suffix"], job.source) or "Keiner"
         except ValueError:
-            return options.suffix or "_fps" + options.target_fps
+            return options.suffix or fps_suffix(options.target_fps)
 
     def available_suffixes(self, options, job=None):
         layout, swap = options.layout, False
@@ -610,8 +609,9 @@ class Window:
             self.status.set("Keine noch offenen Dateien in der Liste.")
             return
         output = self.output_path()
-        log_path = output / "logs" / (datetime.now().strftime("%Y%m%d-%H%M%S") + ".log")
+        log_path = None
         def work():
+            nonlocal log_path
             output.mkdir(parents=True, exist_ok=True)
             with tempfile.TemporaryFile(dir=output):
                 pass
@@ -640,6 +640,8 @@ class Window:
             if not run:
                 self.events.put(("notice", f"Test abgeschlossen: {len(ready)} bereit · {blocked} blockiert."))
                 return
+            if ready:
+                log_path = new_run_log(output)
             counts = {"completed": 0, "failed": 0, "cancelled": 0}
             for index, (job, plan) in enumerate(ready, 1):
                 if self.cancel.is_set():
@@ -660,10 +662,12 @@ class Window:
                     self.events.put(("job", (job.id, "cancelled", "Begonnene Ausgabe verworfen", plan)))
                 except Exception as error:
                     counts["failed"] += 1
+                    with log_path.open("a", encoding="utf-8") as log:
+                        log.write(f"\nFehler: {job.source}\n{error}\n")
                     self.events.put(("job", (job.id, "failed", str(error), plan)))
                     self.events.put(("log", job.source.name + ": " + str(error)))
             summary = (f"{counts['completed']} erfolgreich · {counts['failed']} Fehler · {blocked} blockiert · "
-                       f"{counts['cancelled']} abgebrochen. Log: {log_path}")
+                       f"{counts['cancelled']} abgebrochen. Log: {log_path or 'Kein Lauf gestartet'}")
             self.events.put(("notice", summary))
             self.events.put(("log", summary))
             if ready and not self.cancel.is_set():
@@ -705,6 +709,28 @@ class Window:
         text.pack(fill="both", expand=True)
         text.insert("1.0", "\n\n".join(self.log_lines[-150:]) or "Noch keine technischen Meldungen.")
         text.configure(state="disabled")
+        button = self.button(dialog, 'Logs löschen', lambda: self.clear_logs(text))
+        button.pack(anchor='e', padx=8, pady=8)
+        button.configure(state='disabled' if self.busy else 'normal')
+        def forget(event):
+            if event.widget == dialog:
+                self.controls = [(w, state) for w, state in self.controls if w is not button]
+        dialog.bind('<Destroy>', forget)
+
+    def clear_logs(self, text=None):
+        if self.busy:
+            return
+        try:
+            count = delete_run_logs(self.output_path())
+            self.log_lines.clear()
+            self.status.set(f'{count} Laufprotokolle gelöscht.')
+            if text is not None:
+                text.configure(state='normal')
+                text.delete('1.0', 'end')
+                text.insert('1.0', 'Keine technischen Meldungen.')
+                text.configure(state='disabled')
+        except OSError as error:
+            self.status.set(f'Logs löschen: {error}')
 
     def abort(self):
         if self.busy:

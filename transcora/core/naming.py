@@ -2,7 +2,7 @@
 from pathlib import Path
 import re
 
-from .model import Options
+from .model import Options, frame_rate
 
 
 _HINTS = {"lr": ("full_sbs", False), "lrh": ("half_sbs", False), "lrq": ("half_sbs", False),
@@ -35,11 +35,19 @@ def clean_stem(stem: str) -> str:
     stem = re.sub(r"(?:[-. _])3d[-. _]+h?(?:sbs|tab)(?=$|[-. _])", "", stem, flags=re.I)
     stem = re.sub(r"-(?:lrh|rlh|lrq|rlq|tbh|bth|abq|baq|lr|rl|tb|bt|ab|ba|2d)$", "", stem, flags=re.I)
     stem = re.sub(r"_(?:full_sbs|half_sbs|full_ou|half_ou|mono_l)$", "", stem, flags=re.I)
+    stem = re.sub(r"_\d+(?:\.\d+)?(?:_\d+)?fps$", "", stem, flags=re.I)
     stem = re.sub(r"_fps\d+(?:\.\d+)?(?:_\d+)?$", "", stem, flags=re.I)
     stem = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", stem).strip(" ._-") or "Video"
     if re.fullmatch(r"(?:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\..*)?", stem, re.I):
         stem = "_" + stem
     return stem[:180].rstrip(" .")
+
+
+def fps_suffix(value: str) -> str:
+    rate = frame_rate(value)
+    labels = {'24000/1001': '23.976', '30000/1001': '29.97', '60000/1001': '59.94'}
+    label = labels.get(str(rate), str(rate).replace('/', '_'))
+    return '_' + label + 'fps'
 
 
 def suffix_choices(options: Options, method_suffix: str, layout: str | None = None, swap: bool = False) -> list[str]:
@@ -54,7 +62,7 @@ def suffix_choices(options: Options, method_suffix: str, layout: str | None = No
                        "half_ou": ["-bth", "-baq"], "full_ou": ["-bt", "-ba"]}.get(target, [])
         if target == "mono":
             choices = []
-        choices = ["_fps" + options.target_fps.replace("/", "_").replace(",", ".")] + choices
+        choices = [fps_suffix(options.target_fps)] + choices
     return choices + ["Keiner"]
 
 
@@ -69,7 +77,7 @@ def effective_suffix(options: Options, method_suffix: str, source: Path | None =
                   ("full_ou", False): "-tb", ("half_ou", False): "-tbh",
                   ("full_sbs", True): "-rl", ("half_sbs", True): "-rlh",
                   ("full_ou", True): "-bt", ("half_ou", True): "-bth"}.get((layout, swap), "")
-        return "_fps" + options.target_fps.replace("/", "_").replace(",", ".") + marker
+        return fps_suffix(options.target_fps) + marker
     if options.target == "anaglyph":
         return "_" + method_suffix
     if options.naming == "original":

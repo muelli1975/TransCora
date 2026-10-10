@@ -1,6 +1,7 @@
 """Isolated proof: portable FRIM software MVC, two-view decode, legacy 3D ISO."""
 from pathlib import Path
 import json
+import hashlib
 import os
 import re
 from fractions import Fraction
@@ -17,6 +18,7 @@ ENC = TOOLS/'frim/x64/FRIMEncode64.exe'
 DEC = TOOLS/'frim/x64/FRIMDecode64.exe'
 MUX = TOOLS/'tsmuxer/tsMuxeR.exe'
 sys.path.insert(0, str(ROOT))
+from transcora.core.mvc import tag_generated_stream
 from transcora.core.bd3d import prepare, check_cadence, encoder_args, mux_meta, BD_RATE
 
 ENV = dict(os.environ, PATH=str(ENC.parent)+os.pathsep+os.environ.get('PATH', ''))
@@ -73,6 +75,8 @@ def main():
         report['preparation'] = {'speed': str(config.speed), 'warnings': config.warnings}
         run('encode-mvc', encoder_args(ENC, OUT/'left.yuv', OUT/'right.yuv',
                                       OUT/'base.avc', OUT/'dependent.mvc'))
+        report['tagged_parameter_sets'] = {name: tag_generated_stream(OUT/name)
+                                            for name in ('base.avc', 'dependent.mvc')}
         run('decode-mvc', [DEC, '-sw', '-i:mvc', OUT/'base.avc', OUT/'dependent.mvc',
                           '-o', OUT/'decoded-left.yuv', OUT/'decoded-right.yuv'])
         expected = 1920*1080*3//2*report['frames']
@@ -137,7 +141,9 @@ def main():
         run('decode-disc', [DEC, '-sw', '-i:mvc', avc, mvc,
                             '-o', OUT/'disc-left.yuv', OUT/'disc-right.yuv'])
         for eye in ('left', 'right'):
-            if (OUT/('disc-'+eye+'.yuv')).read_bytes() != (OUT/('decoded-'+eye+'.yuv')).read_bytes():
+            with (OUT/('disc-'+eye+'.yuv')).open('rb') as a, (OUT/('decoded-'+eye+'.yuv')).open('rb') as b:
+                equal = hashlib.file_digest(a, 'sha256').digest() == hashlib.file_digest(b, 'sha256').digest()
+            if not equal:
                 raise ValueError('Disc roundtrip changed decoded '+eye+' view')
         report['disc_roundtrip_identical'] = True
         report['ok'] = True
