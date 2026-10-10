@@ -1,0 +1,56 @@
+FULL-SBS → TABH
+
+-c:v libx264 -crf 18 -preset slow -vf "stereo3d=sbsl:tb2l,scale=1920:1080:flags=lanczos+accurate_rnd+full_chroma_int" -x264-params frame-packing=4 -c:a copy
+
+---
+
+FULL-SBS → HSBS
+
+-c:v libx264 -crf 18 -preset slow -vf "stereo3d=sbsl:sbs2l,scale=1920:1080:flags=lanczos+accurate_rnd+full_chroma_int" -x264-params frame-packing=3 -c:a copy
+
+
+FULL-SBS → Mono
+
+-c:v libx264 -crf 18 -preset slow -vf "stereo3d=sbsl:ml" -c:a copy
+
+---
+
+FULL-SBS → Dubois rot/cyan
+
+-c:v libx264 -crf 18 -preset slow -vf "stereo3d=sbsl:arcd" -c:a copy
+
+---
+
+FULL-SBS → Dubois grün/magenta
+
+-c:v libx264 -crf 18 -preset slow -vf "stereo3d=sbsl:agmd" -c:a copy
+
+---
+
+FULL-SBS → Dubois amber/blau
+
+-c:v libx264 -crf 18 -preset slow -vf "stereo3d=sbsl:aybd" -c:a copy
+
+---
+
+Full-SBS → Dubois LCD + rot
+
+-c:v libx264 -crf 18 -preset slow -vf "format=gbrp16,split[l][r]; [l]crop=iw/2:ih:0:0,zscale=transferin=bt709:transfer=linear,colorchannelmixer=0.4561:0.500484:0.176381:0:-0.0400822:-0.0378246:-0.0157589:0:-0.0152161:-0.0205971:-0.00546856:0[left]; [r]crop=iw/2:ih:iw/2:0,zscale=transferin=bt709:transfer=linear,colorchannelmixer=-0.0434706:-0.0879388:-0.00155529:0:0.378476:0.73364:-0.0184503:0:-0.0721527:-0.112961:1.2264:0[right]; [left][right]blend=all_mode=addition,zscale=transferin=linear:transfer=bt709,lutrgb=r='gammaval(0.75)',format=yuv444p" -colorspace bt709 -color_primaries bt709 -color_trc bt709 -c:a copy
+
+---
+
+Full-SBS → iaian7 Anachrome
+
+-c:v libx264 -crf 18 -preset slow -vf "format=gbrp16,split[l][r]; [l]crop=iw/2:ih:0:0,colorchannelmixer=0.4:0.3:0.3:0:0:0:0:0:0:0:0:0,lutrgb=r='gammaval(0.87)':g='gammaval(0.87)':b='gammaval(0.87)'[left]; [r]crop=iw/2:ih:iw/2:0,colorchannelmixer=0:0:0:0:0.1:0.9:0:0:0.1:0:0.9:0,lutrgb=r='gammaval(1.176)':g='gammaval(1.176)':b='gammaval(1.176)'[right]; [left][right]blend=all_mode=addition,colorchannelmixer=1.16:-0.08:-0.08:0:-0.02:1.04:-0.02:0:-0.02:-0.02:1.04:0,format=yuv444p" -colorspace bt709 -color_primaries bt709 -color_trc bt709 -c:a copy
+
+---
+
+Full-SBS → Rendepth
+
+-c:v libx264 -crf 18 -preset slow -vf "format=gbrp16,split[l][r]; [l]crop=iw/2:ih:0:0,colorchannelmixer=0.4561:0.500484:0.176381:0:-0.0400822:-0.0378246:-0.0157589:0:-0.0152161:-0.0205971:-0.00546856:0,lutrgb=r='clip(val,0,maxval)':g='clip(val,0,maxval)':b='clip(val,0,maxval)'[left]; [r]crop=iw/2:ih:iw/2:0,colorchannelmixer=-0.0434706:-0.0879388:-0.00155529:0:0.378476:0.73364:-0.0184503:0:-0.0721527:-0.112961:1.2264:0,lutrgb=r='clip(val,0,maxval)':g='clip(val,0,maxval)':b='clip(val,0,maxval)'[right]; [left][right]blend=all_mode=addition,lutrgb=r='gammaval(0.625)':g='gammaval(1.25)',format=yuv444p" -colorspace bt709 -color_primaries bt709 -color_trc bt709 -c:a copy
+
+---
+
+Full-SBS → Rendepth 2
+
+-c:v libx264 -crf 18 -preset slow -vf "format=gbrp16,split[l][r]; [l]crop=iw/2:ih:0:0,colorchannelmixer=0.439:0.447:0.148:0:0:0:0:0:0:0:0:0,lutrgb=r='clip(val,0,maxval)':g='clip(val,0,maxval)':b='clip(val,0,maxval)'[left]; [r]crop=iw/2:ih:iw/2:0,colorchannelmixer=0:0:0:0:0.095:0.934:-0.028:0:-0.018:-0.005:1.057:0,lutrgb=r='clip(val,0,maxval)':g='clip(val,0,maxval)':b='clip(val,0,maxval)'[right]; [left][right]blend=all_mode=addition,lutrgb=r='gammaval(0.625)':g='gammaval(1.25)',format=yuv444p" -colorspace bt709 -color_primaries bt709 -color_trc bt709 -c:a copy

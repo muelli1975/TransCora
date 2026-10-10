@@ -1,0 +1,214 @@
+{
+  "schema_version": 1,
+  "status": "reference_data_only_not_an_executable_preset_compiler",
+  "reference": {
+    "repository": "muelli1975/AnaglyphBatch",
+    "path": "AnaglyphBatch_DE.bat",
+    "commit": "f073b9745d21eaa3f001b8fb14222b54cd34021d",
+    "blob_sha": "f1e4bc892498055f999d8a41837a697fe68c9781",
+    "local_snapshot": "../reference/AnaglyphBatch_DE.bat"
+  },
+  "working_space_reference": {
+    "transfer": "iec61966-2-1",
+    "integer_rgb_intermediate": "gbrp16",
+    "video_adapter_status": "to_be_validated",
+    "note": "Keep matrices, clipping, LUT order and their reference working space; do not substitute transfer tags without pixel conversion."
+  },
+  "excluded": [
+    "cielab"
+  ],
+  "methods": [
+    {
+      "id": "dubois_lcd",
+      "revision": 1,
+      "label": "Dubois LCD (Sanders/McAllister) + rot",
+      "suffix": "dubois_lcd",
+      "reference_batch_number": 1,
+      "pipeline_type": "linear",
+      "left_matrix_ffmpeg": "0.4561:0.500484:0.176381:0:-0.0400822:-0.0378246:-0.0157589:0:-0.0152161:-0.0205971:-0.00546856:0",
+      "right_matrix_ffmpeg": "-0.0434706:-0.0879388:-0.00155529:0:0.378476:0.73364:-0.0184503:0:-0.0721527:-0.112961:1.2264:0",
+      "post_filter_ffmpeg": ",lutrgb=r='gammaval(0.75)'"
+    },
+    {
+      "id": "dubois",
+      "revision": 1,
+      "label": "Dubois",
+      "suffix": "dubois",
+      "reference_batch_number": 2,
+      "pipeline_type": "linear",
+      "left_matrix_ffmpeg": "0.437:0.449:0.164:0:-0.062:-0.062:-0.024:0:-0.048:-0.05:-0.017:0",
+      "right_matrix_ffmpeg": "-0.011:-0.032:-0.007:0:0.377:0.761:-0.009:0:-0.026:-0.093:1.234:0",
+      "post_filter_ffmpeg": ""
+    },
+    {
+      "id": "wimmer",
+      "revision": 1,
+      "label": "Optimized (Peter Wimmer)",
+      "suffix": "wimmer",
+      "reference_batch_number": 3,
+      "pipeline_type": "srgb",
+      "left_matrix_ffmpeg": "0:0.7:0.3:0:0:0:0:0:0:0:0:0",
+      "right_matrix_ffmpeg": "0:0:0:0:0:1:0:0:0:0:1:0",
+      "post_filter_ffmpeg": ",lutrgb=r='gammaval(0.6666667)'"
+    },
+    {
+      "id": "cosima3",
+      "revision": 1,
+      "label": "Cosima AnaglyphType=3 (Gerhard P. Herbig)",
+      "suffix": "cosima3",
+      "reference_batch_number": 4,
+      "pipeline_type": "linear",
+      "left_matrix_ffmpeg": "0.299:0.587:0.114:0:0:0:0:0:0:0:0:0",
+      "right_matrix_ffmpeg": "0:0:0:0:0.299:0.701:0:0:0.299:0:0.701:0",
+      "post_filter_ffmpeg": ",lutrgb=r='gammaval(0.75)'"
+    },
+    {
+      "id": "cosima4",
+      "revision": 1,
+      "label": "Cosima AnaglyphType=4 (Gerhard P. Herbig)",
+      "suffix": "cosima4",
+      "reference_batch_number": 5,
+      "pipeline_type": "linear",
+      "left_matrix_ffmpeg": "0.6495:0.2935:0.057:0:0:0:0:0:0:0:0:0",
+      "right_matrix_ffmpeg": "0:0:0:0:0.1495:0.8505:0.057:0:0.1495:0.057:0.8505:0",
+      "post_filter_ffmpeg": ",lutrgb=r='gammaval(0.75)'"
+    },
+    {
+      "id": "compromise",
+      "revision": 1,
+      "label": "Compromise (Jure Ahtik)",
+      "suffix": "compromise",
+      "reference_batch_number": 6,
+      "pipeline_type": "srgb",
+      "left_matrix_ffmpeg": "0.439:0.447:0.148:0:0:0:0:0:0:0:0:0",
+      "right_matrix_ffmpeg": "0:0:0:0:0.095:0.934:-0.005:0:-0.018:-0.028:1.057:0",
+      "post_filter_ffmpeg": ""
+    },
+    {
+      "id": "iaian7",
+      "revision": 1,
+      "label": "iaian7 Anachrome (John Einselen)",
+      "suffix": "iaian7",
+      "reference_batch_number": 7,
+      "pipeline_type": "iaian7",
+      "special_pipeline": {
+        "left_matrix_ffmpeg": "0.4:0.3:0.3:0:0:0:0:0:0:0:0:0",
+        "right_matrix_ffmpeg": "0:0:0:0:0.1:0.9:0:0:0.1:0:0.9:0",
+        "left_lut_ffmpeg": "lutrgb=r='gammaval(0.87)':g='gammaval(0.87)':b='gammaval(0.87)'",
+        "right_lut_ffmpeg": "lutrgb=r='gammaval(1.176)':g='gammaval(1.176)':b='gammaval(1.176)'",
+        "combine_ffmpeg": "blend=all_mode=addition",
+        "post_matrix_ffmpeg": "1.16:-0.08:-0.08:0:-0.02:1.04:-0.02:0:-0.02:-0.02:1.04:0"
+      }
+    },
+    {
+      "id": "rendepth",
+      "revision": 1,
+      "label": "Rendepth (Andres Hernandez)",
+      "suffix": "rendepth",
+      "reference_batch_number": 8,
+      "pipeline_type": "rendepth",
+      "left_matrix_ffmpeg": "0.4561:0.500484:0.176381:0:-0.0400822:-0.0378246:-0.0157589:0:-0.0152161:-0.0205971:-0.00546856:0",
+      "right_matrix_ffmpeg": "-0.0434706:-0.0879388:-0.00155529:0:0.378476:0.73364:-0.0184503:0:-0.0721527:-0.112961:1.2264:0",
+      "post_filter_ffmpeg": ",lutrgb=r='gammaval(0.625)':g='gammaval(1.25)'"
+    },
+    {
+      "id": "rendepth2",
+      "revision": 1,
+      "label": "Rendepth 2 (Andres Hernandez)",
+      "suffix": "rendepth2",
+      "reference_batch_number": 9,
+      "pipeline_type": "rendepth",
+      "left_matrix_ffmpeg": "0.439:0.447:0.148:0:0:0:0:0:0:0:0:0",
+      "right_matrix_ffmpeg": "0:0:0:0:0.095:0.934:-0.028:0:-0.018:-0.005:1.057:0",
+      "post_filter_ffmpeg": ",lutrgb=r='gammaval(0.625)':g='gammaval(1.25)'"
+    },
+    {
+      "id": "color",
+      "revision": 1,
+      "label": "Color",
+      "suffix": "color",
+      "reference_batch_number": 10,
+      "pipeline_type": "srgb",
+      "left_matrix_ffmpeg": "1:0:0:0:0:0:0:0:0:0:0:0",
+      "right_matrix_ffmpeg": "0:0:0:0:0:1:0:0:0:0:1:0",
+      "post_filter_ffmpeg": ""
+    },
+    {
+      "id": "halfcolor",
+      "revision": 1,
+      "label": "Half-Color",
+      "suffix": "halfcolor",
+      "reference_batch_number": 11,
+      "pipeline_type": "srgb",
+      "left_matrix_ffmpeg": "0.299:0.587:0.114:0:0:0:0:0:0:0:0:0",
+      "right_matrix_ffmpeg": "0:0:0:0:0:1:0:0:0:0:1:0",
+      "post_filter_ffmpeg": ""
+    },
+    {
+      "id": "grey",
+      "revision": 1,
+      "label": "Grey",
+      "suffix": "grey",
+      "reference_batch_number": 12,
+      "pipeline_type": "srgb",
+      "left_matrix_ffmpeg": "0.299:0.587:0.114:0:0:0:0:0:0:0:0:0",
+      "right_matrix_ffmpeg": "0:0:0:0:0.299:0.587:0.114:0:0.299:0.587:0.114:0",
+      "post_filter_ffmpeg": ""
+    },
+    {
+      "id": "oldschool",
+      "revision": 1,
+      "label": "Oldschool",
+      "suffix": "oldschool",
+      "reference_batch_number": 13,
+      "pipeline_type": "srgb",
+      "left_matrix_ffmpeg": "0.299:0.587:0.114:0:0:0:0:0:0:0:0:0",
+      "right_matrix_ffmpeg": "0:0:0:0:0.299:0.587:0.114:0:0:0:0:0",
+      "post_filter_ffmpeg": ""
+    },
+    {
+      "id": "vdp",
+      "revision": 1,
+      "label": "Frans van den Poel",
+      "suffix": "vdp",
+      "reference_batch_number": 14,
+      "pipeline_type": "srgb",
+      "left_matrix_ffmpeg": "0.5:0.5:0:0:0:0:0:0:0:0:0:0",
+      "right_matrix_ffmpeg": "0:0:0:0:0.4:0.6:0:0:0.2:0:0.8:0",
+      "post_filter_ffmpeg": ""
+    },
+    {
+      "id": "wattie",
+      "revision": 1,
+      "label": "John Wattie",
+      "suffix": "wattie",
+      "reference_batch_number": 15,
+      "pipeline_type": "srgb",
+      "left_matrix_ffmpeg": "0.8:0.2:0.2:0:0:0:0:0:0:0:0:0",
+      "right_matrix_ffmpeg": "0:0:0:0:0.2:0.8:0:0:0.1:0:0.9:0",
+      "post_filter_ffmpeg": ""
+    },
+    {
+      "id": "dubois_gm",
+      "revision": 1,
+      "label": "Dubois grün/magenta (GM)",
+      "suffix": "dubois_gm",
+      "reference_batch_number": 17,
+      "pipeline_type": "linear",
+      "left_matrix_ffmpeg": "-0.062:-0.158:-0.039:0:0.284:0.668:0.143:0:-0.015:-0.027:0.021:0",
+      "right_matrix_ffmpeg": "0.529:0.705:0.024:0:-0.016:-0.015:-0.065:0:0.009:0.075:0.937:0",
+      "post_filter_ffmpeg": ""
+    },
+    {
+      "id": "dubois_yb",
+      "revision": 1,
+      "label": "Dubois amber/blau (YB)",
+      "suffix": "dubois_yb",
+      "reference_batch_number": 18,
+      "pipeline_type": "linear",
+      "left_matrix_ffmpeg": "1.062:-0.205:0.299:0:-0.026:0.908:0.068:0:-0.038:-0.173:0.022:0",
+      "right_matrix_ffmpeg": "-0.016:-0.123:-0.017:0:0.006:0.062:-0.017:0:0.094:0.185:0.911:0",
+      "post_filter_ffmpeg": ""
+    }
+  ]
+}
