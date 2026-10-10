@@ -104,7 +104,11 @@ def main():
                 '-af', af, '-ar', '48000', '-c:a', 'pcm_s24le', '-f', 's24le', 'pipe:1'], timeout=120)
             actual_audio = capture([str(tools.ffmpeg), '-v', 'error', '-i', str(packed), '-map', '0:a:0',
                 '-c:a', 'pcm_s24le', '-f', 's24le', 'pipe:1'], timeout=120)
-            if actual_audio != expected_audio:
+            # LPCM uses 5-ms blocks; the final block may contain fewer than 240
+            # silent padding samples. Every source sample and channel must match.
+            padding = actual_audio[len(expected_audio):]
+            if (not actual_audio.startswith(expected_audio) or len(padding) >= 240*channels*3
+                    or any(padding) or len(actual_audio) % (channels*3)):
                 raise ValueError('LPCM roundtrip altered audio samples/channel order')
             # A second destination cannot overwrite an existing published movie.
             again = plan_job(tools, job, OUT, set(), threading.Event(), capabilities)
