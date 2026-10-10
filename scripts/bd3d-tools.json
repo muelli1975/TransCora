@@ -1,0 +1,15 @@
+{
+  "frim": {
+    "version": "1.31 x64",
+    "url": "https://drive.google.com/uc?export=download&id=1lumXLd74U-E2k195bzfETbHgFcHcT4sH",
+    "size": 15022306,
+    "sha256": "76689784495d53b34889f0ea67c9db6b9750925db9d1147f8fd9159e111c0778",
+    "author": "https://sites.google.com/site/videofan3d/software/frim-encoder"
+  },
+  "tsmuxer": {
+    "version": "2.6.12",
+    "download_page": "https://digital-digest.com/software/download_cont.php?sid=1666&ssid=0&did=1",
+    "size": 2825369,
+    "sha256": "28291042ade38829999587f2e88f079634c1b9ed36f3491f53367f32ee9c946f"
+  }
+}

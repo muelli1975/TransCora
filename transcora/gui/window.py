@@ -374,11 +374,11 @@ class Window:
         text = ""
         if anaglyph:
             if options.profile == "compatible":
-                text = "4:2:0: geringere Farbauflösung. Die Anaglyphenqualität kann darunter leiden."
+                text = "4:2:0: Geringere Farbauflösung. Die Anaglyphenqualität kann darunter leiden."
             else:
                 text = "4:4:4: Nicht alle Player und Hardwaredecoder unterstützen dieses Format."
                 if options.profile == "quality10":
-                    text += " 10 Bit: feinere Abstufungen; kein HDR-Modus."
+                    text += " 10 Bit: Feinere Abstufungen; kein HDR-Modus."
         if framerate:
             text = "Layout, Auflösung und Augenreihenfolge bleiben erhalten. Video wird neu kodiert; Ton wird kopiert."
         if options.codec == "h265":
@@ -423,7 +423,7 @@ class Window:
                                       self.catalog[self.defaults.method]["suffix"], set()).name
                 self.output_name.set("Beispiel-Ausgabename: " + name)
             except (ValueError, OSError):
-                self.output_name.set("Ausgabename: nach Auswahl einer Datei")
+                self.output_name.set("Ausgabename: Nach Auswahl einer Datei")
             return
         job = selected[0]
         try:

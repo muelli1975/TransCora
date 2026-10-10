@@ -66,7 +66,7 @@ def probe(tools: Toolchain, path: Path, cancel: threading.Event | None = None) -
     if not videos:
         raise ValueError("Keine nutzbare Videospur gefunden.")
     if len(videos) > 1:
-        raise ValueError("Mehrere Videospuren: getrennte L/R-Spuren sind in Version 0.1 noch nicht freigegeben.")
+        raise ValueError("Mehrere Videospuren: Getrennte L/R-Spuren sind in Version 0.1 noch nicht freigegeben.")
     result["video"] = videos[0]
     return result
 
@@ -169,7 +169,7 @@ class Plan:
     @property
     def stereo_summary(self) -> str:
         if not self.stereo:
-            return "3D-Kennzeichnung: keine SBS/OU-Kennzeichnung"
+            return "3D-Kennzeichnung: Keine SBS/OU-Kennzeichnung"
         axis, inverted = self.stereo
         flags = "MKV-StereoMode" if self.options.container == "mkv" else "MP4-st3d"
         if self.options.codec == "h264" and not inverted:
@@ -374,7 +374,7 @@ def plan_job(tools: Toolchain, job: Job, output_root: Path, reserved: set[str],
         if unsupported:
             raise ValueError("Audio passt nicht zum MP4-Kopierprofil (" + ", ".join(sorted(unsupported)) + "). MKV wählen.")
     if options.target == "anaglyph":
-        warnings.append("4:2:0: geringere Farbauflösung kann Anaglyphenqualität beeinträchtigen."
+        warnings.append("4:2:0: Geringere Farbauflösung kann Anaglyphenqualität beeinträchtigen."
                         if options.profile == "compatible" else "4:4:4 wird nicht von allen Playern/Hardwaredecodern unterstützt.")
     graph, size, pixel_format = build_graph(video, options, layout, swap, colors, catalog[options.method])
     output_colors = dict(colors) if options.target == "framerate" else {

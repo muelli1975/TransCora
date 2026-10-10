@@ -1,0 +1,40 @@
+name: Windows BD3D proof
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/bd3d*'
+      - 'scripts/fetch_bd3d_tools.py'
+      - '.github/workflows/bd3d-proof.yml'
+      - 'transcora/core/bd3d.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  software-mvc:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Fetch pinned portable tools
+        run: |
+          python scripts/fetch_ffmpeg.py
+          python scripts/fetch_bd3d_tools.py
+      - name: Check runtime and software MVC
+        shell: pwsh
+        run: |
+          Get-CimInstance Win32_Processor | Select-Object Name, Manufacturer, NumberOfCores
+          python scripts/bd3d_proof.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: TransCora-BD3D-Proof
+          path: output/bd3d-proof/
+          if-no-files-found: error
+          retention-days: 30

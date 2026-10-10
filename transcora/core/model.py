@@ -84,7 +84,7 @@ class Options:
             raise ValueError("Ungültiges Anaglyphenverfahren.")
         if self.suffix is not None and (not isinstance(self.suffix, str) or len(self.suffix) > 80
                 or re.search(r'[<>:"/\\|?*\x00-\x1f]', self.suffix) or self.suffix.endswith((" ", "."))):
-            raise ValueError("Dateinamenszusatz: höchstens 80 Zeichen, ohne Pfad- oder ungültige Dateizeichen.")
+            raise ValueError("Dateinamenszusatz: Höchstens 80 Zeichen, ohne Pfad- oder ungültige Dateizeichen.")
         if not isinstance(self.target_fps, str):
             raise ValueError("Ungültige Zielbildrate.")
         frame_rate(self.target_fps)
