@@ -52,7 +52,7 @@ Diese Tabelle bildet zunächst die zehn hochgeladenen Fragmente ab. Die drei `*_
 | `video.anaglyph.rendepth` | Rendepth | Anaglyphe | Augenauflösung erhalten | Vergleich; Produkt verwendet Batch-Definition |
 | `video.anaglyph.rendepth2` | Rendepth 2 | Anaglyphe | Augenauflösung erhalten | Vergleich; Produkt verwendet Batch-Definition |
 
-Alle zehn Originalfragmente bleiben für Vergleiche erhalten. Im Produkt gibt es vier Ausgabearten mit einem Verfahren-Menü bei „Anaglyphe“. Dieses Menü orientiert sich an den 17 Batch-Verfahren; die drei historischen FFmpeg-Dubois-Kürzel werden nicht als weitere gleichnamige Varianten daneben gestellt. Ein bevorzugtes Verfahren wird erst nach Referenzvergleich festgelegt.
+Alle zehn Originalfragmente bleiben für Vergleiche erhalten. Im Produkt gibt es vier Ausgabearten mit einem Verfahren-Menü bei „Anaglyph“. Dieses Menü orientiert sich an den 17 Batch-Verfahren; die drei historischen FFmpeg-Dubois-Kürzel werden nicht als weitere gleichnamige Varianten daneben gestellt. Ein bevorzugtes Verfahren wird erst nach Referenzvergleich festgelegt.
 
 Container ist eine getrennte Entscheidung. Vorschlag: MP4/H.264 für übliche Stereo-/Mono-Wiedergabe, MKV/H.264 für hochwertige 4:4:4-Anaglyphen. Auch MP4 kann entsprechende H.264-Daten enthalten; ein Containerwechsel allein schafft jedoch keine Hardware-Kompatibilität. Zielgeräte müssen separat getestet werden. H.265 kommt in keiner Vorlage vor und erhält noch kein eigenes Qualitätsprofil.
 
@@ -88,7 +88,7 @@ Verbindliche Nutzervorgabe: Anaglyphen standardmäßig explizit mit 4:4:4 ausgeb
 | Eingabedateien | Einzeldatei, Mehrfachauswahl, wiederholtes Hinzufügen aus verschiedenen Ordnern oder Ordnersuche |
 | Quelleintrag | Herkunftspfad, optional gewählter Ordner als Spiegelungswurzel |
 | Zielart / Verfahren | Auswahl eines der abgeleiteten Presets |
-| Ausgabeordner | Vom Nutzer wählbar; außerhalb des Eingabebaums bevorzugt |
+| Ausgabeordner | Standard `output` unter dem portablen Programmordner; frei gewähltes Ziel wird separat gemerkt |
 | Dateiname | Verfahrenssuffix, Quellname, festgelegte Konfliktregel |
 | Container | Nur kuratierte passende Kombinationen; nicht automatisch aus dem Eingabecontainer übernehmen |
 | Streamauswahl | Hauptvideo, gewünschte Tonspuren; Untertitel separat prüfen |
@@ -107,7 +107,7 @@ Framerate, Quellenfarbraum und Pixelformat sind zunächst technische Eigenschaft
 1. Dateien hinzufügen mit Mehrfachauswahl, auch über mehrere Hinzufüge-Vorgänge aus verschiedenen Ordnern. Eine einzelne Datei ist eine Liste mit einem Job.
 2. Ordner hinzufügen, Unterordner optional. Beide Importwege erzeugen dieselben Jobs.
 3. Technische Vorabprüfung mit ffprobe, sichtbaren Fehlern und geplantem Ausgabeformat.
-4. Vier Ausgabearten: Half-SBS, Half-OU, Mono links und Anaglyphe mit 17 Batch-Verfahren ohne CIELab.
+4. Vier Ausgabearten: Half-SBS, Half-OU, Mono links und Anaglyph mit 17 Batch-Verfahren ohne CIELab.
 5. H.264 mit CRF 18 / slow; bestätigte Pixelformate und passende Container.
 6. Audio zunächst kopieren, wenn möglich. Bei Inkompatibilität verständliche Meldung und bewusst gewählte Lösung; keine versteckte verlustbehaftete Neukodierung.
 7. Fortschritt pro Datei und gesamte Liste, Protokoll, Abbrechen, Fehlerstatus. Zunächst sequenzielle Jobs als einfache robuste Ausführung.

@@ -55,7 +55,7 @@ MP4, MKV, MOV, M2TS/TS und AVI bleiben die sinnvollen Eingabecontainer. Ein Cont
 
 Diese Layoutbezeichnungen sind durch die FFmpeg-Filterdokumentation belegt. Die technische Unterstützung des Filters ist noch kein fertiger Importadapter. [Q4]
 
-In der GUI reichen vier Layouts plus „Augen tauschen“. Die Jobdaten speichern die tatsächliche Reihenfolge. Ein Standard für alle neu hinzugefügten Dateien ist möglich; abweichende Dateien erhalten eine eigene Einstellung. Eine gemischte Liste darf nicht unbemerkt als ein einziges Quelllayout behandelt werden.
+In der GUI reichen vier Layouts plus „L/R tauschen“. Die Jobdaten speichern die tatsächliche Reihenfolge. Ein Standard für alle neu hinzugefügten Dateien ist möglich; abweichende Dateien erhalten eine eigene Einstellung. Eine gemischte Liste darf nicht unbemerkt als ein einziges Quelllayout behandelt werden.
 
 Beispiel mit beabsichtigtem 16:9-Bild pro Auge und quadratischen Zielpixeln:
 
@@ -95,7 +95,7 @@ Diese Kombinationen sind eine eigene Ableitung aus den dokumentierten Regeln. Es
 
 Andere Container ändern nur die echte Endung: zum Beispiel `Film.3D.HSBS-lrh.mp4`. `.HSBS` wird keine erfundene Dateiendung. Für einen 10-Bit-Hinweis ist `Film_anaglyph_dubois_lcd_10bit-2d.mkv` möglich. Alle Qualitäts-/Auflösungshinweise müssen vor dem abschließenden Player-Suffix stehen. Standardmäßig sollte das kombinierte Schema automatisch verwendet werden, mit einer abschaltbaren Option „Stereo-Kürzel im Dateinamen“. Eine Liste aller historischen Player-Suffixvarianten in der Hauptoberfläche ist unnötig.
 
-Ausgaben werden grundsätzlich links-zuerst beziehungsweise links-oben geschrieben. „Augen tauschen“ korrigiert die Quelle, es bedeutet nicht automatisch einen rechts-zuerst-Export.
+Ausgaben werden grundsätzlich links-zuerst beziehungsweise links-oben geschrieben. „L/R tauschen“ korrigiert die Quelle, es bedeutet nicht automatisch einen rechts-zuerst-Export.
 
 Bei einer Umwandlung werden erkannte Layout-Marker des Eingabenamens gezielt ersetzt. Aus `Film.3D.HSBS-lrh.mkv` muss für Anaglyph beispielsweise `Film_anaglyph_dubois-2d.mkv` entstehen. Ein alter SBS-/TAB-Hinweis darf das fertige Anaglyphenbild nicht zu einer erneuten Stereotrennung veranlassen. Nicht blind jedes Vorkommen von „3D“ aus Filmtiteln entfernen. Kollisionen vorab erkennen; notwendige Unterscheidungszusätze stehen vor dem finalen Layout-Suffix.
 
@@ -141,10 +141,25 @@ Vorgeschlagenes Windows-Fenster: ungefähr 820 × 560 logische Pixel als Ausgang
 
 - **Oben:** „Dateien hinzufügen“, „Ordner hinzufügen“, Entfernen; „Liste speichern/laden“ als kompakte Nebenaktion.
 - **Mitte:** Jobliste mit Datei, Quelllayout, Ziel/Preset und Status. Auswahl zeigt technische Angaben; Warnungen sind am betroffenen Job sichtbar. Alle Dateipfade sind zugänglich, auch wenn die Listenspalte nur den Dateinamen zeigt.
-- **Darunter:** Quelllayout/„Augen tauschen“ für ausgewählte Jobs, Zielpreset, nur bei Anaglyphen die Methode, passendes Qualitätsprofil, Ausgabeordner und ein Beispiel des geplanten Zielnamens. Gemeinsame Einstellungen können bewusst auf die Auswahl beziehungsweise alle noch nicht gestarteten Jobs angewandt werden.
+- **Darunter:** Quelllayout/„L/R tauschen“ für ausgewählte Jobs, Zielpreset, nur bei Anaglyphen die Methode, passendes Qualitätsprofil, Ausgabeordner und ein Beispiel des geplanten Zielnamens. Gemeinsame Einstellungen können bewusst auf die Auswahl beziehungsweise alle noch nicht gestarteten Jobs angewandt werden.
 - **Unten:** Fortschrittsbalken, „Datei n von m“, aktueller Schritt, Geschwindigkeit und gegebenenfalls geschätzte Restzeit. „Starten“, während des Laufs „Abbrechen“. Technische Einzelheiten und Log sind aufklappbar.
 
 Die Hauptansicht zeigt keine beliebige Codec-/Filter-/Formatliste. Presets kapseln kompatible Kombinationen. Sie blendet unpassende Felder aus oder deaktiviert sie nachvollziehbar. Quell- und Zielordner werden getrennt gemerkt. Das Quelllayout ist eine Interpretationsentscheidung pro Job; das Zielpreset ist eine Ausgabeentscheidung.
+
+### Ausgabeziel und optionale Encoder-Einstellungen
+
+Verbindliche Ergänzung vom 10. Oktober: Die GUI verwendet „L/R tauschen“ und Ziel „Anaglyph“. Standardziel ist `output` unter dem portablen TransCora-Hauptordner, sofern kein eigener Ausgabeordner gewählt beziehungsweise gespeichert ist. Für einen entpackten Windows-Build wäre das beispielsweise `D:\TransCora\output`. Der Programmstandort bestimmt den Standardpfad, nicht das aktuelle Arbeitsverzeichnis und nicht ein temporäres Bundle-Entpackverzeichnis. Das Ziel wird bei Bedarf angelegt und vor dem Start auf Schreibbarkeit geprüft. Ein nicht mehr verfügbarer gespeicherter Zielordner wird sichtbar geklärt, ohne still an anderer Stelle auszugeben. Bei Ordnerimporten bleibt Strukturspiegelung optional; bei Rekursion darf der Ausgabeordner nicht wieder als Quelle eingesammelt werden.
+
+**Entwicklungsvorschlag zu Bitraten und zusätzlichen Codecs – noch keine freigegebene Implementierung:** Ein geschlossenes Feld „Erweitert“ kann wenige geprüfte Encoder-Einstellungen aufnehmen. Die Hauptansicht und alle Methoden bleiben unverändert übersichtlich.
+
+- **Qualität (Standard):** H.264 zunächst mit dem bewährten CRF 18 / slow. CRF steuert die Qualität mit variabler Bitrate; damit sind weder eine feste Bitrate noch eine feste Dateigröße zugesagt. Ein optional bearbeitbarer CRF-Wert gehört in den erweiterten Bereich, mit erklärter Richtung der Qualitätsänderung. [Q1, Q2]
+- **Zielbitrate (optional):** Positive Videobitrate in Mbit/s, als durchschnittliches Ziel (ABR) gekennzeichnet. Dieses Eingabefeld ersetzt den CRF-Modus; beide werden nicht als konkurrierende Ziele gleichzeitig übergeben. Die Bitrate betrifft das Video, Audio und Container kommen zur Dateigröße hinzu. Geringe Werte können trotz 4:4:4/10 Bit starke Kompressionsverluste verursachen. Ein durchschnittliches Ziel ist keine echte CBR-Ausgabe und kein garantiertes Dateigrößenlimit. [Q1, Q2]
+- **Zwei Durchgänge:** Für gezielte Dateigrößenplanung später sinnvoll; zusätzliche Laufzeit und Pass-Verwaltung einschließlich Abbruch, temporären Dateien und Gesamtfortschritt müssen vorher sauber umgesetzt werden. Eine einfache erste ABR-Option kann einen Durchgang verwenden, ohne die Genauigkeit einer geprüften Zwei-Pass-Ausgabe zu behaupten. Ein gerätespezifisches Spitzenbitratelimit/VBV wäre eine weitere getrennte Anforderung und wird nicht aus einem ABR-Feld abgeleitet.
+- **Videocodec:** H.264 bleibt Standard und erster geprüfter Durchstich. H.265/HEVC ist die naheliegende nächste kuratierte Ergänzung, sobald ein tatsächlicher Bedarf und Build-/Player-Tests vorliegen. Es kann effizienter komprimieren, benötigt mit Softwareencoding aber typischerweise mehr Zeit und hat andere Kompatibilitätsgrenzen. Ein H.265-4:4:4-Profil ist nicht mit verbreiteter H.265-Main10-4:2:0-Unterstützung gleichzusetzen. Codecwechsel übernimmt weder CRF-Werte noch Pixel-/Containerkombinationen ungeprüft. [Q2, Q12]
+
+Keine vollständige FFmpeg-Encoderliste, freie Kommandozeilenfelder oder neue Qualitäts-Presetflut. AV1, ProRes, FFV1 und Hardwareencoder werden erst bei einem konkreten Workflowbedarf geprüft. Encoder, Container, Bittiefe und Chroma werden als kompatible Kombination validiert; ein Encoderwechsel darf Anaglyphen nicht unbemerkt von 4:4:4 auf 4:2:0 umstellen. Auch manuelle Bitraten verändern keine AnaglyphBatch-Matrizen oder LUTs.
+
+Das Jobmodell erhält bei Umsetzung `rate_control_mode` (crf/abr), `crf` oder `target_video_bitrate_bps` sowie bei späterem Bedarf `passes`. Mbit/s wird eindeutig als dezimale Einheit angegeben und intern in Bit/s gespeichert. Qualitätswarnungen, aktivierte Abweichungen und der konkrete Encoder stehen im Exportplan. Geänderte Encoder-Einstellungen dürfen bereits eingeplante Jobs nicht rückwirkend und unsichtbar verändern.
 
 ### Kontrollbild statt dauerhaftem Videoplayer
 
@@ -183,5 +198,6 @@ Erst nach dem ersten Full-SBS-Referenzdurchstich weitere Adapter freigeben. So e
 - **Q9 – Matroska, Multi-planar and 3D Videos:** https://www.matroska.org/technical/notes.html
 - **Q10 – Bino, Container-Metadatenhinweise:** https://bino3d.org/metadata-for-stereo-3d-and-surround-video.html
 - **Q11 – MKVToolNix, Trackeigenschaften bearbeiten:** https://mkvtoolnix.download/doc/mkvpropedit.html
+- **Q12 – HandBrake, Vergleich der Video-Codecs:** https://handbrake.fr/docs/en/1.11.0/technical/video-codecs.html
 
 Alle Webquellen wurden am 10. Oktober 2026 gelesen. Belegte Player-Regeln, lokale FFmpeg-Ergebnisse und eigene TransCora-Vorschläge sind im Text getrennt ausgewiesen. Externe Webseiten werden zur Entwicklungsrecherche verwendet; die geplante Anwendung benötigt dadurch keine Onlinefunktion.

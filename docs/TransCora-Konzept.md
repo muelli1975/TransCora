@@ -17,6 +17,8 @@ FFmpeg ist die Haupt-Engine, ffprobe übernimmt die technische Analyse. ExifTool
 - Technische Vorabprüfung, geplante Ausgabe, Warnungen, Jobstatus, Fortschritt, Abbruch und verständliches Log stehen im Mittelpunkt.
 - Eine große visuelle Vorschau ist offen und kein Pflichtbestandteil.
 - Die Oberfläche orientiert sich optisch und bedienlogisch an SplatTricia, StereoFine, AnaglyphBatch, Freeda und AnaChroma.
+- Kompakte Beschriftungen: „L/R tauschen“ und Ziel „Anaglyph“.
+- Standard-Ausgabeordner ist `output` unter dem portablen TransCora-Hauptordner, solange kein anderer Zielordner gewählt beziehungsweise gespeichert ist. Der Pfad wird vom Programmstandort abgeleitet, nicht vom aktuellen Arbeitsverzeichnis. Ein abweichender Ausgabeordner wird getrennt vom Eingabeordner gemerkt; ist das Ziel nicht beschreibbar, muss vor dem Start ein anderes gewählt werden.
 - Das gelieferte `transcora.ico` wird bytegetreu verwendet; geprüft sind 16, 24, 32, 40, 48, 64 und 256 Pixel. Der vorhandene Standardsound `assets/ready.wav` aus AnaChroma wird unverändert wiederverwendet.
 
 Die Vorabprüfung zeigt unter anderem Container/Codec, Auflösung, SAR/DAR, Framerate, gewählten beziehungsweise belegten 3D-Typ, geplante Zielgröße, Container, Codec, Timing-Verhalten und technische Warnungen. Ein Job darf durch fehlende Angaben blockiert sein, ohne dass die gesamte Liste unbedienbar wird.
