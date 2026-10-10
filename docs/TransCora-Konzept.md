@@ -38,7 +38,7 @@ Die Oberfläche zeigt nur sinnvolle Kombinationen prominent. MP4/MKV und H.264 b
 
 Framerate-Erhalt und jede spätere Konvertierung müssen ausdrücklich beschrieben werden. 24 fps ist kein globaler Zwang. 24/1 und 24000/1001 werden getrennt behandelt. Drop/Duplizieren, Geschwindigkeitsänderung und Interpolation sind unterschiedliche Methoden und dürfen nicht als versteckte Automatik vermischt werden.
 
-Anaglyphenvideos benötigen ein bewusstes 4:4:4-Qualitätsprofil mit geprüftem Zielplayer. Höhere Bittiefe bleibt eine spätere offene Entscheidung. Pixelwandlung und Farbkennzeichnung müssen zusammenpassen.
+Anaglyphenvideos verwenden 4:4:4 als Standard mit Hinweis auf eingeschränkte Player-/Hardware-Unterstützung. Ein optionaler 4:2:0-Kompatibilitätsmodus weist sichtbar auf den Qualitätsverlust hin. Ein zusätzlicher H.264-Qualitätsmodus mit 10 Bit/4:4:4 darf eingeplant werden. Alle Profile nutzen ausschließlich die AnaglyphBatch-Verfahren ohne CIELab; alte Textdatei-Anaglyphen werden nicht als Produktvarianten beibehalten. Der ergänzende Vorschlag in [Video-Workflow-und-Oberflaeche.md](Video-Workflow-und-Oberflaeche.md) behandelt außerdem zusätzliche gepackte Quelllayouts, Player-Dateinamen und eine kompakte Oberfläche mit zuschaltbarer Standbildkontrolle. Diese Vorschläge sind noch keine implementierten Funktionen. Pixelwandlung und Farbkennzeichnung müssen zusammenpassen.
 
 ## Portable Struktur und Entwicklung
 

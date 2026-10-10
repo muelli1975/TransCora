@@ -2,7 +2,7 @@
 
 Stand: 10. Oktober 2026. Phase 1, Entwicklungsgrundlage; noch keine fertige Anwendung.
 
-Grundlage für die Video-Workflows ist Christophs `FFBatch-Presets.txt` mit zehn Parameterketten. Ergänzend ist nach Christophs Präzisierung **AnaglyphBatch die maßgebliche Verfahrensreferenz**: 17 Verfahren ohne CIELab. Die FFBatch-Kommandos bleiben unverändert in `reference/FFBatch-Presets.txt` erhalten; ihre sieben Anaglyphenketten bestimmen nicht allein den endgültigen Katalog. Ergänzungen sind als Vorschläge oder offene Prüfungen gekennzeichnet.
+Grundlage für die Video-Workflows ist Christophs `FFBatch-Presets.txt` mit zehn Parameterketten. Nach Christophs Präzisierung ist **ausschließlich AnaglyphBatch die Verfahrensreferenz**: 17 Verfahren ohne CIELab. Die FFBatch-Kommandos bleiben unverändert in `reference/FFBatch-Presets.txt` erhalten; ihre sieben Anaglyphenketten sind Analysebeispiele und keine zusätzlich beizubehaltenden Produktvarianten. Anaglyphen verwenden standardmäßig 4:4:4 mit Hinweis auf eingeschränkte Player-Unterstützung. Ein optionaler 4:2:0-Kompatibilitätsmodus muss den Qualitätsverlust anzeigen; ein zusätzlicher H.264-Modus mit 10 Bit/4:4:4 darf vorgesehen werden. Ergänzungen sind als Vorschläge oder offene Prüfungen gekennzeichnet.
 
 ## 1. Übersicht aller vorhandenen Kommandos
 
@@ -39,18 +39,18 @@ Die Funktionen `gammaval(…)` sind Potenz-LUTs mit dem angegebenen Exponenten [
 
 Diese Tabelle bildet zunächst die zehn hochgeladenen Fragmente ab. Die drei `*_ffmpeg`-Dubois-IDs kennzeichnen historische Referenzen, keine zusätzlichen Standardverfahren im endgültigen Menü. Der maßgebliche 17er-Katalog folgt weiter unten. Anzeigenamen können übersetzt werden, ohne Jobdateien umzudeuten.
 
-| Preset-ID | Anzeigename | Zielart | Auflösungsregel der Referenz | Empfehlung V1 |
+| Preset-ID | Anzeigename | Zielart | Auflösungsregel der Referenz | Verwendung |
 |---|---|---|---|---|
 | `video.hsbs.1080` | Half-SBS · 1080p | Stereo-Layout | Gesamtbild 1920 × 1080 | Hauptauswahl |
 | `video.hou.1080` | Half-Over-Under · 1080p | Stereo-Layout | Gesamtbild 1920 × 1080 | Hauptauswahl |
 | `video.mono.left` | Mono · linkes Auge | Mono | Augenauflösung erhalten | Hauptauswahl |
-| `video.anaglyph.dubois_rc_ffmpeg` | Dubois · Rot/Cyan (FFmpeg) | Anaglyphe | Augenauflösung erhalten | Verfahren unter „Anaglyphe“ |
-| `video.anaglyph.dubois_gm_ffmpeg` | Dubois · Grün/Magenta (FFmpeg) | Anaglyphe | Augenauflösung erhalten | Verfahren unter „Anaglyphe“ |
-| `video.anaglyph.dubois_yb_ffmpeg` | Dubois · Amber/Blau (FFmpeg) | Anaglyphe | Augenauflösung erhalten | Verfahren unter „Anaglyphe“ |
-| `video.anaglyph.dubois_lcd_red` | Dubois LCD + Rotkorrektur | Anaglyphe | Augenauflösung erhalten | Verfahren unter „Anaglyphe“, Referenzprüfung erforderlich |
-| `video.anaglyph.iaian7` | iaian7 Anachrome | Anaglyphe | Augenauflösung erhalten | Verfahren unter „Anaglyphe“ |
-| `video.anaglyph.rendepth` | Rendepth | Anaglyphe | Augenauflösung erhalten | Verfahren unter „Anaglyphe“ |
-| `video.anaglyph.rendepth2` | Rendepth 2 | Anaglyphe | Augenauflösung erhalten | Verfahren unter „Anaglyphe“ |
+| `video.anaglyph.dubois_rc_ffmpeg` | Dubois · Rot/Cyan (FFmpeg) | Anaglyphe | Augenauflösung erhalten | Nur Analysebeispiel; kein Produktpreset |
+| `video.anaglyph.dubois_gm_ffmpeg` | Dubois · Grün/Magenta (FFmpeg) | Anaglyphe | Augenauflösung erhalten | Nur Analysebeispiel; kein Produktpreset |
+| `video.anaglyph.dubois_yb_ffmpeg` | Dubois · Amber/Blau (FFmpeg) | Anaglyphe | Augenauflösung erhalten | Nur Analysebeispiel; kein Produktpreset |
+| `video.anaglyph.dubois_lcd_red` | Dubois LCD + Rotkorrektur | Anaglyphe | Augenauflösung erhalten | Vergleich; Produkt verwendet Batch-Definition |
+| `video.anaglyph.iaian7` | iaian7 Anachrome | Anaglyphe | Augenauflösung erhalten | Vergleich; Produkt verwendet Batch-Definition |
+| `video.anaglyph.rendepth` | Rendepth | Anaglyphe | Augenauflösung erhalten | Vergleich; Produkt verwendet Batch-Definition |
+| `video.anaglyph.rendepth2` | Rendepth 2 | Anaglyphe | Augenauflösung erhalten | Vergleich; Produkt verwendet Batch-Definition |
 
 Alle zehn Originalfragmente bleiben für Vergleiche erhalten. Im Produkt gibt es vier Ausgabearten mit einem Verfahren-Menü bei „Anaglyphe“. Dieses Menü orientiert sich an den 17 Batch-Verfahren; die drei historischen FFmpeg-Dubois-Kürzel werden nicht als weitere gleichnamige Varianten daneben gestellt. Ein bevorzugtes Verfahren wird erst nach Referenzvergleich festgelegt.
 
@@ -79,7 +79,7 @@ Container ist eine getrennte Entscheidung. Vorschlag: MP4/H.264 für übliche St
 - Referenzskalierung `lanczos+accurate_rnd+full_chroma_int` bei HSBS/Half-OU. Die Flags beschreiben Skalierung und Chroma-Interpolation [2], nicht das Encoder-Ausgabeformat.
 - Die Auflösung 1920 × 1080 ist fest im jeweiligen 1080p-Preset, kein globales Größenlimit für alle Verfahren.
 
-Neue verbindliche Vorgabe als Vorschlag: alle Anaglyphen explizit mit 4:4:4 ausgeben. Bei den ersten drei Anaglyphen ist dies gegenüber der Textvorlage eine zusätzliche Absicherung, keine belegte bisherige 4:2:0-Ausgabe.
+Verbindliche Nutzervorgabe: Anaglyphen standardmäßig explizit mit 4:4:4 ausgeben und auf eingeschränkte Player-Unterstützung hinweisen. Ein optionaler Kompatibilitätsmodus darf 4:2:0 verwenden, mit sichtbarem Qualitätshinweis. Das bedeutet keine unbelegte Behauptung, die alten kurzen Dubois-Beispiele seien zuvor als 4:2:0 ausgegeben worden. Der ergänzende [Video-Workflow-Vorschlag](Video-Workflow-und-Oberflaeche.md) behandelt außerdem den optionalen H.264-Qualitätsmodus mit 10 Bit/4:4:4.
 
 ## 4. Variable Parameter
 
