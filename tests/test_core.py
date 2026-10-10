@@ -5,12 +5,14 @@ import re
 import tempfile
 import threading
 import unittest
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from transcora.core.engine import Cancelled, color_spec, methods, publish_without_overwrite
 from transcora.core.model import Job, Options, app_root
 from transcora.core.naming import clean_stem, filename_layout, reserve_output
 from transcora.core.storage import load_list, save_list
+from transcora.core.toolchain import Toolchain
 
 
 class CoreTests(unittest.TestCase):
@@ -35,7 +37,7 @@ class CoreTests(unittest.TestCase):
 
     def test_names_and_collisions_keep_method_at_end(self):
         with tempfile.TemporaryDirectory() as tmp:
-            folder = Path(tmp)
+            folder = Path(tmp).resolve()
             reserved = set()
             for key, method in methods().items():
                 options = Options(target='anaglyph', naming='players', profile='quality10')
@@ -65,7 +67,7 @@ class CoreTests(unittest.TestCase):
 
     def test_lists_roundtrip_and_revalidate(self):
         with tempfile.TemporaryDirectory() as tmp:
-            folder = Path(tmp)
+            folder = Path(tmp).resolve()
             job = Job(folder/'a.mp4', replace(Options(), target='anaglyph', method='rendepth2'), folder)
             job.status = 'completed'
             path = folder/'list.json'
@@ -90,6 +92,21 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(len(warnings), 4)
         with self.assertRaisesRegex(ValueError, 'HDR'):
             color_spec({'color_transfer': 'smpte2084'}, True)
+
+    def test_tool_inspection_supports_ffmpeg_6_and_9_listing(self):
+        names = ['zscale', 'colorchannelmixer', 'lutrgb', 'blend', 'crop', 'scale',
+                 'pad', 'hstack', 'vstack', 'format', 'setsar', 'sidedata']
+        for flags in ('TSC', 'TS'):
+            def run(args, **kwargs):
+                if '-filters' in args:
+                    text = '\n'.join(f' {flags} {name:20} V->V filter' for name in names)
+                elif '-encoders' in args:
+                    text = ' V..... libx264\n V..... libx265'
+                else:
+                    text = 'FFmpeg version\nSupported pixel formats: yuv444p yuv444p10le yuv420p'
+                return SimpleNamespace(returncode=0, stdout=text, stderr='')
+            with self.subTest(flags=flags), patch('transcora.core.toolchain.subprocess.run', side_effect=run):
+                self.assertTrue(Toolchain(Path('ffmpeg'), Path('ffprobe')).inspect()['h265'])
 
     def test_publication_never_overwrites_and_fat_fallback_cleans(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -49,10 +49,12 @@ jobs:
       - name: Smoke test frozen executable
         shell: pwsh
         run: |
-          $process = Start-Process -FilePath ./dist/TransCora/TransCora.exe -PassThru
-          Start-Sleep -Seconds 8
-          if ($process.HasExited) { throw "TransCora exited before its window could open" }
-          Stop-Process -Id $process.Id
+          $report = Join-Path $env:RUNNER_TEMP "transcora-smoke.json"
+          $process = Start-Process -FilePath ./dist/TransCora/TransCora.exe -ArgumentList @("--self-test", "`"$report`"") -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "TransCora self-test failed" }
+          $result = Get-Content $report | ConvertFrom-Json
+          if (-not $result.ok -or $result.methods -ne 17) { throw "TransCora assets/toolchain check failed" }
+          Get-Content $report
       - uses: actions/upload-artifact@v4
         with:
           name: TransCora-Windows

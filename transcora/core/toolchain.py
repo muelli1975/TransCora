@@ -43,7 +43,8 @@ class Toolchain:
         filters = run("-filters")
         required = {"zscale", "colorchannelmixer", "lutrgb", "blend", "crop", "scale", "pad",
                     "hstack", "vstack", "format", "setsar", "sidedata"}
-        found = set(re.findall(r"^\s*[TSC.]{3}\s+(\w+)\s", filters, re.M))
+        # FFmpeg 9 removed the third (command-support) flag from this listing.
+        found = set(re.findall(r"^\s*[TSC.]{2,3}\s+(\w+)\s", filters, re.M))
         missing = required - found
         if missing:
             raise ValueError("FFmpeg-Build ungeeignet; fehlende Filter: " + ", ".join(sorted(missing)))

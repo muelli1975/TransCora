@@ -1,12 +1,16 @@
 from pathlib import Path
+from dataclasses import replace
 import os
 import tempfile
+import time
 import tkinter as tk
 import unittest
 from unittest.mock import patch
 
 from transcora.core.model import Options
 from transcora.gui.window import Window
+from transcora.core.engine import capture
+from transcora.core.toolchain import Toolchain
 
 
 class GuiTests(unittest.TestCase):
@@ -61,6 +65,31 @@ class GuiTests(unittest.TestCase):
         self.window.toggle_advanced()
         self.root.update()
         self.assertTrue(self.window.advanced.winfo_ismapped())
+
+    def test_background_conversion_updates_real_job_list(self):
+        try:
+            tools = Toolchain.find()
+        except ValueError:
+            self.skipTest('FFmpeg fehlt')
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp).resolve()
+            source = folder/'sample-lr.mkv'
+            capture([str(tools.ffmpeg), '-v', 'error', '-f', 'lavfi', '-i', 'testsrc2=size=128x32:rate=25',
+                     '-frames:v', '3', '-c:v', 'ffv1', '-colorspace', 'bt709', '-color_trc', 'bt709',
+                     '-color_primaries', 'bt709', '-color_range', 'tv', str(source)])
+            self.window.defaults = replace(Options(), target='anaglyph')
+            self.window.add_paths([source])
+            self.window.output_var.set(str(folder/'output'))
+            self.window.check(True)
+            deadline = time.monotonic()+30
+            while self.window.busy and time.monotonic() < deadline:
+                self.root.update()
+                time.sleep(.01)
+            self.assertFalse(self.window.busy, 'Worker did not finish')
+            job = self.window.jobs[0]
+            self.assertEqual(job.status, 'completed', self.window.status.get()+'\n'+job.detail)
+            self.assertTrue(job.plan.output.is_file())
+            self.assertTrue(list((folder/'output/logs').glob('*.log')))
 
 
 if __name__ == '__main__':
