@@ -221,7 +221,7 @@ class GuiTests(unittest.TestCase):
         self.assertTrue(self.window.title_frame.winfo_ismapped())
         with tempfile.TemporaryDirectory() as tmp, patch('transcora.gui.window.app_root', return_value=Path(tmp)):
             self.window.store_preset('Blu-ray Qualität')
-            data = json.loads((Path(tmp)/'user-presets.json').read_text())
+            data = json.loads((Path(tmp)/'user-presets.json').read_text(encoding='utf-8'))
             self.assertNotIn('disc_title', data['presets']['Blu-ray Qualität'])
             self.assertNotIn('source', data['presets']['Blu-ray Qualität'])
             self.window.presets = load_presets(Path(tmp)/'user-presets.json')
