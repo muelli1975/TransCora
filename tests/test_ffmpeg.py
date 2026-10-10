@@ -27,7 +27,7 @@ class FFmpegTests(unittest.TestCase):
             raise unittest.SkipTest('FFmpeg/ffprobe fehlen')
         cls.capabilities = cls.tools.inspect()
         cls.temp = tempfile.TemporaryDirectory()
-        cls.folder = Path(cls.temp.name)
+        cls.folder = Path(cls.temp.name).resolve()
         cls.source = cls.folder/'Test-lr.mkv'
         cls.ppm = cls.folder/'stereo.ppm'
         # Distinct eye colors and gradations reveal swaps and LUT/order differences.
@@ -147,6 +147,9 @@ class FFmpegTests(unittest.TestCase):
         self.assertNotIn('-filter_complex_threads', args)
         for method in ('dubois_lcd', 'iaian7', 'rendepth2'):
             graph = self.plan(Options(target='anaglyph', method=method)).graph
+            # Compare the actual high-precision method result, before final
+            # YUV error diffusion can redistribute single-code-value rounding.
+            graph = graph.split(';[composite]zscale=')[0]+';[composite]format=gbrp16le[v]'
             hashes = []
             for threads in ('1', '0'):
                 hashes.append(capture([str(self.tools.ffmpeg), '-v', 'error', '-nostdin',
