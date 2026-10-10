@@ -27,10 +27,13 @@ artifact is an early test build, with upstream license and build documents inclu
 
 ## Python, Tcl/Tk and PyInstaller
 
-Python and Tcl/Tk are included in the frozen desktop application. Their license
-files remain in the PyInstaller payload when provided by its hooks. The Python
+Python and Tcl/Tk are included in the frozen desktop application. Their full
+license notices are retained under `licenses/`, with Python's license taken
+directly from the exact build installation. Tcl/Tk notices come verbatim from
+the upstream 8.6.14 `license.terms` files. The Python
 license is available at https://docs.python.org/3/license.html and Tcl/Tk licensing
 at https://www.tcl-lang.org/software/tcltk/license.html.
+The installed PyInstaller license/bootloader notices are also retained there.
 PyInstaller's bootloader exception permits distribution of bundled applications;
 see https://pyinstaller.org/en/stable/license.html.
 

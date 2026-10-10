@@ -1,6 +1,7 @@
 """Create the portable one-folder distribution, preserving external tools/assets."""
 from pathlib import Path
 import hashlib
+import importlib.metadata
 import json
 import shutil
 import subprocess
@@ -15,8 +16,20 @@ def main():
                     '--onedir', '--name', 'TransCora', '--icon', str(root/'assets/transcora.ico'),
                     str(root/'run_transcora.py')], cwd=root, check=True)
     output = root/'dist/TransCora'
-    for name in ('assets', 'presets', 'tools', 'docs', 'reference', 'transcora', 'scripts', 'tests'):
+    for name in ('assets', 'presets', 'tools', 'docs', 'reference', 'transcora', 'scripts', 'tests', 'licenses'):
         shutil.copytree(root/name, output/name, ignore=shutil.ignore_patterns('__pycache__'), dirs_exist_ok=True)
+    python_license = next((p for p in (Path(sys.base_prefix)/'LICENSE.txt', Path(sys.base_prefix)/'LICENSE') if p.is_file()), None)
+    if python_license is None:
+        raise ValueError('Python license missing from the build installation')
+    shutil.copy2(python_license, output/'licenses/PYTHON.txt')
+    distribution = importlib.metadata.distribution('PyInstaller')
+    notices = [p for p in distribution.files or [] if 'licenses' in p.parts]
+    if not notices:
+        raise ValueError('PyInstaller bootloader license notice missing')
+    for notice in notices:
+        path = Path(distribution.locate_file(notice))
+        if path.is_file():
+            shutil.copy2(path, output/'licenses'/('PYINSTALLER-'+path.name))
     for name in ('README.md', 'LICENSE', 'THIRD_PARTY.md', 'requirements-build.txt', 'run_transcora.py', 'Start-TransCora.bat'):
         shutil.copy2(root/name, output/name)
     (output/'output').mkdir(exist_ok=True)
