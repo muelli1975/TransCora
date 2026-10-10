@@ -17,7 +17,7 @@ from .bd3d import BD_RATE, prepare, check_cadence, encoder_args, mux_meta
 from .engine import Cancelled, stop_process, publish_without_overwrite, capture, probe
 from .model import app_root
 from .mvc import tag_generated_stream
-from .naming import clean_stem
+from .naming import default_disc_title
 from .toolchain import process_options
 from .udf import Disc, write_label
 
@@ -137,6 +137,10 @@ def scan(tools, plan, config, cancel, log, env):
         cancel, log, env, frames)
     if count < 2:
         raise ValueError('BD-3D: Zu wenige Bilder für eine verlässliche Timing-Prüfung.')
+    expected_span = float((count-1)/config.source_rate)
+    tolerance = min(float(1/config.source_rate)/8, max(2.2*float(Fraction(plan.info['video']['time_base'])), .00001))
+    if abs((previous-first)-expected_span) > tolerance:
+        raise ValueError('BD-3D: Die tatsächliche Bildfolge entspricht nicht der angegebenen konstanten Framerate.')
     return count, first
 
 
@@ -298,7 +302,7 @@ def export(tools, plan, cancel, emit, log_path):
         emit('phase', 'BD-3D: '+('Blu-ray-ISO erstellen' if plan.options.container == 'iso' else 'M2TS erstellen'))
         movie = folder/('movie.'+plan.options.container)
         meta = folder/'movie.meta'
-        label = plan.options.disc_title or clean_stem(plan.source.stem)
+        label = plan.options.disc_title or default_disc_title(plan.source)
         meta.write_text(mux_meta(base, dependent, None, disc=plan.options.container == 'iso',
                                  label=label, audios=audio_paths), encoding='utf-8')
         run([bd.muxer, meta, movie], cancel, log, bd.environment)

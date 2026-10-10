@@ -15,7 +15,7 @@ from tkinter import filedialog, messagebox, ttk
 from transcora import __version__
 from transcora.core.engine import Cancelled, execute, methods, plan_job, preview
 from transcora.core.model import Job, LAYOUTS, PROFILES, TARGETS, Options, VIDEO_EXTENSIONS, app_root, FPS_CHOICES, COMPATIBILITY_NOTE
-from transcora.core.naming import effective_suffix, suffix_choices, reserve_output, filename_layout, fps_suffix, clean_stem
+from transcora.core.naming import effective_suffix, suffix_choices, reserve_output, filename_layout, fps_suffix, default_disc_title
 from transcora.core.storage import load_list, save_list, write_json, new_run_log, delete_run_logs, load_presets, save_presets, validate_preset_name
 from transcora.core.toolchain import Toolchain
 from transcora.gui.native import schedule_dark_titlebar
@@ -427,7 +427,7 @@ class Window:
         for key, var in self.variables.items():
             values = [getattr(job.options, key) for job in selected]
             if key == "disc_title":
-                values = [job.options.disc_title or clean_stem(job.source.stem) for job in selected]
+                values = [job.options.disc_title or default_disc_title(job.source) for job in selected]
             if key == "suffix":
                 values = [self.display_suffix(job) for job in selected]
             value = values[0]

@@ -60,7 +60,7 @@ def main():
             packed = plan.output
             if container == 'iso':
                 # Cross-check the runtime reader against an independent UDF tool.
-                listing = subprocess.check_output([r'C:\Program Files\7-Zip\7z.exe', 'l', '-slt', str(plan.output)], encoding='utf-8')
+                listing = subprocess.check_output([r'C:\Program Files\7-Zip\7z.exe', 'l', '-slt', '-sccUTF-8', str(plan.output)], encoding='utf-8')
                 if 'Version = 2.50' not in listing or '00000.ssif' not in listing:
                     raise ValueError('Independent ISO structure check failed')
                 with Disc(plan.output) as disc:

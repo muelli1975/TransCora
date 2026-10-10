@@ -11,6 +11,15 @@ from transcora.core.toolchain import Toolchain
 
 
 class BdPreparationTests(unittest.TestCase):
+    def test_ntsc_average_is_not_slowed_again_when_nominal_rate_is_rounded(self):
+        video = dict(index=0, width=3840, height=1080, r_frame_rate='24/1',
+                     avg_frame_rate='24000/1001', color_space='bt709', color_primaries='bt709',
+                     color_transfer='bt709', color_range='tv', pix_fmt='yuv420p')
+        result = prepare(video, 'full_sbs')
+        self.assertEqual(result.source_rate, BD_RATE)
+        self.assertEqual(result.speed, 1)
+        self.assertEqual(result.audio_filter, 'anull')
+
     def test_cadence_accepts_container_rounding_but_rejects_gaps(self):
         check_cadence([0, .042, .083, .125], BD_RATE, '1/1000')
         with self.assertRaises(ValueError):
@@ -65,6 +74,15 @@ class AudioLayoutTests(unittest.TestCase):
 
 
 class UdfLabelTests(unittest.TestCase):
+    def test_default_long_title_fits_label_and_matches_output_filename(self):
+        from transcora.core.naming import default_disc_title, reserve_output
+        from transcora.core.model import Options
+        source = Path('Ä'*100+'_full_sbs.mkv')
+        title = default_disc_title(source)
+        self.assertEqual(title, 'Ä'*62)
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertEqual(reserve_output(source, Path(tmp), Options(target='bd3d', container='iso'), '', set()).stem, title)
+
     def test_labels_preserve_unicode_and_short_identifiers_end_on_character_boundaries(self):
         from transcora.core.udf import label_field, dstring
         for value in ('Unser Film', 'ÄÖÜ', 'Mein 3D Film – ÄÖÜ', 'T'*62):

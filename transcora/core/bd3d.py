@@ -31,6 +31,12 @@ def prepare(video: dict, layout: str, swap: bool = False) -> Preparation:
     # Container rationals may round 24000/1001. Actual cadence must also be scanned.
     if abs(rate - BD_RATE) <= BD_RATE / 1_000_000:
         rate = BD_RATE
+    if abs(average - BD_RATE) <= BD_RATE / 1_000_000:
+        average = BD_RATE
+    if rate in {BD_RATE, Fraction(24)} and average in {BD_RATE, Fraction(24)}:
+        # The average timing can be NTSC despite a rounded nominal 24-fps field.
+        # A full timestamp scan below independently confirms the chosen clock.
+        rate = average
     if rate not in {BD_RATE, Fraction(24)} or abs(average-rate) > rate/1000:
         raise ValueError('BD-3D: Diese Version unterstützt konstante 23,976 oder 24 fps.')
     colors, warnings = color_spec(video)

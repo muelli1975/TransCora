@@ -43,6 +43,13 @@ def clean_stem(stem: str) -> str:
     return stem[:180].rstrip(" .")
 
 
+def default_disc_title(source: Path) -> str:
+    title = clean_stem(source.stem)
+    while len(title.encode('utf-16-be')) > 124:
+        title = title[:-1]
+    return title.rstrip(' .') or 'Video'
+
+
 def fps_suffix(value: str) -> str:
     rate = frame_rate(value)
     labels = {'24000/1001': '23.976', '30000/1001': '29.97', '60000/1001': '59.94'}
@@ -90,7 +97,7 @@ def effective_suffix(options: Options, method_suffix: str, source: Path | None =
 
 
 def output_parts(source: Path, options: Options, method_suffix: str) -> tuple[str, str]:
-    title = options.disc_title if options.target == "bd3d" else None
+    title = (options.disc_title or default_disc_title(source)) if options.target == "bd3d" else None
     return clean_stem(title or source.stem), effective_suffix(options, method_suffix, source)
 
 
