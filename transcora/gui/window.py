@@ -17,6 +17,9 @@ from transcora.core.engine import Cancelled, execute, methods, plan_job, preview
 from transcora.core.model import Job, LAYOUTS, NAMING, PROFILES, TARGETS, Options, VIDEO_EXTENSIONS, app_root
 from transcora.core.storage import load_list, save_list, write_json
 from transcora.core.toolchain import Toolchain
+from transcora.gui.native import dark_titlebar
+from transcora.gui.preview_window import PreviewWindow
+from transcora.gui.theme import apply_theme, GOLD_LIGHT, MUTED, TEXT, PANEL_BG
 
 
 STATUS = {"queued": "Wartet", "checking": "Prüfung", "ready": "Bereit", "blocked": "Prüfen!",
@@ -36,32 +39,30 @@ class Window:
         self.log_lines = []
         self.catalog = methods()
         self.defaults = Options()
-        self.custom_tools = ""
         self.input_folder = str(app_root())
         self.output_folder = str(app_root() / "output")
         self.recursive_value = False
-        self.mirror_value = False
         self._load_settings()
         self.last_output = str(Path(self.output_folder).expanduser().resolve())
         self._style()
         self._build()
+        root.after_idle(lambda: dark_titlebar(root))
         root.protocol("WM_DELETE_WINDOW", self.close)
         root.after(100, self.poll)
 
     def _load_settings(self):
         try:
             data = json.loads((app_root() / "settings.json").read_text(encoding="utf-8"))
-            if not isinstance(data, dict) or data.get("schema_version") != 1:
+            if not isinstance(data, dict) or data.get("schema_version") not in (1, 2):
                 return
             defaults = Options.from_dict(data.get("defaults", {}))
             if defaults.method not in self.catalog:
                 return
-            self.defaults = defaults
-            for key in ("input_folder", "output_folder", "custom_tools"):
+            self.defaults = replace(defaults, layout="auto", swap=False)
+            for key in ("input_folder", "output_folder"):
                 if isinstance(data.get(key), str):
                     setattr(self, key, data[key])
             self.recursive_value = data.get("recursive") is True
-            self.mirror_value = data.get("mirror") is True
         except (OSError, ValueError, TypeError):
             pass
 
@@ -69,33 +70,12 @@ class Window:
         self.root.title(f"TransCora {__version__}")
         self.root.geometry("860x650")
         self.root.minsize(780, 570)
-        self.root.configure(background="#181818")
         self.root.option_add("*Font", ("Segoe UI", 9))
         try:
             self.root.iconbitmap(str(app_root() / "assets" / "transcora.ico"))
         except tk.TclError:
             pass
-        style = ttk.Style(self.root)
-        style.theme_use("clam")
-        style.configure(".", background="#181818", foreground="#e0e0e0", bordercolor="#333333")
-        style.configure("TButton", background="#282828", foreground="#e0e0e0", padding=(9, 5))
-        style.map("TButton", background=[("active", "#383838"), ("disabled", "#202020")],
-                  foreground=[("disabled", "#777777")])
-        style.configure("Primary.TButton", background="#9c7c38", foreground="#111111")
-        style.map("Primary.TButton", background=[("active", "#c6a95e"), ("disabled", "#383020")],
-                  foreground=[("disabled", "#777777")])
-        style.configure("TCombobox", fieldbackground="#282828", background="#282828", arrowcolor="#c6a95e")
-        style.map("TCombobox", fieldbackground=[("readonly", "#282828"), ("disabled", "#202020")],
-                  foreground=[("readonly", "#e0e0e0"), ("disabled", "#777777")],
-                  selectbackground=[("readonly", "#282828")], selectforeground=[("readonly", "#e0e0e0")])
-        style.configure("TEntry", fieldbackground="#282828", foreground="#e0e0e0", insertcolor="#e0e0e0")
-        style.configure("Treeview", background="#202020", fieldbackground="#202020", foreground="#e0e0e0", rowheight=25)
-        style.map("Treeview", background=[("selected", "#4d4028")], foreground=[("selected", "#ffffff")])
-        style.configure("Treeview.Heading", background="#282828", foreground="#c6a95e")
-        style.configure("Horizontal.TProgressbar", background="#9c7c38", troughcolor="#333333")
-        self.root.option_add("*TCombobox*Listbox.background", "#282828")
-        self.root.option_add("*TCombobox*Listbox.foreground", "#e0e0e0")
-        self.root.option_add("*TCombobox*Listbox.selectBackground", "#4d4028")
+        apply_theme(self.root)
 
     def button(self, parent, text, command, **kwargs):
         button = ttk.Button(parent, text=text, command=command, **kwargs)
@@ -109,8 +89,8 @@ class Window:
         outer.rowconfigure(2, weight=1)
         header = ttk.Frame(outer)
         header.grid(row=0, column=0, sticky="ew", pady=(0, 8))
-        ttk.Label(header, text="TransCora", foreground="#c6a95e", font=("Segoe UI", 15)).pack(side="left")
-        ttk.Label(header, text="Lokale 3D-Video-Konvertierung", foreground="#a8a8a8").pack(side="right")
+        ttk.Label(header, text="TransCora", foreground=GOLD_LIGHT, font=("Segoe UI", 15)).pack(side="left")
+        ttk.Label(header, text="Lokale 3D-Video-Konvertierung", foreground=MUTED).pack(side="right")
         toolbar = ttk.Frame(outer)
         toolbar.grid(row=1, column=0, sticky="ew", pady=(0, 8))
         for text, callback in (("Dateien hinzufügen", self.add_files), ("Ordner hinzufügen", self.add_folder),
@@ -131,7 +111,7 @@ class Window:
         self.tree.configure(yscrollcommand=scrollbar.set)
         self.tree.bind("<<TreeviewSelect>>", self.selection_changed)
         self.selection_text = tk.StringVar(value="Einstellungen gelten für neu hinzugefügte Dateien.")
-        ttk.Label(outer, textvariable=self.selection_text, foreground="#a8a8a8").grid(row=3, column=0, sticky="w", pady=(5, 3))
+        ttk.Label(outer, textvariable=self.selection_text, foreground=MUTED).grid(row=3, column=0, sticky="w", pady=(5, 3))
         fields = ttk.Frame(outer)
         fields.grid(row=4, column=0, sticky="ew")
         for col in (0, 1, 2):
@@ -160,19 +140,17 @@ class Window:
         swap.grid(row=0, column=1, sticky="sw", padx=(0, 8), pady=5)
         self.controls.append((swap, "normal"))
         combo(fields, 0, 2, "target", "Ziel")
-        combo(fields, 1, 0, "method", "Anaglyphverfahren")
+        combo(fields, 1, 0, "method", "Anaglyphenverfahren")
         combo(fields, 1, 1, "profile", "Anaglyph-Ausgabeprofil")
         combo(fields, 1, 2, "container", "Container")
         combo(fields, 2, 0, "naming", "Dateinamen · SBS/OU/Mono")
         folder_checks = ttk.Frame(fields)
         folder_checks.grid(row=2, column=1, columnspan=2, sticky="sw", pady=4)
         self.recursive = tk.BooleanVar(value=self.recursive_value)
-        self.mirror = tk.BooleanVar(value=self.mirror_value)
-        for label, var in (("Unterordner", self.recursive), ("Struktur spiegeln", self.mirror)):
-            check = ttk.Checkbutton(folder_checks, text=label, variable=var)
-            check.pack(side="left", padx=(0, 10))
-            self.controls.append((check, "normal"))
-        ttk.Label(folder_checks, text="beim Ordnerimport", foreground="#a8a8a8").pack(side="left")
+        check = ttk.Checkbutton(folder_checks, text="Unterordner mitverarbeiten", variable=self.recursive)
+        check.pack(side="left", padx=(0, 10))
+        self.controls.append((check, "normal"))
+        ttk.Label(folder_checks, text="beim Ordnerimport", foreground=MUTED).pack(side="left")
         output = ttk.Frame(outer)
         output.grid(row=5, column=0, sticky="ew", pady=(6, 0))
         output.columnconfigure(1, weight=1)
@@ -184,9 +162,9 @@ class Window:
         self.controls.append((entry, "normal"))
         self.button(output, "Wählen", self.choose_output).grid(row=0, column=2, padx=(8, 0))
         self.warning = tk.StringVar()
-        ttk.Label(outer, textvariable=self.warning, foreground="#d8c392", wraplength=800).grid(row=6, column=0, sticky="ew", pady=5)
+        ttk.Label(outer, textvariable=self.warning, foreground=GOLD_LIGHT, wraplength=800).grid(row=6, column=0, sticky="ew", pady=5)
         self.details = tk.StringVar(value="Dateien hinzufügen oder eine gespeicherte Liste laden.")
-        ttk.Label(outer, textvariable=self.details, foreground="#a8a8a8", wraplength=800).grid(row=7, column=0, sticky="ew")
+        ttk.Label(outer, textvariable=self.details, foreground=MUTED, wraplength=800).grid(row=7, column=0, sticky="ew")
         actions = ttk.Frame(outer)
         actions.grid(row=8, column=0, sticky="ew", pady=5)
         self.button(actions, "Erweitert ▸", self.toggle_advanced).pack(side="left")
@@ -199,23 +177,24 @@ class Window:
         combo(self.advanced, 0, 1, "rate_mode", "Qualitätssteuerung")
         numeric = ttk.Frame(self.advanced)
         numeric.grid(row=0, column=2, sticky="ew", padx=(0, 8), pady=3)
-        for col, key, label in ((0, "crf", "CRF"), (1, "bitrate_mbps", "Mbit/s")):
-            ttk.Label(numeric, text=label).grid(row=0, column=col, sticky="w")
+        self.rate_fields = {}
+        numeric.columnconfigure(0, weight=1)
+        # Both alternatives occupy the same grid cell; switching does not grow
+        # or move the advanced section, and retains both entered values.
+        for key, label in (("crf", "CRF"), ("bitrate_mbps", "Bitrate (Mbit/s)")):
+            rate_field = ttk.Frame(numeric)
+            rate_field.grid(row=0, column=0, sticky="ew")
+            self.rate_fields[key] = rate_field
+            ttk.Label(rate_field, text=label).pack(anchor="w")
             var = tk.StringVar(value=str(getattr(self.defaults, key)))
             self.variables[key] = var
-            number = ttk.Entry(numeric, textvariable=var, width=8)
-            number.grid(row=1, column=col, sticky="ew", padx=(0, 5))
+            number = ttk.Entry(rate_field, textvariable=var, width=8)
+            number.pack(fill="x")
             number.bind("<FocusOut>", lambda event, k=key: self.option_changed(k))
             number.bind("<Return>", lambda event, k=key: self.option_changed(k))
             self.controls.append((number, "normal"))
             self.combos[key] = number
-            numeric.columnconfigure(col, weight=1)
-        self.variables["assume_bt709"] = tk.BooleanVar(value=self.defaults.assume_bt709)
-        assume = ttk.Checkbutton(self.advanced, text="Fehlende Farben: BT.709 SDR annehmen", variable=self.variables["assume_bt709"],
-                                command=lambda: self.option_changed("assume_bt709"))
-        assume.grid(row=1, column=0, columnspan=2, sticky="w", pady=5)
-        self.controls.append((assume, "normal"))
-        self.button(self.advanced, "FFmpeg-Ordner", self.choose_tools).grid(row=1, column=2, sticky="e")
+        self.button(self.advanced, "Standardeinstellungen", self.reset_defaults).grid(row=1, column=2, sticky="e", pady=5)
         self.status = tk.StringVar(value="Bereit")
         self.status_label = ttk.Label(outer, textvariable=self.status, wraplength=800)
         self.status_label.grid(row=10, column=0, sticky="ew", pady=(6, 3))
@@ -223,13 +202,13 @@ class Window:
         self.progress.grid(row=11, column=0, sticky="ew")
         footer = ttk.Frame(outer)
         footer.grid(row=12, column=0, sticky="ew", pady=(8, 0))
-        self.speed = tk.StringVar(value="Timing erhalten · Audio kopieren")
-        ttk.Label(footer, textvariable=self.speed, foreground="#a8a8a8").pack(side="left")
+        self.speed = tk.StringVar(value="")
+        ttk.Label(footer, textvariable=self.speed, foreground=MUTED).pack(side="left")
         self.abort_button = ttk.Button(footer, text="Abbrechen", command=self.abort, state="disabled")
         self.abort_button.pack(side="right")
-        self.start_button = self.button(footer, "Starten", lambda: self.check(True), style="Primary.TButton")
+        self.start_button = self.button(footer, "Start", lambda: self.check(True), style="Primary.TButton")
         self.start_button.pack(side="right", padx=5)
-        self.button(footer, "Prüfen", lambda: self.check(False)).pack(side="right")
+        self.button(footer, "Testen", lambda: self.check(False)).pack(side="right")
         self.root.bind("<Control-o>", lambda event: self.add_files() if not self.busy else None)
         self.root.bind("<Delete>", lambda event: self.remove() if not self.busy and self.root.focus_get() == self.tree else None)
         self.root.bind("<Escape>", lambda event: self.abort() if self.busy else None)
@@ -238,6 +217,14 @@ class Window:
     def selected_jobs(self):
         ids = set(self.tree.selection())
         return [job for job in self.jobs if job.id in ids]
+
+    def reset_defaults(self):
+        if self.busy:
+            return
+        self.defaults = Options()
+        self.tree.selection_remove(*self.tree.selection())
+        self.selection_changed()
+        self.status.set("Standardeinstellungen für neue Dateien wiederhergestellt. Bestehende Jobs behalten ihre Einstellungen.")
 
     def update_row(self, job):
         values = (job.source.name, LAYOUTS.get(job.options.layout, "?"), TARGETS[job.options.target], STATUS[job.status])
@@ -317,6 +304,9 @@ class Window:
         self.combos["container"].configure(state="disabled" if options.codec == "h265" else "readonly")
         self.combos["crf"].configure(state="normal" if options.rate_mode == "crf" else "disabled")
         self.combos["bitrate_mbps"].configure(state="normal" if options.rate_mode == "abr" else "disabled")
+        active_field = "crf" if options.rate_mode == "crf" else "bitrate_mbps"
+        for key, frame in self.rate_fields.items():
+            frame.grid() if key == active_field else frame.grid_remove()
         text = ""
         if anaglyph:
             if options.profile == "compatible":
@@ -379,7 +369,7 @@ class Window:
             return
         folder = Path(value).resolve()
         output = self.output_path()
-        recursive, mirror = self.recursive.get(), self.mirror.get()
+        recursive = self.recursive.get()
         self.input_folder = str(folder)
         def work():
             paths = []
@@ -390,10 +380,10 @@ class Window:
                     resolved = path.resolve()
                     if resolved == output or output in resolved.parents:
                         continue
-                    if mirror and folder not in resolved.parents:
+                    if folder not in resolved.parents:
                         continue
                     paths.append(resolved)
-            self.events.put(("paths", (sorted(paths, key=lambda p: str(p).casefold()), folder if mirror else None)))
+            self.events.put(("paths", (sorted(paths, key=lambda p: str(p).casefold()), folder)))
         self.background(work, "Ordner durchsuchen")
 
     def remove(self):
@@ -414,7 +404,7 @@ class Window:
         try:
             jobs, output = load_list(Path(value))
             if any(job.options.method not in self.catalog for job in jobs):
-                raise ValueError("Unbekanntes Anaglyphverfahren in der Jobliste.")
+                raise ValueError("Unbekanntes Anaglyphenverfahren in der Jobliste.")
             # Append lists; never erase the current list as a side effect of loading.
             existing = {os.path.normcase(str(job.source)) for job in self.jobs}
             for job in jobs:
@@ -450,13 +440,6 @@ class Window:
     def output_path(self):
         return Path(self.output_var.get().strip()).expanduser().resolve() if self.output_var.get().strip() else app_root() / "output"
 
-    def choose_tools(self):
-        value = filedialog.askdirectory(title="Ordner mit ffmpeg und ffprobe", initialdir=self.custom_tools or str(app_root() / "tools"))
-        if value:
-            self.custom_tools = value
-            self.invalidate_all(force=True)
-            self.status.set("FFmpeg-Ordner gespeichert; wird beim nächsten Prüfen validiert.")
-
     def toggle_advanced(self):
         if self.advanced.winfo_ismapped():
             self.advanced.grid_remove()
@@ -477,6 +460,7 @@ class Window:
         if self.busy:
             return
         self.cancel.clear()
+        self.speed.set("")
         self.set_busy(True)
         self.status.set(phase)
         self.progress.configure(mode="indeterminate")
@@ -500,13 +484,12 @@ class Window:
             self.status.set("Keine noch offenen Dateien in der Liste.")
             return
         output = self.output_path()
-        custom = self.custom_tools
         log_path = output / "logs" / (datetime.now().strftime("%Y%m%d-%H%M%S") + ".log")
         def work():
             output.mkdir(parents=True, exist_ok=True)
             with tempfile.TemporaryFile(dir=output):
                 pass
-            tools = Toolchain.find(custom)
+            tools = Toolchain.find()
             capabilities = tools.inspect()
             self.events.put(("log", capabilities["version"]))
             reserved, ready = set(), []
@@ -515,7 +498,7 @@ class Window:
                 if self.cancel.is_set():
                     raise Cancelled()
                 self.events.put(("job", (job.id, "checking", "Technische Prüfung", None)))
-                self.events.put(("notice", f"Prüfen: Datei {index} von {len(candidates)} · {job.source.name}"))
+                self.events.put(("notice", f"Testen: Datei {index} von {len(candidates)} · {job.source.name}"))
                 try:
                     plan = plan_job(tools, job, output, reserved, self.cancel, capabilities)
                     ready.append((job, plan))
@@ -529,7 +512,7 @@ class Window:
                     self.events.put(("job", (job.id, "blocked", str(error), None)))
                     self.events.put(("log", job.source.name + ": " + str(error)))
             if not run:
-                self.events.put(("notice", f"Vorprüfung: {len(ready)} bereit · {blocked} blockiert."))
+                self.events.put(("notice", f"Test abgeschlossen: {len(ready)} bereit · {blocked} blockiert."))
                 return
             counts = {"completed": 0, "failed": 0, "cancelled": 0}
             for index, (job, plan) in enumerate(ready, 1):
@@ -567,41 +550,22 @@ class Window:
             self.status.set("Für das Kontrollbild genau eine Datei auswählen.")
             return
         job = selected[0]
-        dialog = tk.Toplevel(self.root)
-        dialog.title("Kontrollbild · vor Encoding")
-        dialog.configure(background="#181818")
-        frame = ttk.Frame(dialog, padding=12)
-        frame.pack(fill="both", expand=True)
-        time_var = tk.StringVar(value="0")
-        ttk.Label(frame, text="Zeitstelle (Sekunden)").grid(row=0, column=0, sticky="w")
-        time_entry = ttk.Entry(frame, textvariable=time_var, width=10)
-        time_entry.grid(row=0, column=1, padx=8)
-        image_label = ttk.Label(frame, text="Kontrollbild laden")
-        image_label.grid(row=1, column=0, columnspan=3, pady=10)
-        note = ttk.Label(frame, text="Gleiche Filterkette wie im Export · 8-Bit-Anzeige, ohne Videokompression", wraplength=640)
-        note.grid(row=2, column=0, columnspan=3, sticky="w")
-        button = ttk.Button(frame, text="Laden")
-        button.grid(row=0, column=2)
-        self.controls.extend([(button, "normal"), (time_entry, "normal")])
-        def request():
+        def request(seconds):
             if self.busy:
                 return
-            try:
-                seconds = float(time_var.get().replace(",", "."))
-            except ValueError:
-                note.configure(text="Ungültige Zeitstelle.")
-                return
-            custom, output = self.custom_tools, self.output_path()
+            output = self.output_path()
             def work():
-                tools = Toolchain.find(custom)
+                tools = Toolchain.find()
                 plan = plan_job(tools, job, output, set(), self.cancel, tools.inspect())
                 png = preview(tools, plan, self.cancel, seconds)
-                self.events.put(("preview", (dialog, image_label, png)))
+                self.events.put(("preview", (viewer, png, plan)))
                 self.events.put(("notice", "Kontrollbild bereit."))
             self.background(work, "Kontrollbild berechnen")
-        button.configure(command=request)
-        dialog.protocol("WM_DELETE_WINDOW", lambda: self.close_preview(dialog, button, time_entry))
-        dialog.after(50, request)
+        viewer = PreviewWindow(self.root, request)
+        self.controls.extend(viewer.controls())
+        viewer.dialog.protocol("WM_DELETE_WINDOW", lambda: self.close_preview(
+            viewer.dialog, viewer.button, viewer.time_entry, viewer.scale))
+        viewer.dialog.after(50, viewer.request)
 
     def close_preview(self, dialog, *widgets):
         self.controls = [(widget, state) for widget, state in self.controls if widget not in widgets]
@@ -610,7 +574,8 @@ class Window:
     def show_log(self):
         dialog = tk.Toplevel(self.root)
         dialog.title("TransCora · Log")
-        text = tk.Text(dialog, background="#202020", foreground="#e0e0e0", wrap="word", width=90, height=25)
+        dialog.after_idle(lambda: dark_titlebar(dialog))
+        text = tk.Text(dialog, background=PANEL_BG, foreground=TEXT, wrap="word", width=90, height=25)
         text.pack(fill="both", expand=True)
         text.insert("1.0", "\n\n".join(self.log_lines[-150:]) or "Noch keine technischen Meldungen.")
         text.configure(state="disabled")
@@ -649,15 +614,25 @@ class Window:
                         self.progress.configure(mode="determinate")
                         self.progress["value"] = ((index - 1) + value["percent"] / 100) / count * 100
                 elif kind == "speed":
-                    self.speed.set("Geschwindigkeit " + payload[3] + " · Timing erhalten")
+                    value = payload[3]
+                    parts = []
+                    if value["speed"] != "N/A":
+                        parts.append("Geschwindigkeit " + value["speed"].replace("x", "×").replace(".", ","))
+                    if value["fps"] not in (None, "N/A"):
+                        parts.append(value["fps"].replace(".", ",") + " fps")
+                    self.speed.set(" · ".join(parts))
                 elif kind == "phase":
                     self.speed.set(payload[3])
                 elif kind == "preview":
-                    dialog, label, png = payload
-                    if dialog.winfo_exists():
+                    viewer, png, plan = payload
+                    if viewer.dialog.winfo_exists():
+                        viewer.set_plan(plan)
+                        widgets = {viewer.button, viewer.time_entry, viewer.scale}
+                        self.controls = [(widget, state) for widget, state in self.controls if widget not in widgets]
+                        self.controls.extend(viewer.controls())
                         image = tk.PhotoImage(data=base64.b64encode(png))
-                        label.configure(image=image, text="")
-                        label.image = image
+                        viewer.image_label.configure(image=image, text="")
+                        viewer.image_label.image = image
                 elif kind == "sound":
                     if os.name == "nt":
                         import winsound
@@ -681,9 +656,10 @@ class Window:
 
     def finish_close(self):
         try:
-            write_json(app_root() / "settings.json", {"schema_version": 1, "defaults": asdict(self.defaults),
+            write_json(app_root() / "settings.json", {"schema_version": 2,
+                       "defaults": asdict(replace(self.defaults, layout="auto", swap=False)),
                        "output_folder": str(self.output_path()), "input_folder": self.input_folder,
-                       "custom_tools": self.custom_tools, "recursive": self.recursive.get(), "mirror": self.mirror.get()})
+                       "recursive": self.recursive.get()})
         except OSError:
             # Read-only application folders must not prevent exit or conversion to a writable destination.
             messagebox.showwarning("Einstellungen", "Der Programmordner ist schreibgeschützt; Einstellungen konnten nicht gespeichert werden.", parent=self.root)

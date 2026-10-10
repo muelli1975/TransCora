@@ -6,6 +6,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 
 from .model import app_root
 
@@ -20,18 +21,19 @@ class Toolchain:
     ffprobe: Path
 
     @classmethod
-    def find(cls, custom: str = "") -> "Toolchain":
+    def find(cls) -> "Toolchain":
         ext = ".exe" if os.name == "nt" else ""
-        roots = ([Path(custom)] if custom else []) + [app_root() / "tools" / "ffmpeg"]
+        roots = [app_root() / "tools" / "ffmpeg"]
         for root in roots:
             for folder in (root, root / "bin"):
                 if all((folder / (name + ext)).is_file() for name in ("ffmpeg", "ffprobe")):
                     return cls((folder / ("ffmpeg" + ext)).resolve(), (folder / ("ffprobe" + ext)).resolve())
-        if not custom:
+        if not getattr(sys, "frozen", False):
             paths = [shutil.which(x) for x in ("ffmpeg", "ffprobe")]
             if all(paths):
                 return cls(Path(paths[0]), Path(paths[1]))
-        raise ValueError("ffmpeg und ffprobe fehlen. Den Ordner mit beiden Programmen über „FFmpeg-Ordner“ auswählen.")
+        raise ValueError("Die mitgelieferten Programme ffmpeg und ffprobe fehlen. "
+                         "TransCora.zip vollständig entpacken und den gesamten Programmordner zusammenhalten.")
 
     def inspect(self) -> dict:
         def run(*args: str) -> str:

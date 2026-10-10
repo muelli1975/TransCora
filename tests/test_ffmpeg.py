@@ -10,7 +10,7 @@ import tempfile
 import threading
 import unittest
 
-from transcora.core.engine import (Cancelled, build_graph, execute, methods, plan_job,
+from transcora.core.engine import (Cancelled, build_graph, command, execute, methods, plan_job,
                                    preview, probe, capture)
 from transcora.core.model import Job, Options, app_root
 from transcora.core.toolchain import Toolchain
@@ -55,9 +55,7 @@ class FFmpegTests(unittest.TestCase):
                         '-filter_complex_threads', '1', '-threads', '1', *args], timeout=90)
 
     def plan(self, options=None, source=None):
-        # FFV1/Matroska test fixtures may omit range tags in newer FFmpeg builds.
-        # The fixture's SDR color interpretation is known; exercise the explicit override.
-        options = replace(options or Options(target='anaglyph'), assume_bt709=True)
+        options = options or Options(target='anaglyph')
         return plan_job(self.tools, Job(source or self.source, options),
                         self.folder/'outputs', set(), capabilities=self.capabilities)
 
@@ -129,6 +127,25 @@ class FFmpegTests(unittest.TestCase):
             plan = self.plan(Options(layout=layout, target='mono'))
             self.assertEqual(plan.size, size)
             self.assertTrue(preview(self.tools, plan, threading.Event()).startswith(b'\x89PNG'))
+
+    def test_folder_outputs_and_filter_thread_equivalence(self):
+        source = self.folder/'nested'/'album'/'same-lr.mkv'
+        source.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(self.source, source)
+        job = Job(source, Options(target='anaglyph'), self.folder/'nested')
+        plan = plan_job(self.tools, job, self.folder/'mirrored', set(), capabilities=self.capabilities)
+        self.assertEqual(plan.output.parent, self.folder/'mirrored'/'album')
+        args = command(self.tools, plan, self.folder/'thread-output.mp4')
+        self.assertNotIn('-filter_complex_threads', args)
+        for method in ('dubois_lcd', 'iaian7', 'rendepth2'):
+            graph = self.plan(Options(target='anaglyph', method=method)).graph
+            hashes = []
+            for threads in ('1', '0'):
+                hashes.append(capture([str(self.tools.ffmpeg), '-v', 'error', '-nostdin',
+                    '-filter_complex_threads', threads, '-i', str(self.source), '-filter_complex', graph,
+                    '-map', '[v]', '-frames:v', '3', '-c:v', 'rawvideo', '-threads', '1',
+                    '-f', 'framemd5', 'pipe:1'], timeout=30))
+            self.assertEqual(hashes[0], hashes[1], method)
 
     def test_source_changes_and_cancel_leave_no_final_file(self):
         plan = self.plan(Options(target='half_sbs'))

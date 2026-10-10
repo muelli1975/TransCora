@@ -32,17 +32,22 @@ class Options:
     method: str = "dubois_lcd"
     profile: str = "quality"
     naming: str = "layout"
-    container: str = "mkv"
+    container: str = "mp4"
     codec: str = "h264"
     rate_mode: str = "crf"
     crf: float = 18.0
     bitrate_mbps: float = 20.0
-    assume_bt709: bool = False
 
     @classmethod
     def from_dict(cls, data: dict) -> "Options":
         if not isinstance(data, dict):
             raise ValueError("Ungültige Jobeinstellungen.")
+        data = dict(data)
+        # Version 0.1 lists stored a manual checkbox. Colour interpretation is now
+        # automatic; retain every other per-file choice when loading old lists.
+        legacy = data.pop("assume_bt709", False)
+        if not isinstance(legacy, bool):
+            raise ValueError("Ungültige Farbeinstellung in der Jobliste.")
         allowed = cls.__dataclass_fields__
         if set(data) - set(allowed):
             raise ValueError("Unbekannte Einstellungen in der Jobliste.")
@@ -56,10 +61,10 @@ class Options:
                              ("codec", {"h264", "h265"}), ("rate_mode", {"crf", "abr"})):
             if getattr(self, name) not in values:
                 raise ValueError(f"Ungültige Einstellung: {name}.")
-        if not isinstance(self.swap, bool) or not isinstance(self.assume_bt709, bool):
-            raise ValueError("Ungültige L/R- oder Farbeinstellung.")
+        if not isinstance(self.swap, bool):
+            raise ValueError("Ungültige L/R-Einstellung.")
         if not isinstance(self.method, str):
-            raise ValueError("Ungültiges Anaglyphverfahren.")
+            raise ValueError("Ungültiges Anaglyphenverfahren.")
         if not isinstance(self.crf, (int, float)) or not 1 <= self.crf <= 51:
             raise ValueError("CRF muss zwischen 1 und 51 liegen.")
         if not isinstance(self.bitrate_mbps, (int, float)) or not 0 < self.bitrate_mbps <= 1000:

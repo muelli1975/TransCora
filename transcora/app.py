@@ -16,7 +16,7 @@ def main():
             from transcora.core.model import app_root
             from transcora.core.toolchain import Toolchain
             root.update()
-            capabilities = Toolchain.find(str(app_root() / "tools" / "ffmpeg")).inspect()
+            capabilities = Toolchain.find().inspect()
             if not (app_root() / "assets" / "ready.wav").is_file():
                 raise ValueError("Completion sound is missing")
             Path(sys.argv[2]).write_text(json.dumps({"ok": True, "methods": len(window.catalog),
