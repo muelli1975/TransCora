@@ -13,7 +13,7 @@ from transcora.gui.window import Window
 from transcora.core.engine import capture
 from transcora.core.toolchain import Toolchain
 from transcora.gui.preview_window import PreviewWindow
-from transcora.gui.theme import APP_BG, PANEL_BG, DISABLED
+from transcora.gui.theme import APP_BG, PANEL_BG, DISABLED, GOLD_LIGHT
 from tkinter import ttk
 
 
@@ -46,7 +46,8 @@ class GuiTests(unittest.TestCase):
         self.window.option_changed('target')
         self.assertEqual(first.options.target, 'anaglyph')
         self.assertEqual(second.options.target, 'half_sbs')
-        self.assertEqual(str(self.window.combos['naming'].cget('state')), 'disabled')
+        self.assertEqual(str(self.window.combos['suffix'].cget('state')), 'normal')
+        self.assertEqual(self.window.variables['suffix'].get(), '_dubois_lcd')
         self.window.tree.selection_remove(first.id)
         self.window.selection_changed()
         self.assertEqual(self.window.variables['target'].get(), 'Anaglyph')
@@ -71,6 +72,40 @@ class GuiTests(unittest.TestCase):
         self.window.toggle_advanced()
         self.root.update()
         self.assertTrue(self.window.advanced.winfo_ismapped())
+
+    def test_suffix_preview_framerate_scope_and_selection_contrast(self):
+        self.window.add_paths([Path('/one/Film_half_ou.mp4')])
+        self.window.selection_changed()
+        self.root.update()
+        style = ttk.Style(self.root)
+        self.assertEqual(style.lookup('Treeview', 'background', ('selected', '!focus')), GOLD_LIGHT)
+        self.assertEqual(style.lookup('Treeview', 'foreground', ('selected', '!focus')), APP_BG)
+        self.assertEqual(self.window.test_button.cget('style'), self.window.start_button.cget('style'))
+        self.assertFalse(self.window.fps_frame.winfo_ismapped())
+        self.window.variables['suffix'].set('_eigene_Endung')
+        self.window.option_changed('suffix')
+        self.assertIn('Film_eigene_Endung.mp4', self.window.output_name.get())
+        self.window.variables['container'].set('MKV')
+        self.window.option_changed('container')
+        self.assertIn('Film_eigene_Endung.mkv', self.window.output_name.get())
+        self.window.variables['swap'].set(True)
+        self.window.option_changed('swap')
+        self.window.variables['target'].set('Nur Framerate ändern')
+        self.window.option_changed('target')
+        self.root.update()
+        self.assertTrue(self.window.fps_frame.winfo_ismapped())
+        self.assertFalse(self.window.jobs[0].options.swap)
+        self.assertFalse(self.window.variables['swap'].get())
+        self.assertEqual(str(self.window.swap_control.cget('state')), 'disabled')
+        self.assertIn('Film_fps30-tbh.mkv', self.window.output_name.get())
+        self.window.variables['target_fps'].set('29,97')
+        self.window.option_changed('target_fps')
+        self.assertIn('Film_fps29.97-tbh.mkv', self.window.output_name.get())
+        self.assertNotIn('-lrh', self.window.combos['suffix'].cget('values'))
+        self.window.variables['target'].set('Half-SBS · 1080p')
+        self.window.option_changed('target')
+        self.root.update()
+        self.assertFalse(self.window.fps_frame.winfo_ismapped())
 
     def test_rate_mode_keeps_values_and_does_not_shift_layout(self):
         self.window.toggle_advanced()
@@ -252,7 +287,7 @@ class GuiTests(unittest.TestCase):
             viewer.request()
             self.assertFalse(self.window.busy)
             self.assertIn('außerhalb', viewer.note.cget('text'))
-            self.window.close_preview(viewer.dialog, viewer.button, viewer.time_entry, viewer.scale)
+            self.window.close_preview(viewer.dialog, viewer.time_entry, viewer.scale)
             self.window.set_busy(True)
             self.window.set_busy(False)
 

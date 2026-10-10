@@ -2,19 +2,34 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
+from fractions import Fraction
+import re
 import sys
 import uuid
 
 
 VIDEO_EXTENSIONS = {".mp4", ".mkv", ".mk3d", ".mov", ".m2ts", ".ts", ".avi"}
 LAYOUTS = {"auto": "Automatisch", "full_sbs": "Full-SBS", "half_sbs": "Half-SBS",
-           "full_ou": "Full-OU", "half_ou": "Half-OU"}
+           "full_ou": "Full-OU", "half_ou": "Half-OU", "mono": "Mono / 2D"}
 TARGETS = {"half_sbs": "Half-SBS · 1080p", "half_ou": "Half-OU · 1080p",
-           "anaglyph": "Anaglyph", "mono": "Mono · linkes Auge"}
+           "anaglyph": "Anaglyph", "mono": "Mono · linkes Auge", "framerate": "Nur Framerate ändern"}
 NAMING = {"original": "Kein Layout-Zusatz", "layout": "Layout-Zusatz",
           "players": "Player-Kürzel (Kodi/Bino)"}
 PROFILES = {"quality": "Qualität · 8 Bit / 4:4:4", "quality10": "Qualität · 10 Bit / 4:4:4",
             "compatible": "Kompatibel · 8 Bit / 4:2:0"}
+FPS_CHOICES = ("23,976", "24", "25", "29,97", "30", "50", "59,94", "60")
+
+
+def frame_rate(value: str) -> Fraction:
+    value = value.strip().replace(",", ".")
+    aliases = {"23.976": "24000/1001", "29.97": "30000/1001", "59.94": "60000/1001"}
+    try:
+        rate = Fraction(aliases.get(value, value))
+        if not 1 <= rate <= 240 or rate.denominator > 1_000_000:
+            raise ValueError
+        return rate
+    except (ValueError, ZeroDivisionError, TypeError):
+        raise ValueError("Zielbildrate: 1 bis 240 fps, als Zahl oder Bruch (z. B. 24000/1001).") from None
 
 
 def app_root() -> Path:
@@ -32,6 +47,8 @@ class Options:
     method: str = "dubois_lcd"
     profile: str = "quality"
     naming: str = "layout"
+    suffix: str | None = None
+    target_fps: str = "30"
     container: str = "mp4"
     codec: str = "h264"
     rate_mode: str = "crf"
@@ -65,6 +82,12 @@ class Options:
             raise ValueError("Ungültige L/R-Einstellung.")
         if not isinstance(self.method, str):
             raise ValueError("Ungültiges Anaglyphenverfahren.")
+        if self.suffix is not None and (not isinstance(self.suffix, str) or len(self.suffix) > 80
+                or re.search(r'[<>:"/\\|?*\x00-\x1f]', self.suffix) or self.suffix.endswith((" ", "."))):
+            raise ValueError("Dateinamenszusatz: höchstens 80 Zeichen, ohne Pfad- oder ungültige Dateizeichen.")
+        if not isinstance(self.target_fps, str):
+            raise ValueError("Ungültige Zielbildrate.")
+        frame_rate(self.target_fps)
         if not isinstance(self.crf, (int, float)) or not 1 <= self.crf <= 51:
             raise ValueError("CRF muss zwischen 1 und 51 liegen.")
         if not isinstance(self.bitrate_mbps, (int, float)) or not 0 < self.bitrate_mbps <= 1000:

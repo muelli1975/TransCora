@@ -9,7 +9,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from transcora.core.engine import Cancelled, color_spec, methods, publish_without_overwrite
-from transcora.core.model import Job, Options, app_root
+from transcora.core.model import Job, Options, app_root, frame_rate
 from transcora.core.naming import clean_stem, filename_layout, reserve_output
 from transcora.core.storage import load_list, save_list
 from transcora.core.toolchain import Toolchain
@@ -64,6 +64,30 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(clean_stem('CON'), '_CON')
         self.assertEqual(clean_stem('My3Dmovie'), 'My3Dmovie')
         self.assertEqual(clean_stem('a/b:*?'), 'a_b')
+        for layout in ('full_sbs', 'half_sbs', 'full_ou', 'half_ou'):
+            self.assertEqual(filename_layout('Film_'+layout), (layout, False))
+
+    def test_custom_suffix_and_exact_frame_rates(self):
+        self.assertEqual(str(frame_rate('23,976')), '24000/1001')
+        self.assertEqual(str(frame_rate('29.97')), '30000/1001')
+        self.assertEqual(str(frame_rate('59,94')), '60000/1001')
+        self.assertEqual(str(frame_rate('24')), '24')
+        for value in ('nan', 'inf', '0', '241', '1/0', ''):
+            with self.assertRaises(ValueError):
+                frame_rate(value)
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            options = Options(target='anaglyph', suffix='_mein_test')
+            output = reserve_output(folder/'Film-lr.mp4', folder, options, 'dubois_lcd', set())
+            self.assertEqual(output.name, 'Film_mein_test.mp4')
+            options.suffix = ''
+            self.assertEqual(reserve_output(folder/'Film-lr.mp4', folder, options, '', set()).name, 'Film.mp4')
+            for suffix in ('/bad', '\\bad', '..', 'space ', 'x'*81):
+                with self.assertRaises(ValueError):
+                    replace(options, suffix=suffix).validate()
+            output = reserve_output(folder/'Film-tbh.mp4', folder, Options(target='framerate', layout='half_ou'), '', set())
+            self.assertEqual(output.name, 'Film_fps30-tbh.mp4')
+            self.assertEqual(filename_layout(output.stem), ('half_ou', False))
 
     def test_lists_roundtrip_and_revalidate(self):
         with tempfile.TemporaryDirectory() as tmp:

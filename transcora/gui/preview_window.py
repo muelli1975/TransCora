@@ -5,6 +5,7 @@ import tkinter as tk
 from tkinter import ttk
 
 from transcora.gui.native import dark_titlebar
+from transcora.gui.slider import Timeline
 
 
 class PreviewWindow:
@@ -23,22 +24,20 @@ class PreviewWindow:
         self.time_entry = ttk.Entry(frame, textvariable=self.time_var, width=12)
         self.time_entry.grid(row=0, column=1, padx=8)
         self.time_entry.bind("<Return>", lambda event: self.request())
-        self.button = ttk.Button(frame, text="Laden", command=self.request)
-        self.button.grid(row=0, column=2)
-        self.scale = ttk.Scale(frame, from_=0, to=1, command=self.position_changed, state="disabled")
+        self.scale = Timeline(frame, from_=0, to=1, command=self.position_changed, state="disabled")
         self.scale.grid(row=1, column=0, columnspan=3, sticky="ew", pady=(12, 0))
         self.scale.bind("<ButtonRelease-1>", self.slider_released)
         self.scale.bind("<KeyRelease>", self.slider_released)
         self.position_label = ttk.Label(frame, text="Videodauer wird ermittelt …")
         self.position_label.grid(row=2, column=0, columnspan=3, sticky="w", pady=(2, 8))
-        self.image_label = ttk.Label(frame, text="Kontrollbild laden", background="#000000")
+        self.image_label = ttk.Label(frame, text="Kontrollbild wird berechnet …", background="#000000")
         self.image_label.grid(row=3, column=0, columnspan=3, pady=10)
         self.note = ttk.Label(frame, text="Gleiche Filterkette wie im Export · 8-Bit-Anzeige, ohne Videokompression",
                               wraplength=640)
         self.note.grid(row=4, column=0, columnspan=3, sticky="w")
 
     def controls(self):
-        return [(self.button, "normal"), (self.time_entry, "normal"),
+        return [(self.time_entry, "normal"),
                 (self.scale, "normal" if self.duration > 0 else "disabled")]
 
     @staticmethod

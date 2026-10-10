@@ -1,4 +1,4 @@
-# TransCora 0.1.1
+# TransCora 0.1.2
 
 Portabler, lokaler 3D-Video-Konverter mit kompakter Python-Oberfläche und FFmpeg.
 **Erste Testversion:** Video-Konvertierung ist umgesetzt; Bild-/MPO-Werkzeuge und
@@ -46,24 +46,32 @@ Durchläufen erstellen. Fertige Jobs laufen erst nach bewusster Einstellungsänd
 | Half-OU | 1920 × 1080, links oben/rechts unten |
 | Anaglyph | Volle rekonstruierte Auflösung eines Auges; 17 AnaglyphBatch-Verfahren |
 | Mono | Linkes Auge; mit **L/R tauschen** das andere Auge |
+| Nur Framerate ändern | Auflösung, gepacktes Layout, Augenreihenfolge und YUV-Farbaufteilung bleiben erhalten |
 
 Half-SBS/OU passen jedes Auge unter Erhalt seines Seitenverhältnisses in 1920 × 1080
 ein, ergänzen bei Bedarf schwarze Ränder und halbieren danach die Packachse.
 Full-/Half-SBS und Full-/Half-OU sind mögliche Quellen. MVC, Anaglyphen,
 Frame-sequential und getrennte Videospuren sind keine unterstützten Quellen.
 
-| Dateinamen-Auswahl für SBS/OU/Mono | Beispiele |
+**Dateinamenszusatz · frei editierbar** bietet zum Ziel passende konkrete Zusätze,
+**Keiner** und eigene Eingaben. Darunter steht unmittelbar der vollständige
+**Ausgabename** der ausgewählten Datei; erkannte Kollisionen werden berücksichtigt.
+
+| Ziel | Vorgegebene Zusätze (Auswahl) |
 | --- | --- |
-| Kein Layout-Zusatz | `Film.mkv` |
-| Layout-Zusatz | `Film_half_sbs.mkv`, `Film_half_ou.mkv`, `Film_mono_l.mkv` |
-| Player-Kürzel (Kodi/Bino) | `Film.3D.HSBS-lrh.mkv`, `Film.3D.HTAB-tbh.mkv`, `Film_mono_l-2d.mkv` |
+| Half-SBS | `_half_sbs`, `-lrh`, `-lrq`, `.3D.HSBS`, `.3D.HSBS-lrh` |
+| Half-OU | `_half_ou`, `-tbh`, `-abq`, `.3D.HTAB`, `.3D.HTAB-tbh` |
+| Anaglyph | Zusatz des gewählten Batch-Verfahrens, etwa `_dubois_lcd` |
+| Mono | `_mono_l`, `-2d` |
+| Nur Framerate ändern | Standard etwa `_fps30-tbh`; passende Layout-Kürzel und eigene Zusätze |
 
 Erkannte alte Stereo-Kürzel werden entfernt, unbekannte Zusätze bleiben erhalten.
-Player-Kürzel helfen der Layout-Erkennung, garantieren jedoch keine Codec-Unterstützung.
-Stereoscopic Player kann das Layout auch manuell wählen.
+Auch TransCoras eigene `_full_sbs`, `_half_sbs`, `_full_ou` und `_half_ou` werden
+beim Import erkannt. Player-Kürzel helfen der Layout-Erkennung, garantieren jedoch
+keine Codec-Unterstützung. Stereoscopic Player kann das Layout auch manuell wählen.
 
-**Anaglyphen behalten die AnaglyphBatch-Zusätze**, etwa `Film_dubois_lcd.mkv`
-oder `Film_rendepth2.mp4`, ohne zusätzliche `anaglyph`-, `2d`- oder Bit-Tiefen-Kürzel.
+Anaglyphen verwenden standardmäßig die **AnaglyphBatch-Zusätze**, etwa
+`Film_dubois_lcd.mkv` oder `Film_rendepth2.mp4`. Eigene Zusätze sind möglich.
 Vorhandene Dateien werden nicht überschrieben. Kollisionen werden vor dem Zusatz
 nummeriert, z. B. `Film_2_dubois_lcd.mkv`; auch nachträglich angelegte Ziele sind geschützt.
 
@@ -80,9 +88,21 @@ nummeriert, z. B. `Film_2_dubois_lcd.mkv`; auch nachträglich angelegte Ziele si
   kein garantiertes Dateigrößenlimit. Nur das zum gewählten Modus passende Feld ist
   sichtbar; beide Werte bleiben beim Umschalten erhalten. Startwert der Zielbitrate:
   **20 Mbit/s = 20.000 kbit/s**. Kein beliebiges Encoder-Menü.
-- Quell-Timing bleibt erhalten, auch variable Framerate. Keine Umstellung,
-  Interpolation oder bewusste Frame-Duplikation/-Auslassung. Container können
-  Zeitstempel auf ihre eigene Genauigkeit runden.
+- Bei Layout-/Anaglyph-/Mono-Konvertierungen bleibt das Quell-Timing erhalten,
+  auch variable Framerate. Container können Zeitstempel auf ihre eigene Genauigkeit
+  runden. **Nur Framerate ändern** erzeugt dagegen die gewählte konstante Bildrate.
+  Eingaben `23,976`, `29,97` und `59,94` stehen für die exakten Brüche
+  `24000/1001`, `30000/1001` und `60000/1001`; `24`, `30`, `60` bleiben ganze Raten.
+  Andere Zahlen und Brüche sind frei eingebbar (1–240 fps).
+- Eine Halbierung wie 60 → 30 oder 59,94 → 29,97 behält jedes zweite ganze Bild,
+  beide Augen bleiben zeitlich zusammen. Andere Änderungen lassen Bilder aus oder
+  wiederholen sie; keine Überblendung, Bewegungsinterpolation oder Tonverlangsamung.
+  Wiedergabegeschwindigkeit und Audio-/Video-Versatz bleiben erhalten; die Enddauer
+  kann um höchstens die Rasterung eines Zielbildes abweichen.
+  Der Ton wird kopiert, das Video muss neu kodiert werden. Quell-YUV-Farbkennzeichnung,
+  Farbaufteilung, Bit-Tiefe und Pixelseitenverhältnis bleiben erhalten, soweit der
+  gewählte Encoder sie unterstützt. RGB benötigt eine gekennzeichnete YUV-Wandlung.
+  Mono/2D ist für diesen Zweck als Quelllayout verfügbar.
 - Unterstütztes SDR wird anhand seiner Farbkennzeichnung tatsächlich nach
   sRGB/16-Bit-RGB für die Batch-Verfahren umgerechnet und anschließend nach
   BT.709-YUV konvertiert und gekennzeichnet; keine bloße Änderung der Farb-Tags.
@@ -92,7 +112,7 @@ nummeriert, z. B. `Film_2_dubois_lcd.mkv`; auch nachträglich angelegte Ziele si
   Farbräume werden mit Hinweis blockiert. Der Wertebereich wird getrennt behandelt:
   vorhandene Angaben haben Vorrang, RGB/JPEG-YUV verwendet bei fehlender Kennzeichnung
   Vollbereich, gewöhnliches YUV den üblichen begrenzten Videobereich. Jede Annahme
-  steht in der Vorprüfung und im Log. Eine fehlende Kennzeichnung lässt sich nicht
+  steht unter **Testen** und im Log. Eine fehlende Kennzeichnung lässt sich nicht
   anhand der Auflösung beweisen; die Kontrollbild-/Player-Prüfung bleibt sinnvoll.
   Erkannte HDR-Quellen werden nicht automatisch umgewandelt. Interlacing, nichtquadratische Pixel,
   Rotation und VR-Projektion werden in dieser Version mit Hinweis blockiert.
@@ -101,8 +121,16 @@ nummeriert, z. B. `Film_2_dubois_lcd.mkv`; auch nachträglich angelegte Ziele si
   Zeitstempel werden noch nicht übertragen; ausgewählte globale Metadaten wie
   `creation_time` und Titel werden übernommen.
 
-**Kontrollbild** bietet einen Positionsregler und eine genaue Sekundenangabe. Beim
-Loslassen des Reglers wird das Bild an der gewählten Stelle geladen. Es zeigt
+Stereo-Ausgaben enthalten **MKV-StereoMode** bzw. die explizite **MP4-st3d**-Box.
+H.264 verwendet zusätzlich Frame-Packing-SEI (3 für SBS, 4 für OU). Ein verlustfreier
+MKV→MP4-Verpackungsschritt überträgt die Container-Kennzeichnung; das Video wird
+nur einmal kodiert. Die fertige Ausgabe wird auf diese Kennzeichnungen geprüft.
+Bei **Nur Framerate ändern** mit umgekehrter Augenreihenfolge ist MKV erforderlich:
+st3d kann R/L nicht ausdrücken. Anaglyph-/Mono-Ausgaben erhalten keine SBS/OU-Flags.
+**Testen** zeigt die Layout-Erkennung und die geplanten Kennzeichnungen.
+
+**Kontrollbild** lädt das erste Bild automatisch und bietet einen Positionsregler und eine genaue Sekundenangabe. Beim
+Loslassen des Reglers oder mit Enter im Sekundenfeld wird das Bild an der gewählten Stelle geladen. Es zeigt
 optional einen Ausgabe-Frame derselben Filterkette: 8-Bit-Anzeige
 vor Videokompression, kein Ersatz für den Test im Zielplayer. Der Fortschrittsbalken
 kombiniert Dateifortschritt und Jobanzahl; unterschiedlich lange Videos haben gleiches
@@ -113,7 +141,7 @@ der Windows-Abschlusssound bleiben unverändert.
 ## Einstellungen
 
 TransCora merkt Ziel, Anaglyphenverfahren, Ausgabeprofil, Container, Codec,
-Qualitätsmodus, CRF-/Bitratenwerte, Dateinamensoption, Eingabe-/Ausgabeordner und
+Qualitätsmodus, CRF-/Bitratenwerte, Zielbildrate, Dateinamenszusatz, Eingabe-/Ausgabeordner und
 Unterordneroption. Quelllayout beginnt beim nächsten Programmstart mit **Automatisch**,
 **L/R tauschen** ist dann ausgeschaltet. Joblisten behalten ihre individuellen Angaben.
 Dateiliste, Kontrollbildposition und Fenstergröße/-position werden nicht automatisch
@@ -140,7 +168,7 @@ python -m unittest discover -s tests -v
 Unter Linux ohne Display: `xvfb-run -a python -m unittest discover -s tests -v`.
 Tests vergleichen alle 17 sRGB-Composites pixelgenau mit der originalen Batch und
 prüfen echte Exporte, Bit-Tiefen, Audio, variable Zeitstempel, L/R-Tausch, Kontrollbild,
-Abbruch, Namenskollisionen und frei zusammengestellte Listen. Das Material ist
+Abbruch, Namenskollisionen, 3D-Kennzeichnungen, Framerate-Änderungen samt Ton-Synchronität und frei zusammengestellte Listen. Das Material ist
 synthetisch; längere persönliche Videos und Zielplayer sind praktisch zu erproben.
 
 Der Windows-Build läuft nach erfolgreichen Linux- und Windows-Tests. FFmpeg wird

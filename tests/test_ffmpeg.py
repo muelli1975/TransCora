@@ -1,5 +1,6 @@
 """Real FFmpeg exports, timing, cancellation and comparison with the original Batch."""
 from dataclasses import replace
+from fractions import Fraction
 from pathlib import Path
 import json
 import os
@@ -11,7 +12,7 @@ import threading
 import unittest
 
 from transcora.core.engine import (Cancelled, build_graph, command, execute, methods, plan_job,
-                                   preview, probe, capture)
+                                   preview, probe, capture, metadata_layout, verify)
 from transcora.core.model import Job, Options, app_root
 from transcora.core.toolchain import Toolchain
 
@@ -204,6 +205,95 @@ class FFmpegTests(unittest.TestCase):
         self.assertEqual(len(before), len(after))
         for a, b in zip(before, after):
             self.assertAlmostEqual(a-before[0], b-after[0], delta=.0011)
+
+    def test_framerate_preserves_geometry_colour_audio_and_paired_eyes(self):
+        for source_rate, target_rate, suffix, container in [
+                ('60', '30', '-tbh', 'mp4'), ('60000/1001', '29,97', '-lrh', 'mp4'),
+                ('24000/1001', '23,976', '-tbh', 'mkv')]:
+            with self.subTest(source_rate=source_rate, container=container):
+                source = self.folder/f'fps-{source_rate.replace("/", "_")}{suffix}.mkv'
+                self.run_ffmpeg('-f', 'lavfi', '-i', f'nullsrc=size=128x64:rate={source_rate}',
+                    '-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=48000',
+                    '-vf', "geq=lum='16+N*3':cb='if(lt(Y,H/2),64,192)':cr=128,format=yuv444p,"
+                    'setparams=colorspace=bt709:color_primaries=bt709:color_trc=bt709:range=limited',
+                    '-t', '1.001', '-c:v', 'ffv1', '-c:a', 'aac', str(source))
+                options = Options(target='framerate', target_fps=target_rate, container=container, crf=1)
+                plan = self.plan(options, source)
+                self.assertEqual(plan.size, (128,64))
+                self.assertEqual(plan.pixel_format, 'yuv444p')
+                self.assertNotIn('scale=', plan.graph)
+                self.assertNotIn('crop=', plan.graph)
+                execute(self.tools, plan, threading.Event(), lambda *args: None, self.folder/'fps.log')
+                result = probe(self.tools, plan.output)
+                self.assertEqual(Fraction(result['video']['r_frame_rate']),
+                                 Fraction('30000/1001' if target_rate == '29,97' else '24000/1001' if target_rate == '23,976' else '30'))
+                self.assertEqual(metadata_layout(result['video']), plan.stereo)
+                def frames(path):
+                    return json.loads(capture([str(self.tools.ffprobe), '-v', 'error', '-select_streams', 'v:0',
+                        '-show_frames', '-show_entries', 'frame=best_effort_timestamp_time', '-of', 'json', str(path)]))['frames']
+                before, after = frames(source), frames(plan.output)
+                expected_count = 30 if source_rate == '60' else 30 if source_rate == '60000/1001' else 24
+                self.assertEqual(len(after), expected_count)
+                interval = float(1/Fraction(result['video']['r_frame_rate']))
+                origin = plan.info['video']['_start_offset']
+                for index, frame in enumerate(after):
+                    self.assertAlmostEqual(float(frame['best_effort_timestamp_time']), origin+index*interval,
+                                           delta=.00002 if container == 'mp4' else .0011)
+                self.assertAlmostEqual(float(result['format']['duration']),
+                                       float(probe(self.tools, source)['format']['duration']), delta=.045)
+                def audio_hashes(path):
+                    data = json.loads(capture([str(self.tools.ffprobe), '-v', 'error', '-select_streams', 'a',
+                        '-show_packets', '-show_data_hash', 'sha256', '-show_entries', 'packet=data_hash,pts_time',
+                        '-of', 'json', str(path)]))['packets']
+                    return data
+                original_audio, copied_audio = audio_hashes(source), audio_hashes(plan.output)
+                self.assertEqual([p['data_hash'] for p in original_audio], [p['data_hash'] for p in copied_audio])
+                original_offset = float(before[0]['best_effort_timestamp_time'])-float(original_audio[0]['pts_time'])
+                copied_offset = float(after[0]['best_effort_timestamp_time'])-float(copied_audio[0]['pts_time'])
+                self.assertAlmostEqual(original_offset, copied_offset, delta=.0011)
+                raw = self.run_ffmpeg('-i', str(plan.output), '-map', '0:v:0', '-fps_mode', 'passthrough', '-f', 'rawvideo', '-pix_fmt', 'yuv444p', 'pipe:1')
+                size = 128*64
+                luminance = [raw[i*size*3] for i in range(expected_count)]
+                self.assertTrue(all(abs((b-a)-(6 if expected_count == 30 else 3)) <= 2
+                                    for a,b in zip(luminance, luminance[1:])), luminance)
+                for i in range(expected_count):
+                    # Both eye regions retain their distinct source chroma on the same frame.
+                    self.assertAlmostEqual(raw[i*size*3+size], 64, delta=2)
+                    self.assertAlmostEqual(raw[i*size*3+size+128*40], 192, delta=2)
+
+    def test_stereo_flags_and_rejection_of_missing_markers(self):
+        for target in ('half_sbs', 'half_ou'):
+            plan, info = self.export(Options(target=target, crf=28))
+            data = plan.output.read_bytes()
+            mode = 2 if target == 'half_sbs' else 1
+            self.assertIn(b'\x00\x00\x00\rst3d\x00\x00\x00\x00'+bytes([mode]), data)
+            self.assertEqual(metadata_layout(info['video']), plan.stereo)
+        # Deliberately encode without SEI/container stereo tags; publishing must fail verification.
+        plan = self.plan(Options(target='half_sbs', crf=28))
+        unmarked = self.folder/'unmarked.mp4'
+        args = command(self.tools, plan, unmarked)
+        index = args.index('-x264-params')
+        del args[index:index+2]
+        index = args.index('-metadata:s:v:0')
+        del args[index:index+2]
+        capture(args, timeout=60)
+        with self.assertRaisesRegex(ValueError, 'Stereo-Kennzeichnung'):
+            verify(self.tools, plan, unmarked, threading.Event())
+
+    def test_framerate_reversed_eyes_use_mkv_and_mono_has_no_stereo_flags(self):
+        source = self.folder/'reverse-rlh.mkv'
+        shutil.copyfile(self.source, source)
+        with self.assertRaisesRegex(ValueError, 'MKV'):
+            self.plan(Options(target='framerate'), source)
+        plan = self.plan(Options(target='framerate', container='mkv'), source)
+        execute(self.tools, plan, threading.Event(), lambda *args: None, self.folder/'reverse.log')
+        self.assertEqual(metadata_layout(probe(self.tools, plan.output)['video']), ('sbs', True))
+        self.assertTrue(plan.output.stem.endswith('-rlh'))
+        mono = self.folder/'plain.mkv'
+        shutil.copyfile(self.source, mono)
+        plan = self.plan(Options(target='framerate', layout='mono'), mono)
+        execute(self.tools, plan, threading.Event(), lambda *args: None, self.folder/'plain.log')
+        self.assertIsNone(metadata_layout(probe(self.tools, plan.output)['video']))
 
 
 if __name__ == '__main__':

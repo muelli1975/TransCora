@@ -19,7 +19,7 @@ def main():
     for name in ('assets', 'presets', 'tools', 'licenses'):
         shutil.copytree(root/name, output/name, ignore=shutil.ignore_patterns('__pycache__'), dirs_exist_ok=True)
     (output/'docs').mkdir(exist_ok=True)
-    shutil.copy2(root/'docs/RELEASE_NOTES_0.1.1.md', output/'docs/RELEASE_NOTES_0.1.1.md')
+    shutil.copy2(root/'docs/RELEASE_NOTES_0.1.2.md', output/'docs/RELEASE_NOTES_0.1.2.md')
     python_license = next((p for p in (Path(sys.base_prefix)/'LICENSE.txt', Path(sys.base_prefix)/'LICENSE') if p.is_file()), None)
     if python_license is None:
         raise ValueError('Python license missing from the build installation')

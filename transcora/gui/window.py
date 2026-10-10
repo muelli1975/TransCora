@@ -14,12 +14,13 @@ from tkinter import filedialog, messagebox, ttk
 
 from transcora import __version__
 from transcora.core.engine import Cancelled, execute, methods, plan_job, preview
-from transcora.core.model import Job, LAYOUTS, NAMING, PROFILES, TARGETS, Options, VIDEO_EXTENSIONS, app_root
+from transcora.core.model import Job, LAYOUTS, PROFILES, TARGETS, Options, VIDEO_EXTENSIONS, app_root, FPS_CHOICES
+from transcora.core.naming import effective_suffix, suffix_choices, reserve_output, filename_layout
 from transcora.core.storage import load_list, save_list, write_json
 from transcora.core.toolchain import Toolchain
 from transcora.gui.native import dark_titlebar
 from transcora.gui.preview_window import PreviewWindow
-from transcora.gui.theme import apply_theme, GOLD_LIGHT, MUTED, TEXT, PANEL_BG
+from transcora.gui.theme import apply_theme, GOLD_LIGHT, MUTED, TEXT, PANEL_BG, APP_BG
 
 
 STATUS = {"queued": "Wartet", "checking": "Prüfung", "ready": "Bereit", "blocked": "Prüfen!",
@@ -68,8 +69,8 @@ class Window:
 
     def _style(self):
         self.root.title(f"TransCora {__version__}")
-        self.root.geometry("860x650")
-        self.root.minsize(780, 570)
+        self.root.geometry("860x700")
+        self.root.minsize(780, 680)
         self.root.option_add("*Font", ("Segoe UI", 9))
         try:
             self.root.iconbitmap(str(app_root() / "assets" / "transcora.ico"))
@@ -102,7 +103,7 @@ class Window:
         holder.rowconfigure(0, weight=1)
         self.tree = ttk.Treeview(holder, columns=("file", "layout", "target", "status"), show="headings", height=6)
         for key, label, width in (("file", "Datei", 340), ("layout", "Quelle", 100),
-                                  ("target", "Ziel", 140), ("status", "Status", 100)):
+                                  ("target", "Ziel", 165), ("status", "Status", 100)):
             self.tree.heading(key, text=label)
             self.tree.column(key, width=width, minwidth=70, stretch=key == "file")
         self.tree.grid(row=0, column=0, sticky="nsew")
@@ -117,7 +118,7 @@ class Window:
         for col in (0, 1, 2):
             fields.columnconfigure(col, weight=1, uniform="fields")
         self.variables = {}
-        self.mappings = {"layout": LAYOUTS, "target": TARGETS, "profile": PROFILES, "naming": NAMING,
+        self.mappings = {"layout": LAYOUTS, "target": TARGETS, "profile": PROFILES,
                          "method": {k: m["label"] for k, m in self.catalog.items()},
                          "container": {"mkv": "MKV", "mp4": "MP4"},
                          "codec": {"h264": "H.264", "h265": "H.265 / HEVC"},
@@ -138,19 +139,41 @@ class Window:
         self.variables["swap"] = tk.BooleanVar(value=self.defaults.swap)
         swap = ttk.Checkbutton(fields, text="L/R tauschen", variable=self.variables["swap"], command=lambda: self.option_changed("swap"))
         swap.grid(row=0, column=1, sticky="sw", padx=(0, 8), pady=5)
+        self.swap_control = swap
         self.controls.append((swap, "normal"))
         combo(fields, 0, 2, "target", "Ziel")
         combo(fields, 1, 0, "method", "Anaglyphenverfahren")
         combo(fields, 1, 1, "profile", "Anaglyph-Ausgabeprofil")
         combo(fields, 1, 2, "container", "Container")
-        combo(fields, 2, 0, "naming", "Dateinamen · SBS/OU/Mono")
+        suffix_frame = ttk.Frame(fields)
+        suffix_frame.grid(row=2, column=0, sticky="ew", padx=(0, 8), pady=3)
+        ttk.Label(suffix_frame, text="Dateinamenszusatz · frei editierbar").pack(anchor="w")
+        self.variables["suffix"] = tk.StringVar()
+        suffix = ttk.Combobox(suffix_frame, textvariable=self.variables["suffix"], state="normal", width=22)
+        suffix.pack(fill="x")
+        for event in ("<<ComboboxSelected>>", "<FocusOut>", "<Return>", "<KeyRelease>"):
+            suffix.bind(event, lambda e: self.option_changed("suffix"))
+        self.combos["suffix"] = suffix
+        self.controls.append((suffix, "normal"))
+        self.fps_frame = ttk.Frame(fields)
+        self.fps_frame.grid(row=2, column=1, sticky="ew", padx=(0, 8), pady=3)
+        ttk.Label(self.fps_frame, text="Zielbildrate (fps) · Zahl oder Bruch").pack(anchor="w")
+        self.variables["target_fps"] = tk.StringVar(value=self.defaults.target_fps)
+        fps = ttk.Combobox(self.fps_frame, textvariable=self.variables["target_fps"], values=FPS_CHOICES, state="normal", width=22)
+        fps.pack(fill="x")
+        for event in ("<<ComboboxSelected>>", "<FocusOut>", "<Return>"):
+            fps.bind(event, lambda e: self.option_changed("target_fps"))
+        self.combos["target_fps"] = fps
+        self.controls.append((fps, "normal"))
         folder_checks = ttk.Frame(fields)
-        folder_checks.grid(row=2, column=1, columnspan=2, sticky="sw", pady=4)
+        folder_checks.grid(row=2, column=2, sticky="sw", pady=4)
         self.recursive = tk.BooleanVar(value=self.recursive_value)
         check = ttk.Checkbutton(folder_checks, text="Unterordner mitverarbeiten", variable=self.recursive)
         check.pack(side="left", padx=(0, 10))
         self.controls.append((check, "normal"))
-        ttk.Label(folder_checks, text="beim Ordnerimport", foreground=MUTED).pack(side="left")
+        self.output_name = tk.StringVar()
+        ttk.Label(fields, textvariable=self.output_name, foreground=GOLD_LIGHT, wraplength=790).grid(
+            row=3, column=0, columnspan=3, sticky="ew", pady=(3, 0))
         output = ttk.Frame(outer)
         output.grid(row=5, column=0, sticky="ew", pady=(6, 0))
         output.columnconfigure(1, weight=1)
@@ -164,7 +187,23 @@ class Window:
         self.warning = tk.StringVar()
         ttk.Label(outer, textvariable=self.warning, foreground=GOLD_LIGHT, wraplength=800).grid(row=6, column=0, sticky="ew", pady=5)
         self.details = tk.StringVar(value="Dateien hinzufügen oder eine gespeicherte Liste laden.")
-        ttk.Label(outer, textvariable=self.details, foreground=MUTED, wraplength=800).grid(row=7, column=0, sticky="ew")
+        detail_frame = ttk.Frame(outer)
+        detail_frame.grid(row=7, column=0, sticky="ew")
+        detail_frame.columnconfigure(0, weight=1)
+        self.detail_text = tk.Text(detail_frame, height=4, width=1, wrap="word", background=APP_BG,
+            foreground=MUTED, insertbackground=TEXT, selectbackground=GOLD_LIGHT, selectforeground=APP_BG,
+            borderwidth=0, highlightthickness=0, state="disabled")
+        self.detail_text.grid(row=0, column=0, sticky="ew")
+        detail_scroll = ttk.Scrollbar(detail_frame, orient="vertical", command=self.detail_text.yview)
+        detail_scroll.grid(row=0, column=1, sticky="ns")
+        self.detail_text.configure(yscrollcommand=detail_scroll.set)
+        def show_details(*args):
+            self.detail_text.configure(state="normal")
+            self.detail_text.delete("1.0", "end")
+            self.detail_text.insert("1.0", self.details.get())
+            self.detail_text.configure(state="disabled")
+        self.details.trace_add("write", show_details)
+        show_details()
         actions = ttk.Frame(outer)
         actions.grid(row=8, column=0, sticky="ew", pady=5)
         self.button(actions, "Erweitert ▸", self.toggle_advanced).pack(side="left")
@@ -204,15 +243,16 @@ class Window:
         footer.grid(row=12, column=0, sticky="ew", pady=(8, 0))
         self.speed = tk.StringVar(value="")
         ttk.Label(footer, textvariable=self.speed, foreground=MUTED).pack(side="left")
-        self.abort_button = ttk.Button(footer, text="Abbrechen", command=self.abort, state="disabled")
+        self.abort_button = ttk.Button(footer, text="Abbrechen", command=self.abort, state="disabled", style="Danger.TButton")
         self.abort_button.pack(side="right")
         self.start_button = self.button(footer, "Start", lambda: self.check(True), style="Primary.TButton")
         self.start_button.pack(side="right", padx=5)
-        self.button(footer, "Testen", lambda: self.check(False)).pack(side="right")
+        self.test_button = self.button(footer, "Testen", lambda: self.check(False), style="Primary.TButton")
+        self.test_button.pack(side="right")
         self.root.bind("<Control-o>", lambda event: self.add_files() if not self.busy else None)
         self.root.bind("<Delete>", lambda event: self.remove() if not self.busy and self.root.focus_get() == self.tree else None)
         self.root.bind("<Escape>", lambda event: self.abort() if self.busy else None)
-        self.refresh_controls()
+        self.selection_changed()
 
     def selected_jobs(self):
         ids = set(self.tree.selection())
@@ -227,7 +267,8 @@ class Window:
         self.status.set("Standardeinstellungen für neue Dateien wiederhergestellt. Bestehende Jobs behalten ihre Einstellungen.")
 
     def update_row(self, job):
-        values = (job.source.name, LAYOUTS.get(job.options.layout, "?"), TARGETS[job.options.target], STATUS[job.status])
+        layout = job.plan.layout if job.plan else job.options.layout
+        values = (job.source.name, LAYOUTS.get(layout, "?"), TARGETS[job.options.target], STATUS[job.status])
         if self.tree.exists(job.id):
             self.tree.item(job.id, values=values)
         else:
@@ -240,42 +281,59 @@ class Window:
             self.updating = True
             for key, var in self.variables.items():
                 value = getattr(self.defaults, key)
+                if key == "suffix":
+                    value = effective_suffix(self.defaults, self.catalog[self.defaults.method]["suffix"])
+                    value = value or "Keiner"
                 var.set(self.mappings[key][value] if key in self.mappings else value)
             self.updating = False
+            self.last_suffix_display = self.variables['suffix'].get()
             self.refresh_controls()
             return
         self.updating = True
         for key, var in self.variables.items():
             values = [getattr(job.options, key) for job in selected]
+            if key == "suffix":
+                values = [self.display_suffix(job) for job in selected]
             value = values[0]
             if key in self.mappings:
                 var.set(self.mappings[key][value] if all(v == value for v in values) else "")
             else:
-                var.set(value)
+                var.set(value if all(v == value for v in values) else "")
         self.updating = False
+        self.last_suffix_display = self.variables['suffix'].get()
         self.selection_text.set(f"Einstellungen für {len(selected)} ausgewählte Datei(en). Leere Auswahlfelder bedeuten gemischte Werte.")
         job = selected[0]
-        self.details.set(job.plan.summary if job.plan else str(job.source) + "\n" + job.detail)
+        self.details.set((job.plan.summary if job.plan else str(job.source)) + "\n" + job.detail)
         self.refresh_controls()
 
     def option_changed(self, key):
         if self.busy or self.updating:
             return
+        if key == "suffix" and self.variables[key].get() == self.last_suffix_display:
+            return
         try:
             value = self.variables[key].get()
+            if key == "suffix":
+                value = "" if value == "Keiner" else value
             if key in self.mappings:
                 value = next(k for k, label in self.mappings[key].items() if label == value)
             elif key in {"crf", "bitrate_mbps"}:
                 value = float(value.replace(",", "."))
-            def changed(options):
+            def changed(options, source=None):
                 result = replace(options, **{key: value})
+                if key == "target":
+                    result.suffix = None
+                    if value == "framerate":
+                        result.swap = False
+                if key == "suffix" and value == effective_suffix(replace(options, suffix=None), self.catalog[options.method]["suffix"], source):
+                    result.suffix = None
                 if key == "codec" and value == "h265":
                     result.container = "mkv"
                 result.validate()
                 return result
             candidates = self.selected_jobs()
-            updates = [(job, changed(job.options)) for job in candidates]
-            self.defaults = changed(self.defaults)
+            updates = [(job, changed(job.options, job.source)) for job in candidates]
+            self.defaults = changed(self.defaults, candidates[0].source if candidates else None)
             for job, options in updates:
                 job.options = options
                 job.plan = None
@@ -283,11 +341,14 @@ class Window:
                 self.update_row(job)
             if key == "codec" and value == "h265":
                 self.variables["container"].set("MKV")
+            if key in {"target", "method", "target_fps", "layout"}:
+                self.selection_changed()
+            self.last_suffix_display = self.variables['suffix'].get()
             self.status.set("Einstellungen übernommen. Vor dem Start wird erneut geprüft.")
             self.refresh_controls()
         except (ValueError, StopIteration) as error:
             self.status.set(str(error) or "Ungültige Eingabe.")
-            if key in {"crf", "bitrate_mbps"}:
+            if key in {"crf", "bitrate_mbps", "target_fps"}:
                 selected = self.selected_jobs()
                 options = selected[0].options if selected else self.defaults
                 self.variables[key].set(str(getattr(options, key)))
@@ -298,9 +359,12 @@ class Window:
         selected = self.selected_jobs()
         options = selected[0].options if selected else self.defaults
         anaglyph = options.target == "anaglyph"
+        framerate = options.target == "framerate"
+        self.swap_control.configure(state="disabled" if framerate else "normal")
+        self.fps_frame.grid() if framerate else self.fps_frame.grid_remove()
         self.combos["method"].configure(state="readonly" if anaglyph else "disabled")
         self.combos["profile"].configure(state="readonly" if anaglyph else "disabled")
-        self.combos["naming"].configure(state="disabled" if anaglyph else "readonly")
+        self.combos["suffix"].configure(values=self.available_suffixes(options, selected[0] if selected else None))
         self.combos["container"].configure(state="disabled" if options.codec == "h265" else "readonly")
         self.combos["crf"].configure(state="normal" if options.rate_mode == "crf" else "disabled")
         self.combos["bitrate_mbps"].configure(state="normal" if options.rate_mode == "abr" else "disabled")
@@ -315,12 +379,70 @@ class Window:
                 text = "4:4:4: Nicht alle Player und Hardwaredecoder unterstützen dieses Format."
                 if options.profile == "quality10":
                     text += " 10 Bit: feinere Abstufungen; kein HDR-Modus."
-            text += " Dateizusatz wie AnaglyphBatch: _" + self.catalog[options.method]["suffix"]
+        if framerate:
+            text = "Layout, Auflösung und Augenreihenfolge bleiben erhalten. Video wird neu kodiert; Ton wird kopiert."
         if options.codec == "h265":
             text += " H.265: MKV, längere Rechenzeit und Zielplayer prüfen; CRF ist codecabhängig."
         if options.rate_mode == "abr":
             text += " Zielbitrate = Videodurchschnitt, kein festes Dateigrößenlimit."
         self.warning.set(text)
+        self.update_output_name()
+
+    def display_suffix(self, job):
+        options = job.options
+        if job.plan and options.target == "framerate":
+            options = replace(options, layout=job.plan.layout, swap=job.plan.swap)
+        try:
+            return effective_suffix(options, self.catalog[options.method]["suffix"], job.source) or "Keiner"
+        except ValueError:
+            return options.suffix or "_fps" + options.target_fps
+
+    def available_suffixes(self, options, job=None):
+        layout, swap = options.layout, False
+        if job and options.target == "framerate":
+            try:
+                hint = filename_layout(job.source.stem)
+                if layout == "auto" and hint:
+                    layout, swap = hint
+                if job.plan:
+                    layout, swap = job.plan.layout, job.plan.swap
+            except ValueError:
+                pass
+        choices = suffix_choices(options, self.catalog[options.method]["suffix"], layout, swap)
+        if options.target == "framerate":
+            current = self.display_suffix(job) if job else effective_suffix(options, "")
+            if current and current != "Keiner" and current not in choices:
+                choices.insert(0, current)
+        return choices
+
+    def update_output_name(self):
+        selected = self.selected_jobs()
+        if not selected:
+            try:
+                name = reserve_output(Path("Film.mp4"), self.output_path(), self.defaults,
+                                      self.catalog[self.defaults.method]["suffix"], set()).name
+                self.output_name.set("Beispiel-Ausgabename: " + name)
+            except (ValueError, OSError):
+                self.output_name.set("Ausgabename: nach Auswahl einer Datei")
+            return
+        job = selected[0]
+        try:
+            reserved = set()
+            for entry in self.jobs:
+                if entry.plan:
+                    path = entry.plan.output
+                    reserved.add(str(path.resolve()).casefold())
+                else:
+                    options = entry.options
+                    folder = self.output_path()
+                    if entry.source_root:
+                        folder /= entry.source.parent.relative_to(entry.source_root)
+                    path = reserve_output(entry.source, folder, options, self.catalog[options.method]["suffix"], reserved)
+                if entry is job:
+                    self.output_name.set("Ausgabename: " + path.name)
+                    break
+        except (ValueError, OSError):
+            self.output_name.set("Ausgabename: Quelllayout prüfen")
 
     def invalidate_all(self, force=False):
         if self.busy:
@@ -334,6 +456,7 @@ class Window:
                 job.plan = None
                 job.status, job.detail = "queued", "Ausgabeziel geändert; erneut prüfen."
                 self.update_row(job)
+        self.update_output_name()
 
     def add_paths(self, paths, source_root=None):
         existing = {os.path.normcase(str(job.source.resolve())) for job in self.jobs}
@@ -479,6 +602,9 @@ class Window:
     def check(self, run):
         if self.busy:
             return
+        self.option_changed("suffix")
+        if self.variables['suffix'].get() != self.last_suffix_display:
+            return
         candidates = [job for job in self.jobs if job.status != "completed"]
         if not candidates:
             self.status.set("Keine noch offenen Dateien in der Liste.")
@@ -528,7 +654,7 @@ class Window:
                 try:
                     execute(tools, plan, self.cancel, emit, log_path)
                     counts["completed"] += 1
-                    self.events.put(("job", (job.id, "completed", "Gespeichert: " + str(plan.output), plan)))
+                    self.events.put(("job", (job.id, "completed", "Ausgabe geprüft · " + plan.stereo_summary + "\nGespeichert: " + str(plan.output), plan)))
                 except Cancelled:
                     counts["cancelled"] += 1
                     self.events.put(("job", (job.id, "cancelled", "Begonnene Ausgabe verworfen", plan)))
@@ -542,7 +668,7 @@ class Window:
             self.events.put(("log", summary))
             if ready and not self.cancel.is_set():
                 self.events.put(("sound", None))
-        self.background(work, "Vorabprüfung")
+        self.background(work, "Testen")
 
     def show_preview(self):
         selected = self.selected_jobs()
@@ -564,7 +690,7 @@ class Window:
         viewer = PreviewWindow(self.root, request)
         self.controls.extend(viewer.controls())
         viewer.dialog.protocol("WM_DELETE_WINDOW", lambda: self.close_preview(
-            viewer.dialog, viewer.button, viewer.time_entry, viewer.scale))
+            viewer.dialog, viewer.time_entry, viewer.scale))
         viewer.dialog.after(50, viewer.request)
 
     def close_preview(self, dialog, *widgets):
@@ -627,7 +753,7 @@ class Window:
                     viewer, png, plan = payload
                     if viewer.dialog.winfo_exists():
                         viewer.set_plan(plan)
-                        widgets = {viewer.button, viewer.time_entry, viewer.scale}
+                        widgets = {viewer.time_entry, viewer.scale}
                         self.controls = [(widget, state) for widget, state in self.controls if widget not in widgets]
                         self.controls.extend(viewer.controls())
                         image = tk.PhotoImage(data=base64.b64encode(png))

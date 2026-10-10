@@ -1,7 +1,7 @@
 """One checked FFmpeg plan for manual files, folders and saved lists."""
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from fractions import Fraction
 from pathlib import Path
 from collections import deque
@@ -14,7 +14,7 @@ import threading
 import time
 import uuid
 
-from .model import Job, Options, app_root
+from .model import Job, Options, app_root, frame_rate, LAYOUTS
 from .naming import filename_layout, reserve_output
 from .toolchain import Toolchain, process_options
 
@@ -155,6 +155,25 @@ class Plan:
     graph: str
     duration: float
     warnings: list[str]
+    colors: dict
+    layout_reason: str
+
+    @property
+    def stereo(self) -> tuple[str, bool] | None:
+        layout = self.layout if self.options.target == "framerate" else self.options.target
+        if layout not in {"half_sbs", "full_sbs", "half_ou", "full_ou"}:
+            return None
+        return ("sbs" if layout.endswith("sbs") else "ou", self.swap if self.options.target == "framerate" else False)
+
+    @property
+    def stereo_summary(self) -> str:
+        if not self.stereo:
+            return "3D-Kennzeichnung: keine SBS/OU-Kennzeichnung"
+        axis, inverted = self.stereo
+        flags = "MKV-StereoMode" if self.options.container == "mkv" else "MP4-st3d"
+        if self.options.codec == "h264" and not inverted:
+            flags += f" · H.264 Frame-Packing {'3' if axis == 'sbs' else '4'}"
+        return f"3D-Kennzeichnung: {flags} · {'SBS' if axis == 'sbs' else 'OU'} · " + ("R/L" if inverted else "L/R")
 
     @property
     def summary(self) -> str:
@@ -164,14 +183,53 @@ class Plan:
             fps = f"{float(Fraction(rate)):.3f}"
         except (ValueError, ZeroDivisionError):
             fps = "?"
+        timing = ""
+        if self.options.target == "framerate":
+            target = frame_rate(self.options.target_fps)
+            timing = f" → {float(target):.3f} fps ({target}) · Laufzeit unverändert"
         return (f"{video['width']} × {video['height']} · {video.get('codec_name', '?')} · "
-                f"{fps} fps ({rate}) → {self.size[0]} × {self.size[1]} · "
-                f"{self.options.codec.upper()} / {self.pixel_format}\n{self.output}")
+                f"{fps} fps ({rate}){timing} → {self.size[0]} × {self.size[1]} · "
+                f"{self.options.codec.upper()} / {self.pixel_format}\n{self.layout_reason}\n"
+                f"{self.stereo_summary}\n{self.output}")
 
 
 def build_graph(video: dict, options: Options, layout: str, swap: bool, colors: dict,
                 method: dict) -> tuple[str, tuple[int, int], str]:
     width, height = video["width"], video["height"]
+    if options.target == "framerate":
+        pixel_format = video.get("pix_fmt", "")
+        rate = frame_rate(options.target_fps)
+        ticks = math.lcm(rate.numerator, Fraction(video.get("time_base", "1/1000")).denominator)
+        offset = video.get("_start_offset", 0)
+        thinning = []
+        try:
+            source_rate = Fraction(video.get("avg_frame_rate", "0/1"))
+            ratio = source_rate / rate
+            nominal = Fraction(video.get("r_frame_rate", "0/1"))
+            factor = round(ratio)
+            # Matroska's rational frame-rate field may approximate NTSC rates;
+            # accept at most one part per million around an integer reduction.
+            if abs(source_rate-nominal) <= source_rate/1000 and abs(ratio-factor) <= Fraction(1, 1_000_000) and factor > 1:
+                thinning = [f"select='not(mod(n,{factor}))'"]
+        except (ValueError, ZeroDivisionError):
+            pass
+        filters = [f"[0:{video['index']}]sidedata=mode=delete:type=STEREO3D",
+                   "sidedata=mode=delete:type=SPHERICAL", *thinning, "setpts=PTS-STARTPTS",
+                   f"fps=fps={rate}:start_time=0:round=near:eof_action=pass",
+                   f"settb=expr=1/{ticks}", f"setpts=PTS+{offset}/TB"]
+        if colors["matrix"] == "gbr":
+            filters.append(f"zscale=matrixin=gbr:primariesin={colors['primaries']}:"
+                           f"transferin={colors['transfer']}:rangein=full:matrix=bt709:"
+                           f"primaries={colors['primaries']}:transfer={colors['transfer']}:range=full")
+            pixel_format = "yuv444p10le" if any(n in pixel_format for n in ("10", "12", "16")) else "yuv444p"
+        pixel_format = pixel_format.replace("yuvj", "yuv")
+        pixel_format = {"nv12": "yuv420p", "nv21": "yuv420p", "p010le": "yuv420p10le",
+                        "p012le": "yuv420p12le", "p016le": "yuv420p16le"}.get(pixel_format, pixel_format)
+        matrix = "bt709" if colors['matrix'] == "gbr" else colors['matrix']
+        filters.append(f"format={pixel_format},setparams=colorspace={matrix}:"
+                       f"color_primaries={colors['primaries']}:color_trc={colors['transfer']}:"
+                       f"range={'full' if colors['range'] == 'pc' else 'limited'}[v]")
+        return ",".join(filters), (width, height), pixel_format
     horizontal = layout.endswith("sbs")
     eye_w, eye_h = (width // 2, height) if horizontal else (width, height // 2)
     display_w = eye_w * (2 if layout == "half_sbs" else 1)
@@ -253,13 +311,14 @@ def plan_job(tools: Toolchain, job: Job, output_root: Path, reserved: set[str],
     info["source_mtime_ns"] = after.st_mtime_ns
     info["source_size"] = after.st_size
     video = info["video"]
+    video["_start_offset"] = max(0, float(video.get("start_time") or 0) - float(info.get("format", {}).get("start_time") or 0))
     width, height = video.get("width", 0), video.get("height", 0)
     if not width or not height:
         raise ValueError("Keine gültige Videoauflösung.")
     if video.get("field_order", "unknown") not in {"progressive", "unknown"}:
         raise ValueError("Interlaced-Quelle: Eine geprüfte Deinterlacing-Regel ist noch nicht verfügbar.")
     sar = video.get("sample_aspect_ratio", "1:1")
-    if sar not in {"1:1", "0:1", "N/A", None}:
+    if options.target != "framerate" and sar not in {"1:1", "0:1", "N/A", None}:
         raise ValueError(f"Nichtquadratische Pixel (SAR {sar}) sind in dieser ersten Version noch nicht freigegeben.")
     for side in video.get("side_data_list", []):
         if side.get("side_data_type") in {"Spherical Mapping", "Display Matrix"}:
@@ -287,7 +346,22 @@ def plan_job(tools: Toolchain, job: Job, output_root: Path, reserved: set[str],
             warnings.append("Manuell gewähltes Layout/L/R weicht vom Dateinamen ab.")
         if metadata and metadata != ("sbs" if layout.endswith("sbs") else "ou", swap):
             warnings.append("Manuelle Quellinterpretation ersetzt abweichende Stereo-Metadaten.")
-    if (width if layout.endswith("sbs") else height) % 2:
+    if layout == "mono" and options.target != "framerate":
+        raise ValueError("Mono/2D ist als Quelle für ‚Nur Framerate ändern‘ verfügbar; andere Ziele benötigen SBS/OU.")
+    if options.target == "framerate":
+        if options.swap:
+            raise ValueError("Nur Framerate ändern erhält die Augenreihenfolge. L/R tauschen ausschalten.")
+        orientation = "sbs" if layout.endswith("sbs") else "ou"
+        swap = metadata[1] if metadata and metadata[0] == orientation else hint[1] if hint and hint[0] == layout else False
+        if layout == "mono":
+            if metadata or hint:
+                raise ValueError("Stereo-Kennzeichnung an einer als Mono/2D gewählten Quelle; Quelllayout prüfen.")
+            swap = False
+        if swap and options.container == "mp4":
+            raise ValueError("R/L-Quelle: Für unveränderte Augenreihenfolge MKV wählen; MP4-st3d unterstützt diese Umkehrung nicht.")
+        warnings.append("Ganze Bilder werden ausgelassen/wiederholt; keine Überblendung oder Bewegungsinterpolation. "
+                        "Video wird neu kodiert; Ton und Wiedergabegeschwindigkeit bleiben erhalten.")
+    if layout != "mono" and (width if layout.endswith("sbs") else height) % 2:
         raise ValueError("Das gepackte Raster lässt sich nicht in zwei gleich große Ansichten teilen.")
     colors, color_warnings = color_spec(video)
     warnings.extend(color_warnings)
@@ -302,6 +376,10 @@ def plan_job(tools: Toolchain, job: Job, output_root: Path, reserved: set[str],
         warnings.append("4:2:0: geringere Farbauflösung kann Anaglyphenqualität beeinträchtigen."
                         if options.profile == "compatible" else "4:4:4 wird nicht von allen Playern/Hardwaredecodern unterstützt.")
     graph, size, pixel_format = build_graph(video, options, layout, swap, colors, catalog[options.method])
+    output_colors = dict(colors) if options.target == "framerate" else {
+        "matrix": "bt709", "primaries": "bt709", "transfer": "bt709", "range": "tv"}
+    if output_colors["matrix"] == "gbr":
+        output_colors["matrix"] = "bt709"
     if capabilities:
         if options.codec == "h265" and not capabilities.get("h265"):
             raise ValueError("Dieser FFmpeg-Build enthält keinen H.265-Encoder.")
@@ -313,7 +391,8 @@ def plan_job(tools: Toolchain, job: Job, output_root: Path, reserved: set[str],
             folder = folder / job.source.resolve().parent.relative_to(job.source_root.resolve())
         except ValueError:
             raise ValueError("Quelle liegt nicht unter der gespeicherten Ordnerwurzel.") from None
-    output = reserve_output(job.source, folder, options, catalog[options.method]["suffix"], reserved)
+    naming_options = replace(options, layout=layout, swap=swap) if options.target == "framerate" else options
+    output = reserve_output(job.source, folder, naming_options, catalog[options.method]["suffix"], reserved)
     duration = 0.0
     try:
         duration = float(video.get("duration") or info.get("format", {}).get("duration") or 0)
@@ -321,7 +400,8 @@ def plan_job(tools: Toolchain, job: Job, output_root: Path, reserved: set[str],
             duration = 0.0
     except (ValueError, TypeError):
         pass
-    return Plan(job.source.resolve(), output, options, info, layout, swap, size, pixel_format, graph, duration, warnings)
+    reason = f"{LAYOUTS[layout]} · " + (f"erkannt am Dateizusatz in {job.source.name}" if options.layout == "auto" else "manuell gewählt")
+    return Plan(job.source.resolve(), output, options, info, layout, swap, size, pixel_format, graph, duration, warnings, output_colors, reason)
 
 
 def command(tools: Toolchain, plan: Plan, temporary: Path) -> list[str]:
@@ -332,17 +412,21 @@ def command(tools: Toolchain, plan: Plan, temporary: Path) -> list[str]:
             "-filter_complex", plan.graph, "-map", "[v]", "-map", "0:a?", "-sn", "-dn",
             "-map_metadata", "-1", "-c:v", "libx264" if options.codec == "h264" else "libx265",
             "-preset", "slow", "-pix_fmt", plan.pixel_format,
-            "-fps_mode", "passthrough", "-enc_time_base", str(plan.info['video'].get('time_base', '1/1000')), "-c:a", "copy",
-            "-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709", "-color_range", "tv"]
+            "-fps_mode", "passthrough", "-enc_time_base", "1/" + str(math.lcm(frame_rate(options.target_fps).numerator,
+            Fraction(plan.info['video'].get('time_base', '1/1000')).denominator)) if options.target == "framerate"
+            else str(plan.info['video'].get('time_base', '1/1000')), "-c:a", "copy",
+            "-colorspace", plan.colors['matrix'], "-color_primaries", plan.colors['primaries'],
+            "-color_trc", plan.colors['transfer'], "-color_range", plan.colors['range']]
     if options.rate_mode == "abr":
         args += ["-b:v", str(round(options.bitrate_mbps * 1_000_000))]
     else:
         args += ["-crf", str(options.crf)]
-    layout = {"half_sbs": "left_right", "half_ou": "top_bottom"}.get(options.target, "mono")
+    layout = {("sbs", False): "left_right", ("sbs", True): "right_left",
+              ("ou", False): "top_bottom", ("ou", True): "bottom_top"}.get(plan.stereo, "mono")
     args += ["-metadata:s:v:0", "stereo_mode=" + layout]
-    if options.codec == "h264" and options.target in {"half_sbs", "half_ou"}:
-        args += ["-x264-params", "frame-packing=" + ("3" if options.target == "half_sbs" else "4")]
-    if options.container == "mp4":
+    if options.codec == "h264" and plan.stereo and not plan.stereo[1]:
+        args += ["-x264-params", "frame-packing=" + ("3" if plan.stereo[0] == "sbs" else "4")]
+    if options.container == "mp4" and temporary.suffix == ".mp4":
         args += ["-movflags", "+faststart"]
     for name in ("creation_time", "title", "artist", "copyright"):
         value = plan.info.get("format", {}).get("tags", {}).get(name)
@@ -354,18 +438,31 @@ def command(tools: Toolchain, plan: Plan, temporary: Path) -> list[str]:
 def verify(tools: Toolchain, plan: Plan, path: Path, cancel: threading.Event) -> None:
     info = probe(tools, path, cancel)
     video = info["video"]
-    if (video.get("width"), video.get("height")) != plan.size or video.get("pix_fmt") != plan.pixel_format:
+    if (video.get("width"), video.get("height")) != plan.size or str(video.get("pix_fmt", "")).replace("yuvj", "yuv") != plan.pixel_format:
         raise ValueError("Ausgabemaße oder Pixelformat entsprechen nicht dem geprüften Plan.")
     if video.get("codec_name") != ("h264" if plan.options.codec == "h264" else "hevc"):
         raise ValueError("Unerwarteter Ausgabecodec.")
-    if any(video.get(k) != "bt709" for k in ("color_space", "color_transfer", "color_primaries")):
-        raise ValueError("Die BT.709-Farbkennzeichnung der Ausgabe stimmt nicht.")
+    if any(video.get(k) != plan.colors[v] for k, v in (
+            ("color_space", "matrix"), ("color_transfer", "transfer"), ("color_primaries", "primaries"), ("color_range", "range"))):
+        raise ValueError("Die Farbkennzeichnung der Ausgabe stimmt nicht mit dem Plan überein.")
     expected_audio = [s.get("codec_name") for s in plan.info["streams"] if s.get("codec_type") == "audio"]
     actual_audio = [s.get("codec_name") for s in info["streams"] if s.get("codec_type") == "audio"]
     if actual_audio != expected_audio:
         raise ValueError("Die Audioübernahme stimmt nicht mit der Quelle überein.")
-    if plan.options.target in {"anaglyph", "mono"} and metadata_layout(video):
-        raise ValueError("Falsche Stereo-Kennzeichnung an einer fertigen Anaglyph-/Mono-Ausgabe.")
+    if metadata_layout(video) != plan.stereo:
+        raise ValueError("Die Stereo-Kennzeichnung der Ausgabe stimmt nicht mit dem Plan überein.")
+    if plan.stereo and plan.options.codec == "h264" and not plan.stereo[1]:
+        frame_info = json.loads(capture([str(tools.ffprobe), "-v", "error", "-select_streams", "v:0",
+            "-read_intervals", "%+#1", "-show_frames", "-of", "json", str(path)], cancel))
+        if not frame_info.get("frames") or metadata_layout(frame_info["frames"][0]) != plan.stereo:
+            raise ValueError("Die H.264-Frame-Packing-Kennzeichnung fehlt oder ist falsch.")
+    if plan.options.target == "framerate":
+        if Fraction(video.get("r_frame_rate", "0/1")) != frame_rate(plan.options.target_fps):
+            raise ValueError("Die Zielbildrate wurde nicht korrekt gespeichert.")
+        if plan.options.container == "mp4" and Fraction(video.get("avg_frame_rate", "0/1")) != frame_rate(plan.options.target_fps):
+            raise ValueError("Die MP4-Bildzeiten entsprechen nicht der exakten Zielbildrate.")
+        if video.get("sample_aspect_ratio", "1:1") != plan.info['video'].get("sample_aspect_ratio", "1:1"):
+            raise ValueError("Das Pixelseitenverhältnis wurde unerwartet geändert.")
     if path.stat().st_size == 0:
         raise ValueError("Die Ausgabe ist leer.")
 
@@ -397,7 +494,10 @@ def publish_without_overwrite(temporary: Path, destination: Path, cancel: thread
 def execute(tools: Toolchain, plan: Plan, cancel: threading.Event, emit, log_path: Path) -> None:
     plan.output.parent.mkdir(parents=True, exist_ok=True)
     temporary = plan.output.with_name("." + plan.output.stem + "." + uuid.uuid4().hex + ".part." + plan.options.container)
-    args = command(tools, plan, temporary)
+    # MKV exposes StereoMode as stream side data. A lossless remux transfers it
+    # into MP4's st3d box; metadata:s:v alone does not create that MP4 box.
+    encoded = temporary.with_suffix(".mkv") if plan.stereo and plan.options.container == "mp4" else temporary
+    args = command(tools, plan, encoded)
     log_path.parent.mkdir(parents=True, exist_ok=True)
     tail = deque(maxlen=24)
     process = None
@@ -446,13 +546,25 @@ def execute(tools: Toolchain, plan: Plan, cancel: threading.Event, emit, log_pat
                 raise Cancelled()
             if process.returncode:
                 raise ValueError("FFmpeg: " + "\n".join(tail)[-3500:])
+            if encoded != temporary:
+                emit("phase", "MP4-3D-Kennzeichnung schreiben")
+                remux = [str(tools.ffmpeg), "-v", "error", "-nostdin", "-n", "-i", str(encoded),
+                         "-map", "0", "-c", "copy", "-strict", "unofficial", "-movflags", "+faststart"]
+                if plan.options.target == "framerate":
+                    # Recover the exact CFR grid after MKV's millisecond time base.
+                    rate = frame_rate(plan.options.target_fps)
+                    ticks = math.lcm(rate.numerator, Fraction(plan.info['video'].get('time_base', '1/1000')).denominator)
+                    offset = plan.info['video']['_start_offset']
+                    expression = lambda field: f"round(({field}*TB-{offset})*{rate.numerator}/{rate.denominator})*{ticks}*{rate.denominator}/{rate.numerator}+{offset}*{ticks}"
+                    remux += ["-bsf:v", f"setts=time_base=1/{ticks}:pts={expression('PTS')}:dts={expression('DTS')}:duration={ticks}*{rate.denominator}/{rate.numerator}"]
+                capture(remux + [str(temporary)], cancel, timeout=3600)
             emit("phase", "Ausgabe prüfen")
             verify(tools, plan, temporary, cancel)
             if plan.source.stat().st_mtime_ns != plan.info["source_mtime_ns"]:
                 raise ValueError("Die Quelldatei wurde während der Verarbeitung geändert.")
             emit("phase", "Abschließen")
             publish_without_overwrite(temporary, plan.output, cancel)
-            log.write("COMPLETED " + str(plan.output) + "\n")
+            log.write("VERIFIED " + plan.stereo_summary + "\nCOMPLETED " + str(plan.output) + "\n")
             emit("progress", {"percent": 100.0, "seconds": plan.duration})
         finally:
             if process:
@@ -462,6 +574,8 @@ def execute(tools: Toolchain, plan: Plan, cancel: threading.Event, emit, log_pat
                 process.stdout.close()
                 process.stderr.close()
             temporary.unlink(missing_ok=True)
+            if encoded != temporary:
+                encoded.unlink(missing_ok=True)
 
 
 def preview(tools: Toolchain, plan: Plan, cancel: threading.Event, seconds: float = 0) -> bytes:
