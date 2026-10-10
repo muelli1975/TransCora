@@ -5,6 +5,7 @@ import re
 import tempfile
 import threading
 import unittest
+import struct
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -13,6 +14,7 @@ from transcora.core.model import Job, Options, app_root, frame_rate
 from transcora.core.naming import clean_stem, filename_layout, reserve_output
 from transcora.core.storage import load_list, save_list
 from transcora.core.toolchain import Toolchain
+from transcora.core.mp4 import packed_stereo_boxes
 
 
 class CoreTests(unittest.TestCase):
@@ -88,6 +90,30 @@ class CoreTests(unittest.TestCase):
             output = reserve_output(folder/'Film-tbh.mp4', folder, Options(target='framerate', layout='half_ou'), '', set())
             self.assertEqual(output.name, 'Film_fps30-tbh.mp4')
             self.assertEqual(filename_layout(output.stem), ('half_ou', False))
+
+    def test_mp4_normalization_keeps_media_and_offsets_unchanged(self):
+        def box(kind, content):
+            return struct.pack('>I4s', len(content)+8, kind)+content
+        st3d = box(b'st3d', b'\0\0\0\0\2')
+        vexu = box(b'vexu', box(b'eyes', b'placeholder'))
+        sample = box(b'avc1', bytes(78)+st3d+vexu)
+        sample = box(b'stsd', bytes(4)+struct.pack('>I',1)+sample)
+        for kind in (b'stbl', b'minf', b'mdia', b'trak', b'moov'):
+            sample = box(kind, sample)
+        media = box(b'mdat', b'unchanged media vexu eyes st3d')
+        original = sample+media
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp)/'packed.mp4'
+            path.write_bytes(original)
+            self.assertEqual(packed_stereo_boxes(path), [2])
+            self.assertEqual(path.read_bytes(), original)
+            self.assertEqual(packed_stereo_boxes(path, normalize=True), [2])
+            expected = original.replace(vexu, vexu[:4]+b'free'+vexu[8:], 1)
+            self.assertEqual(path.read_bytes(), expected)
+            self.assertEqual(len(path.read_bytes()), len(original))
+            path.write_bytes(struct.pack('>I4s', 500, b'moov'))
+            with self.assertRaises(ValueError):
+                packed_stereo_boxes(path)
 
     def test_lists_roundtrip_and_revalidate(self):
         with tempfile.TemporaryDirectory() as tmp:

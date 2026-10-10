@@ -251,7 +251,8 @@ class FFmpegTests(unittest.TestCase):
                 original_offset = float(before[0]['best_effort_timestamp_time'])-float(original_audio[0]['pts_time'])
                 copied_offset = float(after[0]['best_effort_timestamp_time'])-float(copied_audio[0]['pts_time'])
                 self.assertAlmostEqual(original_offset, copied_offset, delta=.0011)
-                raw = self.run_ffmpeg('-i', str(plan.output), '-map', '0:v:0', '-fps_mode', 'passthrough', '-f', 'rawvideo', '-pix_fmt', 'yuv444p', 'pipe:1')
+                raw = self.run_ffmpeg('-i', str(plan.output), '-map', '0:v:0', '-vf', 'sidedata=mode=delete:type=STEREO3D',
+                                     '-fps_mode', 'passthrough', '-f', 'rawvideo', '-pix_fmt', 'yuv444p', 'pipe:1')
                 size = 128*64
                 luminance = [raw[i*size*3] for i in range(expected_count)]
                 self.assertTrue(all(abs((b-a)-(6 if expected_count == 30 else 3)) <= 2
@@ -294,6 +295,17 @@ class FFmpegTests(unittest.TestCase):
         plan = self.plan(Options(target='framerate', layout='mono'), mono)
         execute(self.tools, plan, threading.Event(), lambda *args: None, self.folder/'plain.log')
         self.assertIsNone(metadata_layout(probe(self.tools, plan.output)['video']))
+
+    def test_flagged_stereo_exports_can_be_converted_again(self):
+        for container in ('mp4', 'mkv'):
+            with self.subTest(container=container):
+                stereo = self.plan(Options(target='framerate', container=container))
+                execute(self.tools, stereo, threading.Event(), lambda *args: None, self.folder/'roundtrip.log')
+                again = self.plan(Options(target='anaglyph', container=container), stereo.output)
+                self.assertEqual(again.layout, 'full_sbs')
+                execute(self.tools, again, threading.Event(), lambda *args: None, self.folder/'roundtrip.log')
+                self.assertIsNone(metadata_layout(probe(self.tools, again.output)['video']))
+                self.assertTrue(preview(self.tools, again, threading.Event()).startswith(b'\x89PNG'))
 
 
 if __name__ == '__main__':

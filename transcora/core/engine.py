@@ -17,6 +17,7 @@ import uuid
 from .model import Job, Options, app_root, frame_rate, LAYOUTS
 from .naming import filename_layout, reserve_output
 from .toolchain import Toolchain, process_options
+from .mp4 import packed_stereo_boxes
 
 
 class Cancelled(Exception):
@@ -87,7 +88,7 @@ def metadata_layout(video: dict) -> tuple[str, bool] | None:
             kind = {"side by side": "sbs", "top and bottom": "ou"}.get(side.get("type"))
             if kind:
                 return kind, bool(side.get("inverted", 0))
-            if side.get("type") not in (None, "2D"):
+            if side.get("type") not in (None, "2D", "unspecified"):
                 raise ValueError("Dieses Stereo-Layout ist noch nicht freigegeben. SBS/OU-Quelle verwenden.")
     return None
 
@@ -450,7 +451,10 @@ def verify(tools: Toolchain, plan: Plan, path: Path, cancel: threading.Event) ->
     if actual_audio != expected_audio:
         raise ValueError("Die Audioübernahme stimmt nicht mit der Quelle überein.")
     if metadata_layout(video) != plan.stereo:
-        raise ValueError("Die Stereo-Kennzeichnung der Ausgabe stimmt nicht mit dem Plan überein.")
+        raise ValueError("Die Stereo-Kennzeichnung der Ausgabe stimmt nicht mit dem Plan überein: " + json.dumps(video.get('side_data_list', [])))
+    if plan.options.container == "mp4" and plan.stereo:
+        if packed_stereo_boxes(path) != [2 if plan.stereo[0] == "sbs" else 1]:
+            raise ValueError("Die explizite MP4-st3d-Kennzeichnung fehlt oder ist falsch.")
     if plan.stereo and plan.options.codec == "h264" and not plan.stereo[1]:
         frame_info = json.loads(capture([str(tools.ffprobe), "-v", "error", "-select_streams", "v:0",
             "-read_intervals", "%+#1", "-show_frames", "-of", "json", str(path)], cancel))
@@ -558,6 +562,7 @@ def execute(tools: Toolchain, plan: Plan, cancel: threading.Event, emit, log_pat
                     expression = lambda field: f"round(({field}*TB-{offset})*{rate.numerator}/{rate.denominator})*{ticks}*{rate.denominator}/{rate.numerator}+{offset}*{ticks}"
                     remux += ["-bsf:v", f"setts=time_base=1/{ticks}:pts={expression('PTS')}:dts={expression('DTS')}:duration={ticks}*{rate.denominator}/{rate.numerator}"]
                 capture(remux + [str(temporary)], cancel, timeout=3600)
+                packed_stereo_boxes(temporary, normalize=True)
             emit("phase", "Ausgabe prüfen")
             verify(tools, plan, temporary, cancel)
             if plan.source.stat().st_mtime_ns != plan.info["source_mtime_ns"]:

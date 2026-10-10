@@ -14,7 +14,9 @@
 - Stereo MP4 exports contain an explicit **st3d** box as well as H.264 frame-packing
   SEI. A lossless MKV-to-MP4 packaging pass writes st3d; video is encoded once.
   Frame-rate-only MP4 exports restore exact frame timestamps after MKV time-base
-  rounding. Reversed-eye frame-rate-only sources require MKV, which preserves
+  rounding. Optional spatial-video extensions added by FFmpeg 9 are neutralized
+  in generated packed-video MP4 files, preserving explicit SBS/OU metadata,
+  media bytes and chunk offsets. Reversed-eye frame-rate-only sources require MKV, which preserves
   their StereoMode; st3d cannot represent the reversed order.
 - Replaced the preview timeline with a continuous track and a single round gold
   handle. The first image loads automatically; slider release or Enter in the
