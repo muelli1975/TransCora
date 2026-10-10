@@ -1,0 +1,93 @@
+from __future__ import annotations
+
+from dataclasses import asdict, dataclass, field
+from pathlib import Path
+import sys
+import uuid
+
+
+VIDEO_EXTENSIONS = {".mp4", ".mkv", ".mk3d", ".mov", ".m2ts", ".ts", ".avi"}
+LAYOUTS = {"auto": "Automatisch", "full_sbs": "Full-SBS", "half_sbs": "Half-SBS",
+           "full_ou": "Full-OU", "half_ou": "Half-OU"}
+TARGETS = {"half_sbs": "Half-SBS · 1080p", "half_ou": "Half-OU · 1080p",
+           "anaglyph": "Anaglyph", "mono": "Mono · linkes Auge"}
+NAMING = {"original": "Kein Layout-Zusatz", "layout": "Layout-Zusatz",
+          "players": "Player-Kürzel (Kodi/Bino)"}
+PROFILES = {"quality": "Qualität · 8 Bit / 4:4:4", "quality10": "Qualität · 10 Bit / 4:4:4",
+            "compatible": "Kompatibel · 8 Bit / 4:2:0"}
+
+
+def app_root() -> Path:
+    # A one-folder frozen application keeps assets and tools beside its executable.
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    return Path(__file__).resolve().parents[2]
+
+
+@dataclass
+class Options:
+    layout: str = "auto"
+    swap: bool = False
+    target: str = "half_sbs"
+    method: str = "dubois_lcd"
+    profile: str = "quality"
+    naming: str = "layout"
+    container: str = "mkv"
+    codec: str = "h264"
+    rate_mode: str = "crf"
+    crf: float = 18.0
+    bitrate_mbps: float = 20.0
+    assume_bt709: bool = False
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "Options":
+        if not isinstance(data, dict):
+            raise ValueError("Ungültige Jobeinstellungen.")
+        allowed = cls.__dataclass_fields__
+        if set(data) - set(allowed):
+            raise ValueError("Unbekannte Einstellungen in der Jobliste.")
+        result = cls(**data)
+        result.validate()
+        return result
+
+    def validate(self) -> None:
+        for name, values in (("layout", LAYOUTS), ("target", TARGETS), ("profile", PROFILES),
+                             ("naming", NAMING), ("container", {"mp4", "mkv"}),
+                             ("codec", {"h264", "h265"}), ("rate_mode", {"crf", "abr"})):
+            if getattr(self, name) not in values:
+                raise ValueError(f"Ungültige Einstellung: {name}.")
+        if not isinstance(self.swap, bool) or not isinstance(self.assume_bt709, bool):
+            raise ValueError("Ungültige L/R- oder Farbeinstellung.")
+        if not isinstance(self.method, str):
+            raise ValueError("Ungültiges Anaglyphverfahren.")
+        if not isinstance(self.crf, (int, float)) or not 1 <= self.crf <= 51:
+            raise ValueError("CRF muss zwischen 1 und 51 liegen.")
+        if not isinstance(self.bitrate_mbps, (int, float)) or not 0 < self.bitrate_mbps <= 1000:
+            raise ValueError("Die Zielbitrate muss größer als 0 und höchstens 1000 Mbit/s sein.")
+        if self.codec == "h265" and self.container != "mkv":
+            raise ValueError("H.265 ist in dieser Version nur mit MKV freigegeben.")
+
+
+@dataclass
+class Job:
+    source: Path
+    options: Options = field(default_factory=Options)
+    source_root: Path | None = None
+    id: str = field(default_factory=lambda: uuid.uuid4().hex)
+    status: str = "queued"
+    detail: str = "Noch nicht geprüft"
+    plan: object | None = None
+
+    def serializable(self) -> dict:
+        return {"source": str(self.source), "source_root": str(self.source_root) if self.source_root else None,
+                "options": asdict(self.options)}
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "Job":
+        if not isinstance(data, dict) or not isinstance(data.get("source"), str):
+            raise ValueError("Ungültiger Dateieintrag.")
+        source_root = data.get("source_root")
+        if source_root is not None and not isinstance(source_root, str):
+            raise ValueError("Ungültige Ordnerwurzel.")
+        return cls(Path(data["source"]).expanduser().resolve(), Options.from_dict(data.get("options", {})),
+                   Path(source_root).expanduser().resolve() if source_root else None)

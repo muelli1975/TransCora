@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "status": "reference_data_only_not_an_executable_preset_compiler",
+  "status": "used_by_v0_1_compiler_verified_against_original_batch",
   "reference": {
     "repository": "muelli1975/AnaglyphBatch",
     "path": "AnaglyphBatch_DE.bat",
@@ -11,7 +11,7 @@
   "working_space_reference": {
     "transfer": "iec61966-2-1",
     "integer_rgb_intermediate": "gbrp16",
-    "video_adapter_status": "to_be_validated",
+    "video_adapter_status": "sdr_adapter_implemented_synthetic_exports_verified",
     "note": "Keep matrices, clipping, LUT order and their reference working space; do not substitute transfer tags without pixel conversion."
   },
   "excluded": [

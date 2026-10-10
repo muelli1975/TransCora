@@ -1,0 +1,2 @@
+# Runtime conversion uses only the Python standard library and external FFmpeg.
+PyInstaller==6.22.3
