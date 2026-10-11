@@ -207,6 +207,7 @@ def encode(tools, bd, plan, base, dependent, cancel, emit, log, estimated_frames
 def decoded_digest(bd, base, dependent, frames, cancel, log, emit=None):
     count, digest = 0, hashlib.sha256()
     last_report = 0
+    started = time.monotonic()
     def pictures(pipe):
         nonlocal count, last_report
         while chunk := pipe.read(1024*1024):
@@ -216,8 +217,10 @@ def decoded_digest(bd, base, dependent, frames, cancel, log, emit=None):
             now = time.monotonic()
             if emit and (now-last_report >= .5 or count == frames*FRAME_BYTES):
                 last_report = now
+                elapsed = now-started
+                remaining = max(0, frames*FRAME_BYTES-count)*elapsed/count if elapsed >= 2 else None
                 emit('progress', {'percent': 93+6*min(1, count/(frames*FRAME_BYTES)),
-                                  'seconds': count/FRAME_BYTES/float(BD_RATE)})
+                                  'seconds': count/FRAME_BYTES/float(BD_RATE), 'remaining_seconds': remaining})
     run([bd.decoder, '-sw', '-i:mvc', base, dependent, '-sbs', '-o', '-'],
         cancel, log, bd.environment, pictures)
     if count != frames*FRAME_BYTES:

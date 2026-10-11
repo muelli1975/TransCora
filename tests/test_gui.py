@@ -282,6 +282,12 @@ class GuiTests(unittest.TestCase):
         self.assertEqual(self.window.speed.get(), '')
         self.assertEqual(self.window.elapsed.get(), 'Restzeit: —')
         self.assertEqual(str(self.window.progress.cget('mode')), 'indeterminate')
+        self.window.events.put(('progress', ('job', 1, 1,
+            {'percent': 94, 'seconds': 100, 'remaining_seconds': 120})))
+        with patch('transcora.gui.window.time.monotonic', return_value=100):
+            self.window.poll()
+        self.assertEqual(self.window.elapsed.get(), 'Restzeit: ca. 02:00')
+        self.assertEqual(str(self.window.progress.cget('mode')), 'determinate')
         self.window.set_busy(False)
 
     def test_log_has_dark_surfaces_and_scrollbar(self):

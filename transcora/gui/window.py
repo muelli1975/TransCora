@@ -1010,7 +1010,14 @@ class Window:
                 elif kind == "progress":
                     _, index, count, value = payload
                     if value["percent"] is not None:
-                        self.estimate_remaining(index, count, value["percent"])
+                        if 'remaining_seconds' in value and index == count:
+                            now = time.monotonic()
+                            remaining = value['remaining_seconds']
+                            self.estimated_finish = now+remaining if remaining is not None else None
+                            self.estimate_updated = now
+                            self.update_elapsed()
+                        else:
+                            self.estimate_remaining(index, count, value["percent"])
                         self.progress.stop()
                         self.progress.configure(mode="determinate")
                         self.progress["value"] = ((index - 1) + value["percent"] / 100) / count * 100
