@@ -87,11 +87,11 @@ class CoreTests(unittest.TestCase):
             for suffix in ('/bad', '\\bad', '..', 'space ', 'x'*81):
                 with self.assertRaises(ValueError):
                     replace(options, suffix=suffix).validate()
-            output = reserve_output(folder/'Film-tbh.mp4', folder, Options(target='framerate', layout='half_ou'), '', set())
+            output = reserve_output(folder/'Film-tbh.mp4', folder, Options(target='framerate', fps_mode='custom', layout='half_ou'), '', set())
             self.assertEqual(output.name, 'Film_30fps-tbh.mp4')
             self.assertEqual(filename_layout(output.stem), ('half_ou', False))
             output = reserve_output(folder/'Film_30fps-tbh.mp4', folder,
-                Options(target='framerate', layout='half_ou', target_fps='24000/1001'), '', set())
+                Options(target='framerate', fps_mode='custom', layout='half_ou', target_fps='24000/1001'), '', set())
             self.assertEqual(output.name, 'Film_23.976fps-tbh.mp4')
 
     def test_mp4_normalization_keeps_media_and_offsets_unchanged(self):
@@ -189,7 +189,7 @@ class CoreTests(unittest.TestCase):
 
     def test_tool_inspection_supports_ffmpeg_6_and_9_listing(self):
         names = ['zscale', 'colorchannelmixer', 'lutrgb', 'blend', 'crop', 'scale',
-                 'pad', 'hstack', 'vstack', 'format', 'setsar', 'sidedata']
+                 'pad', 'hstack', 'vstack', 'format', 'setsar', 'sidedata', 'bwdif']
         for flags in ('TSC', 'TS'):
             def run(args, **kwargs):
                 if '-filters' in args:

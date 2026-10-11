@@ -13,7 +13,7 @@ from PIL import Image, ImageTk
 from transcora.core.images import (ImageJob, ImageOptions, EXTENSIONS, TASKS, LAYOUTS, TARGETS, FORMATS,
     plans, execute_image, save_images, load_images, SIZES, SIZE_EDGES, image_methods)
 from transcora.core.engine import Cancelled, methods
-from transcora.core.model import app_root
+from transcora.core.model import app_root, ROW_ORDERS
 from transcora.core.storage import write_json, new_run_log, validate_preset_name
 from transcora.core.toolchain import Toolchain
 from .theme import GOLD_LIGHT, MUTED, SECONDARY_BG, TEXT
@@ -105,6 +105,27 @@ class ImagePanel:
         for event in ('<FocusOut>', '<Return>'): entry.bind(event, lambda e: self.changed('size_pixels'))
         ttk.Label(self.custom_size, text='px').pack(side='left')
         self.controls.append((entry, 'normal')); self.size_entry = entry
+        self.screen_fields = ttk.Frame(fields)
+        self.screen_fields.grid(row=3, column=0, columnspan=3, sticky='ew', pady=(2, 4))
+        self.mappings['row_first'] = ROW_ORDERS
+        for column, (key, label) in enumerate((('screen_width', 'Monitorbreite (Pixel)'), ('screen_height', 'Monitorhöhe (Pixel)'), ('row_first', 'Erste Bildschirmzeile'))):
+            cell = ttk.Frame(self.screen_fields)
+            cell.grid(row=0, column=column, sticky='ew', padx=(0, 8))
+            self.screen_fields.columnconfigure(column, weight=1)
+            ttk.Label(cell, text=label).pack(anchor='w')
+            value = getattr(self.defaults, key)
+            self.variables[key] = tk.StringVar(value=self.t(ROW_ORDERS[value]) if key == 'row_first' else str(value))
+            if key == 'row_first':
+                control = ttk.Combobox(cell, textvariable=self.variables[key], values=[self.t(v) for v in ROW_ORDERS.values()], state='readonly')
+                control.bind('<<ComboboxSelected>>', lambda e: self.changed('row_first'))
+                self.combos[key] = control
+                self.controls.append((control, 'readonly'))
+            else:
+                control = ttk.Entry(cell, textvariable=self.variables[key], width=8)
+                for event in ('<FocusOut>', '<Return>'):
+                    control.bind(event, lambda e, k=key: self.changed(k))
+                self.controls.append((control, 'normal'))
+            control.pack(fill='x')
         row = ttk.Frame(box); row.grid(row=5, column=0, sticky='ew', pady=8); row.columnconfigure(1, weight=1)
         ttk.Label(row, text='Ausgabeordner').grid(row=0, column=0, padx=(0, 8))
         entry = ttk.Entry(row, textvariable=self.output); entry.grid(row=0, column=1, sticky='ew'); self.controls.append((entry, 'normal'))
@@ -157,28 +178,39 @@ class ImagePanel:
         if self.busy or self.updating: return
         raw = self.variables[key].get()
         try:
-            value = next(k for k, v in self.mappings[key].items() if self.t(v) == raw) if key in self.mappings else int(raw) if key == 'size_pixels' else raw
+            value = next(k for k, v in self.mappings[key].items() if self.t(v) == raw) if key in self.mappings else int(raw) if key in {'size_pixels', 'screen_width', 'screen_height'} else raw
             selection = self.selected()
+            def updated(opts):
+                changes = {key: value, 'long_edge': 0}
+                if key == 'target' and value == 'row_interleaved':
+                    changes['format'] = 'png'
+                return replace(opts, **changes)
             for opts in [j.options for j in selection] if selection else [self.defaults]:
-                replace(opts, **{key: value}, long_edge=0).validate()
+                updated(opts).validate()
             if not selection:
-                self.defaults = replace(self.defaults, **{key: value}, long_edge=0)
+                self.defaults = updated(self.defaults)
             for job in selection:
-                job.options = replace(job.options, **{key: value}, long_edge=0); job.status = 'queued'; job.detail = 'Einstellungen geändert; erneut testen.'
+                job.options = updated(job.options); job.status = 'queued'; job.detail = 'Einstellungen geändert; erneut testen.'
             self.refresh(); self.selection_changed()
         except (ValueError, StopIteration) as error:
             messagebox.showerror(self.t('Bildeinstellungen'), self.t(str(error)), parent=self.root); self.selection_changed()
 
     def sensitivity(self):
         opts = self.selected()[0].options if self.selected() else self.defaults
+        rows = opts.task == 'convert' and opts.target == 'row_interleaved'
+        self.screen_fields.grid() if rows else self.screen_fields.grid_remove()
         self.preview_button.configure(state='normal' if not self.busy and not self.owner.busy and len(self.selected()) == 1 else 'disabled')
-        self.custom_size.grid() if opts.task == 'convert' and opts.size_mode == 'custom' else self.custom_size.grid_remove()
+        self.custom_size.grid() if opts.task == 'convert' and opts.size_mode == 'custom' and not rows else self.custom_size.grid_remove()
         self.size_entry.configure(state='normal' if opts.task == 'convert' and not self.busy else 'disabled')
         for key, combo in self.combos.items():
             enabled = opts.task == 'convert' or key == 'task'
             if key == 'method': enabled = enabled and opts.target == 'anaglyph'
             if key == 'quality': enabled = enabled and opts.format == 'jpeg'
+            if key == 'row_first': enabled = rows
+            if key in {'size_mode', 'size_edge'}: enabled = enabled and not rows
             combo.configure(state='readonly' if enabled and not self.busy else 'disabled')
+        if rows:
+            self.detail.set('Polfilter: Exakte Monitorauflösung, Vollbild ohne Skalierung. PNG erhält die Farbzeilen verlustfrei.')
 
     def refresh(self):
         for job in self.jobs:

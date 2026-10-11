@@ -16,7 +16,7 @@ from transcora import __version__
 from transcora.i18n import LANGUAGES
 from transcora.gui.localization import Localizer, TextVar
 from transcora.core.engine import Cancelled, execute, methods, plan_job, preview
-from transcora.core.model import Job, LAYOUTS, PROFILES, TARGETS, Options, VIDEO_EXTENSIONS, app_root, FPS_CHOICES, COMPATIBILITY_NOTE, AUDIO_FORMATS, AUDIO_TRACKS, AUDIO_CHANNELS
+from transcora.core.model import Job, LAYOUTS, PROFILES, TARGETS, Options, VIDEO_EXTENSIONS, app_root, FPS_CHOICES, FPS_MODES, COMPATIBILITY_NOTE, AUDIO_FORMATS, AUDIO_TRACKS, AUDIO_CHANNELS, VIDEO_SIZES, BD_BITRATES, ROW_ORDERS
 from transcora.core.naming import effective_suffix, suffix_choices, reserve_output, filename_layout, fps_suffix, default_disc_title
 from transcora.core.storage import load_list, save_list, write_json, new_run_log, delete_run_logs, load_presets, save_presets, validate_preset_name
 from transcora.core.toolchain import Toolchain
@@ -175,11 +175,11 @@ class Window:
         holder.grid(row=2, column=0, sticky="nsew")
         holder.columnconfigure(0, weight=1)
         holder.rowconfigure(0, weight=1)
-        self.tree = ttk.Treeview(holder, columns=("file", "layout", "target", "status"), show="headings", height=6, selectmode="extended")
-        for key, label, width in (("file", "Datei", 340), ("layout", "Quelle", 100),
-                                  ("target", "Ziel", 165), ("status", "Status", 100)):
+        self.tree = ttk.Treeview(holder, columns=("file", "layout", "fps", "duration", "target", "status"), show="headings", height=6, selectmode="extended")
+        for key, label, width in (("file", "Datei", 245), ("layout", "Quelle", 100), ("fps", "fps", 65),
+                                  ("duration", "Dauer", 85), ("target", "Ziel", 145), ("status", "Status", 95)):
             self.tree.heading(key, text=label)
-            self.tree.column(key, width=width, minwidth=70, stretch=key == "file")
+            self.tree.column(key, width=width, minwidth=55 if key == "fps" else 70, stretch=key == "file")
         self.tree.grid(row=0, column=0, sticky="nsew")
         scrollbar = ttk.Scrollbar(holder, orient="vertical", command=self.tree.yview)
         scrollbar.grid(row=0, column=1, sticky="ns")
@@ -199,6 +199,9 @@ class Window:
                          "container": {"mkv": "MKV", "mp4": "MP4", "iso": "Blu-ray-ISO", "m2ts": "M2TS (AVC/MVC)"},
                          "codec": {"h264": "H.264", "h265": "H.265 / HEVC"},
                          "rate_mode": {"crf": "Qualität (CRF)", "abr": "Zielbitrate (Durchschnitt)"},
+                         'video_size': VIDEO_SIZES, 'bd_bitrate_mbps': {n: str(n)+' Mbit/s' for n in BD_BITRATES},
+                         'row_first': ROW_ORDERS,
+                         'fps_mode': FPS_MODES,
                          'audio_format': AUDIO_FORMATS, 'audio_tracks': AUDIO_TRACKS, 'audio_channels': AUDIO_CHANNELS}
         self.combos = {}
         self.option_frames = {}
@@ -244,21 +247,24 @@ class Window:
             title_entry.bind(event, lambda e: self.option_changed('disc_title'))
         self.controls.append((title_entry, 'normal'))
         self.fps_frame = ttk.Frame(fields)
-        self.fps_frame.grid(row=2, column=1, sticky="ew", padx=(0, 8), pady=3)
-        ttk.Label(self.fps_frame, text="Zielbildrate (fps) · Zahl oder Bruch").pack(anchor="w")
+        self.fps_frame.grid(row=2, column=2, sticky="ew", padx=(0, 8), pady=3)
+        ttk.Label(self.fps_frame, text="Bildrate (fps)").pack(anchor="w")
+        fps_controls = ttk.Frame(self.fps_frame)
+        fps_controls.pack(fill='x')
+        self.variables['fps_mode'] = tk.StringVar(value=self.t(FPS_MODES[self.defaults.fps_mode]))
+        fps_mode = ttk.Combobox(fps_controls, textvariable=self.variables['fps_mode'], values=[self.t(v) for v in FPS_MODES.values()], state='readonly', width=17)
+        fps_mode.pack(side='left', fill='x', expand=True, padx=(0, 4))
+        fps_mode.bind('<<ComboboxSelected>>', lambda e: self.option_changed('fps_mode'))
+        self.combos['fps_mode'] = fps_mode
+        self.controls.append((fps_mode, 'readonly'))
         self.variables["target_fps"] = tk.StringVar(value=self.defaults.target_fps)
-        fps = ttk.Combobox(self.fps_frame, textvariable=self.variables["target_fps"], values=FPS_CHOICES, state="normal", width=22)
-        fps.pack(fill="x")
+        fps = ttk.Combobox(fps_controls, textvariable=self.variables["target_fps"], values=FPS_CHOICES, state="normal", width=8)
+        fps.pack(side='left')
         for event in ("<<ComboboxSelected>>", "<FocusOut>", "<Return>"):
             fps.bind(event, lambda e: self.option_changed("target_fps"))
         self.combos["target_fps"] = fps
         self.controls.append((fps, "normal"))
-        folder_checks = ttk.Frame(fields)
-        folder_checks.grid(row=2, column=2, sticky="sw", pady=4)
-        self.recursive = tk.BooleanVar(value=self.recursive_value)
-        check = ttk.Checkbutton(folder_checks, text="Unterordner mitverarbeiten", variable=self.recursive)
-        check.pack(side="left", padx=(0, 10))
-        self.controls.append((check, "normal"))
+        combo(fields, 2, 1, "video_size", "Größe")
         self.output_name = TextVar(self.localizer, )
         ttk.Label(fields, textvariable=self.output_name, foreground=GOLD_LIGHT, wraplength=790).grid(
             row=3, column=0, columnspan=3, sticky="ew", pady=(3, 0))
@@ -272,10 +278,16 @@ class Window:
         entry.bind("<FocusOut>", lambda event: self.invalidate_all())
         self.controls.append((entry, "normal"))
         self.button(output, "Wählen", self.choose_output).grid(row=0, column=2, padx=(8, 0))
+        folder_checks = ttk.Frame(output)
+        folder_checks.grid(row=0, column=3, sticky="w", padx=(10, 0))
+        self.recursive = tk.BooleanVar(value=self.recursive_value)
+        check = ttk.Checkbutton(folder_checks, text="Unterordner", variable=self.recursive)
+        check.pack(side="left", padx=(0, 10))
+        self.controls.append((check, "normal"))
         self.warning = TextVar(self.localizer, )
         ttk.Label(outer, textvariable=self.warning, foreground=GOLD_LIGHT, wraplength=800).grid(row=6, column=0, sticky="ew", pady=5)
         self.details = TextVar(self.localizer, value="Dateien hinzufügen oder eine gespeicherte Liste laden.")
-        detail_frame = ttk.Frame(outer)
+        detail_frame = ttk.Frame(outer, style="Bordered.TFrame", padding=1)
         detail_frame.grid(row=7, column=0, sticky="ew")
         detail_frame.columnconfigure(0, weight=1)
         self.detail_text = tk.Text(detail_frame, height=4, width=1, wrap="word", background=APP_BG,
@@ -322,6 +334,42 @@ class Window:
             number.bind("<Return>", lambda event, k=key: self.option_changed(k))
             self.controls.append((number, "normal"))
             self.combos[key] = number
+        combo(numeric, 0, 0, "bd_bitrate_mbps", "BD-3D-Bitrate")
+        self.rate_fields["bd_bitrate_mbps"] = self.option_frames["bd_bitrate_mbps"]
+        self.video_dimensions = ttk.Frame(self.advanced)
+        self.video_dimensions.grid(row=1, column=0, columnspan=3, sticky="ew")
+        for column, (key, label) in enumerate((("video_width", "Breite (Pixel)"), ("video_height", "Höhe (Pixel)"))):
+            box = ttk.Frame(self.video_dimensions)
+            box.grid(row=0, column=column, sticky="ew", padx=(0, 8))
+            self.video_dimensions.columnconfigure(column, weight=1)
+            ttk.Label(box, text=label).pack(anchor="w")
+            var = tk.StringVar(value=str(getattr(self.defaults, key)))
+            self.variables[key] = var
+            entry = ttk.Entry(box, textvariable=var, width=10)
+            entry.pack(fill="x")
+            for event in ("<FocusOut>", "<Return>"):
+                entry.bind(event, lambda e, k=key: self.option_changed(k))
+            self.combos[key] = entry
+            self.controls.append((entry, "normal"))
+        self.video_size_note = TextVar(self.localizer)
+        ttk.Label(self.video_dimensions, textvariable=self.video_size_note, foreground=MUTED).grid(
+            row=1, column=0, columnspan=2, sticky="w", pady=(3, 0))
+        self.screen_fields = ttk.Frame(fields)
+        self.screen_fields.grid(row=2, column=1, sticky='ew', padx=(0, 8), pady=3)
+        ttk.Label(self.screen_fields, text='Monitorauflösung (Pixel)').pack(anchor='w')
+        screen_values = ttk.Frame(self.screen_fields)
+        screen_values.pack(fill='x')
+        for key in ('screen_width', 'screen_height'):
+            if key == 'screen_height':
+                ttk.Label(screen_values, text='×').pack(side='left', padx=5)
+            self.variables[key] = tk.StringVar(value=str(getattr(self.defaults, key)))
+            entry = ttk.Entry(screen_values, textvariable=self.variables[key], width=8)
+            entry.pack(side='left', fill='x', expand=True)
+            for event in ('<FocusOut>', '<Return>'):
+                entry.bind(event, lambda e, k=key: self.option_changed(k))
+            self.combos[key] = entry
+            self.controls.append((entry, 'normal'))
+        combo(fields, 1, 0, 'row_first', 'Erste Bildschirmzeile')
         self.advanced_audio_button = self.button(actions, 'Tonoptionen …', self.show_audio_options)
         self.reset_button = self.button(actions, 'Standardeinstellungen', self.reset_defaults)
         # Keep the main window usable at its minimum height. Audio controls live
@@ -507,7 +555,22 @@ class Window:
 
     def update_row(self, job):
         layout = job.plan.layout if job.plan else job.options.layout
-        values = (job.source.name, self.t(LAYOUTS.get(layout, "?")), self.t(TARGETS[job.options.target]), self.t(STATUS[job.status]))
+        if job.plan:
+            job.source_fps = job.plan.info["video"].get("avg_frame_rate")
+            job.source_duration = job.plan.duration or None
+        rate = job.source_fps
+        try:
+            from fractions import Fraction
+            fps = f"{float(Fraction(rate)):.3f}".rstrip("0").rstrip(".")
+        except (ValueError, ZeroDivisionError, TypeError):
+            fps = "—"
+        if job.source_duration is None:
+            duration = "-"
+        else:
+            seconds = int(job.source_duration + .5)
+            duration = f"{seconds//3600:02}:{seconds//60%60:02}:{seconds%60:02}"
+        values = (job.source.name, self.t(LAYOUTS.get(layout, "?")), fps, duration,
+                  self.t(TARGETS[job.options.target]), self.t(STATUS[job.status]))
         if self.tree.exists(job.id):
             self.tree.item(job.id, values=values)
         else:
@@ -571,6 +634,8 @@ class Window:
                 value = "" if value == self.t("Keiner") else value
             if key in self.mappings:
                 value = next(k for k, label in self.mappings[key].items() if self.t(label) == value)
+            elif key in {"video_width", "video_height", 'screen_width', 'screen_height'}:
+                value = int(value)
             elif key in {"crf", "bitrate_mbps"}:
                 value = float(value.replace(",", "."))
             def changed(options, source=None):
@@ -581,9 +646,10 @@ class Window:
                         result.container, result.codec = 'iso', 'h264'
                     elif options.target == 'bd3d':
                         result.container = 'mp4'
-                    if value == 'cross_sbs': result.container = 'mkv'
                     if value == "framerate":
                         result.swap = False
+                    if value == 'row_interleaved' and result.profile == 'compatible':
+                        result.profile = 'quality'
                 if key == "suffix" and value == effective_suffix(replace(options, suffix=None), self.catalog[options.method]["suffix"], source):
                     result.suffix = None
                 if key == "codec" and value == "h265":
@@ -603,14 +669,14 @@ class Window:
                 self.update_row(job)
             if key == "codec" and value == "h265":
                 self.variables["container"].set("MKV")
-            if key in {"target", "method", "target_fps", "layout", "disc_title", "container", 'audio_channels'}:
+            if key in {"target", "method", "target_fps", "layout", "disc_title", "container", 'audio_channels', "video_size", 'row_first', 'fps_mode'}:
                 self.selection_changed()
             self.last_suffix_display = self.variables['suffix'].get()
             self.status.set("Einstellungen übernommen. Vor dem Start wird erneut geprüft.")
             self.refresh_controls()
         except (ValueError, StopIteration) as error:
             self.status.set(str(error) or "Ungültige Eingabe.")
-            if key in {"crf", "bitrate_mbps", "target_fps", 'audio_selection'}:
+            if key in {"crf", "bitrate_mbps", "target_fps", 'audio_selection', "video_width", "video_height", 'screen_width', 'screen_height'}:
                 selected = self.selected_jobs()
                 options = selected[0].options if selected else self.defaults
                 self.variables[key].set(str(getattr(options, key)))
@@ -623,18 +689,32 @@ class Window:
         anaglyph = options.target == "anaglyph"
         framerate = options.target == "framerate"
         bd3d = options.target == 'bd3d'
+        rows = options.target == 'row_interleaved'
+        self.screen_fields.grid() if rows else self.screen_fields.grid_remove()
+        self.combos['row_first'].configure(state='readonly' if rows else 'disabled')
+        for key in ('screen_width', 'screen_height'):
+            self.combos[key].configure(state='normal' if rows else 'disabled')
         self.title_frame.grid() if bd3d and selected else self.title_frame.grid_remove()
-        self.option_frames['method'].grid()
+        self.option_frames['method'].grid_remove() if rows else self.option_frames['method'].grid()
+        self.option_frames['row_first'].grid() if rows else self.option_frames['row_first'].grid_remove()
         self.option_frames['profile'].grid()
         self.combos['container'].configure(values=[self.t(self.mappings['container'][k]) for k in
-            (('iso', 'm2ts') if bd3d else ('mkv',) if options.target == 'cross_sbs' else ('mp4', 'mkv'))])
+            (('iso', 'm2ts') if bd3d else ('mp4', 'mkv'))])
         self.advanced_button.configure(state='normal')
         self.swap_control.configure(state="disabled" if framerate else "normal")
-        self.fps_frame.grid() if framerate else self.fps_frame.grid_remove()
+        self.fps_frame.grid_remove() if bd3d else self.fps_frame.grid()
+        self.combos['fps_mode'].configure(state='disabled' if bd3d else 'readonly')
+        self.combos['target_fps'].configure(state='normal' if not bd3d and options.fps_mode == 'custom' else 'disabled')
+        self.option_frames["video_size"].grid_remove() if bd3d or framerate or rows else self.option_frames["video_size"].grid()
+        custom_size = not bd3d and not framerate and not rows and options.video_size == "custom"
+        self.video_dimensions.grid() if custom_size else self.video_dimensions.grid_remove()
+        self.video_size_note.set("Maße je Auge" if options.target in {"full_sbs", "full_ou", "cross_sbs"} else "Maße des Gesamtbildes")
+        self.combos["bd_bitrate_mbps"].configure(state="readonly" if bd3d else "disabled")
         self.combos["method"].configure(state="readonly" if anaglyph else "disabled")
-        self.combos["profile"].configure(state="readonly" if anaglyph else "disabled")
+        self.combos["profile"].configure(state="readonly" if anaglyph or rows else "disabled",
+            values=[self.t(PROFILES[k]) for k in (('quality', 'quality10') if rows else PROFILES)])
         self.combos["suffix"].configure(values=[self.t(v) for v in self.available_suffixes(options, selected[0] if selected else None)])
-        self.combos["container"].configure(state="disabled" if options.codec == "h265" or options.target == "cross_sbs" else "readonly")
+        self.combos["container"].configure(state="disabled" if options.codec == "h265" else "readonly")
         self.combos['codec'].configure(state='disabled' if bd3d else 'readonly')
         self.combos['rate_mode'].configure(state='disabled' if bd3d else 'readonly')
         self.combos["crf"].configure(state="normal" if options.rate_mode == "crf" and not bd3d else "disabled")
@@ -648,7 +728,7 @@ class Window:
         self.audio_note.set('BD-3D: LPCM mit 48 kHz und 24 Bit.' if bd3d else (
             'AAC wird neu kodiert. Stereo mischt vorhandene Kanäle zusammen.' if options.audio_format == 'aac' or options.audio_channels == 'stereo'
             else 'Originalton wird kopiert. Blu-ray-LPCM wird in MKV verlustfrei als FLAC gespeichert.'))
-        active_field = "crf" if options.rate_mode == "crf" else "bitrate_mbps"
+        active_field = "bd_bitrate_mbps" if bd3d else "crf" if options.rate_mode == "crf" else "bitrate_mbps"
         for key, frame in self.rate_fields.items():
             frame.grid() if key == active_field else frame.grid_remove()
         text = ""
@@ -666,7 +746,9 @@ class Window:
             if options.container == 'm2ts':
                 text += " M2TS enthält beide Halbbilder, jedoch keine Blu-ray-Disc-Struktur."
         if options.target == "cross_sbs":
-            text = "Kreuzblick: Full-SBS mit rechtem Halbbild zuerst. MKV erhält die passende R/L-Kennzeichnung."
+            text = "Kreuzblick: Full-SBS mit rechtem Halbbild zuerst."
+        if rows:
+            text = 'Polfilter: Exakte Monitorauflösung, Vollbild ohne Skalierung. 4:4:4 erhält getrennte Farbzeilen.'
         if options.codec == "h265":
             text += " H.265: MKV, längere Rechenzeit und Zielplayer prüfen; CRF ist codecabhängig."
         if options.rate_mode == "abr" and not bd3d:

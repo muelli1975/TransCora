@@ -72,6 +72,8 @@ def apply_theme(root):
               selectforeground=[("disabled", DISABLED), ("readonly", TEXT)])
     style.configure("TEntry", fieldbackground=SECONDARY_BG, foreground=TEXT, insertcolor=TEXT)
     style.map("TEntry", fieldbackground=[("disabled", SECONDARY_BG)], foreground=[("disabled", DISABLED)])
+    style.configure("Bordered.TFrame", background=APP_BG, borderwidth=1, relief="solid",
+                    bordercolor=BORDER, lightcolor=BORDER, darkcolor=BORDER)
     style.configure("Treeview", background=PANEL_BG, fieldbackground=PANEL_BG, foreground=TEXT, rowheight=25)
     style.map("Treeview", background=[("selected", GOLD_LIGHT)], foreground=[("selected", APP_BG)])
     style.configure("Treeview.Heading", background=PANEL_BG, foreground=GOLD_LIGHT)

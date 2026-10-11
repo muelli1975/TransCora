@@ -54,7 +54,7 @@ class Toolchain:
             return p.stdout + p.stderr
         filters = run("-filters")
         required = {"zscale", "colorchannelmixer", "lutrgb", "blend", "crop", "scale", "pad",
-                    "hstack", "vstack", "format", "setsar", "sidedata"}
+                    "hstack", "vstack", "format", "setsar", "sidedata", "bwdif"}
         # FFmpeg 9 removed the third (command-support) flag from this listing.
         found = set(re.findall(r"^\s*[TSC.]{2,3}\s+(\w+)\s", filters, re.M))
         missing = required - found

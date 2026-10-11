@@ -1027,6 +1027,14 @@ for source, target in list(EN.items()):
     if source != source.strip():
         EN.setdefault(source.strip(), target.strip())
 
+EN.update({'Dauer': 'Duration', 'Bildrate (fps)': 'Frame rate (fps)', 'Quelle beibehalten': 'Keep source', 'Zielbildrate wählen': 'Choose frame rate', 'Zeilenverschachtelt (Polfilter)': 'Row interleaved (polarised)', 'Monitorbreite (Pixel)': 'Monitor width (pixels)', 'Monitorhöhe (Pixel)': 'Monitor height (pixels)', 'Erste Bildschirmzeile': 'First screen row', 'Linkes Auge in erster Zeile': 'Left eye in first row', 'Rechtes Auge in erster Zeile': 'Right eye in first row', 'Monitorauflösung: Gerade Pixelzahlen von 2 bis 16384 verwenden.': 'Monitor resolution: use even pixel counts from 2 to 16384.', 'Ungültige Augenzuordnung der ersten Zeile.': 'Invalid first-row eye order.', 'Ungültige Bildratenwahl.': 'Invalid frame-rate selection.', 'Polfilter: Exakte Monitorauflösung, Vollbild ohne Skalierung. 4:4:4 erhält getrennte Farbzeilen.': 'Polarised: exact monitor resolution, full screen without scaling. 4:4:4 keeps colour rows separate.', 'Polfilter: Exakte Monitorauflösung, Vollbild ohne Skalierung. PNG erhält die Farbzeilen verlustfrei.': 'Polarised: exact monitor resolution, full screen without scaling. PNG preserves colour rows losslessly.', 'Kreuzblick: R/L-Anordnung; MP4 ohne Stereo-Kennzeichnung.': 'Cross-view: R/L arrangement; MP4 without stereo metadata.', 'Kreuzblick: Full-SBS mit rechtem Halbbild zuerst.': 'Cross-view: Full-SBS with the right half-image first.', 'Zeilenverschachtelt: {0} · MKV-StereoMode': 'Row interleaved: {0} · MKV StereoMode', 'Zeilenverschachtelt: {0} · MP4 ohne Stereo-Kennzeichnung': 'Row interleaved: {0} · MP4 without stereo metadata', "Mono/2D ist als Quelle für 'Layout beibehalten' verfügbar; andere Ziele benötigen SBS/OU.": "Mono/2D sources can use 'Keep layout'; other targets require SBS/OU.", 'Layout beibehalten erhält die Halbbildreihenfolge. L/R tauschen ausschalten.': 'Keep layout preserves eye order. Disable Swap L/R.', 'Layout beibehalten erhält gepackte SBS/OU-Quellen. Für MVC/MV-HEVC zuerst das gewünschte Ausgabe-Layout wählen.': 'Keep layout retains packed SBS/OU sources. For MVC/MV-HEVC choose the output layout first.'})
+
+EN.update({'Unterordner': 'Subfolders',
+ 'Monitorauflösung (Pixel)': 'Monitor resolution (pixels)',
+ 'Umgekehrte Augenreihenfolge bleibt erhalten; MP4 ohne Stereo-Kennzeichnung.': 'Reversed eye order is '
+                                                                                'preserved; MP4 without '
+                                                                                'stereo metadata.'})
+
 # Long messages win over prefix fragments. Captures retain filenames and values.
 PATTERNS = []
 for source, target in EN.items():
@@ -1035,6 +1043,8 @@ for source, target in EN.items():
         pattern = ''.join('(.*?)' if re.fullmatch(r"\{\d+\}", part) else re.escape(part) for part in parts)
         PATTERNS.append((re.compile('^'+pattern+'$', re.S), target))
 PATTERNS.sort(key=lambda item: len(item[0].pattern), reverse=True)
+
+EN.update({'Half-SBS': 'Half-SBS', 'Half-OU': 'Half-OU', 'Full-SBS': 'Full-SBS', 'Full-OU': 'Full-OU', 'BD-3D-Bitrate': 'BD-3D bitrate', 'Videomaße: Gerade Pixelzahlen von 2 bis 16384 verwenden.': 'Video dimensions: use even pixel counts from 2 to 16384.', 'Ungültige Video-Ausgabegröße.': 'Invalid video output size.', 'BD-3D-Bitrate: 20, 25, 28, 30, 35 oder 40 Mbit/s wählen.': 'BD-3D bitrate: choose 20, 25, 28, 30, 35 or 40 Mbit/s.', 'Ungültige BD-3D-Bitrate.': 'Invalid BD-3D bitrate.', 'Breite (Pixel)': 'Width (pixels)', 'Höhe (Pixel)': 'Height (pixels)', 'Maße je Auge': 'Dimensions per eye', 'Maße des Gesamtbildes': 'Dimensions of the complete image', 'Die deinterlacte Ausgabe ist nicht progressiv gekennzeichnet.': 'The deinterlaced output is not marked as progressive.', 'BD-3D: Die erzeugte Bildfolge entspricht nicht der festen Ausgabebildrate.': 'BD-3D: the generated frame sequence does not match the fixed output frame rate.', 'Interlaced: Ein progressives Bild je Halbbildzeit; die zeitliche Auflösung bleibt erhalten. BD-3D und die Zielbildrate passen die Bildfolge anschließend an.': 'Interlaced: one progressive frame per field time preserves temporal resolution. BD-3D and the target frame rate subsequently adapt the frame sequence.'})
 
 def translate(text, language='de'):
     text = str(text)

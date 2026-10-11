@@ -23,6 +23,7 @@ TASKS = {'convert': 'Bilder konvertieren', 'mpo': 'MPO verlustfrei teilen'}
 LAYOUTS = {'auto': 'Automatisch', 'mono': 'Mono / 2D', 'full_sbs': 'Full-SBS', 'half_sbs': 'Half-SBS',
            'full_ou': 'Full-OU', 'half_ou': 'Half-OU'}
 TARGETS = {'keep': 'Layout beibehalten', 'full_sbs': 'Full-SBS', 'full_ou': 'Full-OU',
+           'row_interleaved': 'Zeilenverschachtelt (Polfilter)',
            'half_sbs': 'Half-SBS', 'half_ou': 'Half-OU', 'anaglyph': 'Anaglyph',
            'left': 'Linkes Halbbild', 'right': 'Rechtes Halbbild', 'split': 'Beide Halbbilder teilen'}
 FORMATS = {'jpeg': 'JPEG', 'png': 'PNG', 'tiff': 'TIFF', 'webp': 'WebP (verlustfrei)'}
@@ -51,6 +52,9 @@ class ImageOptions:
     swap: bool = False
     metadata: bool = True
     method: str = 'dubois_lcd'
+    screen_width: int = 1920
+    screen_height: int = 1080
+    row_first: str = 'left'
 
     @classmethod
     def from_dict(cls, data):
@@ -64,6 +68,8 @@ class ImageOptions:
         return result
 
     def validate(self):
+        from .video import validate_screen
+        validate_screen(self)
         for key, choices in [('task', TASKS), ('layout', LAYOUTS), ('target', TARGETS), ('format', FORMATS)]:
             if getattr(self, key) not in choices:
                 raise ValueError('Ungültige Bildeinstellung: '+key)
@@ -262,7 +268,7 @@ def plans(jobs: list[ImageJob], output: Path, cancel: threading.Event, *, reserv
         ext = '.jpg' if opts.task == 'mpo' else SUFFIX[opts.format]
         suffixes = ('_l'+ext, '_r'+ext) if opts.task == 'mpo' or opts.target == 'split' else (
             ('_'+image_methods()[opts.method]['suffix'] if opts.target == 'anaglyph' else
-             {'left': '_l', 'right': '_r'}.get(opts.target, '_'+opts.target) if opts.target != 'keep' else '')+ext,)
+             {'left': '_l', 'right': '_r', 'row_interleaved': '_rows_'+('rl' if opts.row_first == 'right' else 'lr')}.get(opts.target, '_'+opts.target) if opts.target != 'keep' else '')+ext,)
         # Retaining the layout also retains its existing filename marker.
         stem = source.stem if opts.target == 'keep' and opts.task == 'convert' else clean_stem(source.stem)
         outputs = reserve({source}, folder, stem, suffixes, reserved)
@@ -325,8 +331,14 @@ def image_graph(plan):
         if plan.swap: positions.reverse()
         parts = ['[0:v]format=rgb24,split[a][b]']
         for name, (x, y), label in zip(('a', 'b'), positions, ('l', 'r')):
-            scale = f',scale={dw}:{dh}:flags=lanczos' if (ew, eh) != (dw, dh) else ''
+            scale = f',scale={dw}:{dh}:flags=lanczos' if (ew, eh) != (dw, dh) and target != 'row_interleaved' else ''
             parts.append(f'[{name}]crop={ew}:{eh}:{x}:{y}{scale},setsar=1[{label}]')
+        if target == 'row_interleaved':
+            from .video import row_interleave_graph
+            # Planar RGB keeps all colour channels at one sample per screen row.
+            parts[0] = '[0:v]format=gbrp,split[a][b]'
+            parts.extend(row_interleave_graph(opts, dw, dh))
+            return ';'.join(parts)+';[composite]format=rgb24,setsar=1[v]', (opts.screen_width, opts.screen_height)
         ou = target.endswith('ou')
         parts.append(f"[l][r]{'vstack' if ou else 'hstack'}=inputs=2[composite]")
         graph = ';'.join(parts); size = (dw, dh*2) if ou else (dw*2, dh)

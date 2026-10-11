@@ -267,7 +267,7 @@ class FFmpegTests(unittest.TestCase):
                     '-vf', "geq=lum='16+N*3':cb='if(lt(Y,H/2),64,192)':cr=128,format=yuv444p,"
                     'setparams=colorspace=bt709:color_primaries=bt709:color_trc=bt709:range=limited',
                     '-t', '1.001', '-c:v', 'ffv1', '-c:a', 'aac', str(source))
-                options = Options(target='framerate', target_fps=target_rate, container=container, crf=1)
+                options = Options(target='framerate', fps_mode='custom', target_fps=target_rate, container=container, crf=1)
                 plan = self.plan(options, source)
                 self.assertEqual(plan.size, (128,64))
                 self.assertEqual(plan.pixel_format, 'yuv444p')
@@ -334,15 +334,17 @@ class FFmpegTests(unittest.TestCase):
     def test_framerate_reversed_eyes_use_mkv_and_mono_has_no_stereo_flags(self):
         source = self.folder/'reverse-rlh.mkv'
         shutil.copyfile(self.source, source)
-        with self.assertRaisesRegex(ValueError, 'MKV'):
-            self.plan(Options(target='framerate'), source)
-        plan = self.plan(Options(target='framerate', container='mkv'), source)
+        mp4 = self.plan(Options(target='framerate', fps_mode='custom'), source)
+        execute(self.tools, mp4, threading.Event(), lambda *args: None, self.folder/'reverse-mp4.log')
+        self.assertIsNone(metadata_layout(probe(self.tools, mp4.output)['video']))
+        self.assertTrue(mp4.output.name.endswith('-rlh.mp4'))
+        plan = self.plan(Options(target='framerate', fps_mode='custom', container='mkv'), source)
         execute(self.tools, plan, threading.Event(), lambda *args: None, self.folder/'reverse.log')
         self.assertEqual(metadata_layout(probe(self.tools, plan.output)['video']), ('sbs', True))
         self.assertTrue(plan.output.stem.endswith('-rlh'))
         mono = self.folder/'plain.mkv'
         shutil.copyfile(self.source, mono)
-        plan = self.plan(Options(target='framerate', layout='mono'), mono)
+        plan = self.plan(Options(target='framerate', fps_mode='custom', layout='mono'), mono)
         execute(self.tools, plan, threading.Event(), lambda *args: None, self.folder/'plain.log')
         video = probe(self.tools, plan.output)['video']
         self.assertIsNone(metadata_layout(video))
@@ -356,7 +358,7 @@ class FFmpegTests(unittest.TestCase):
     def test_flagged_stereo_exports_can_be_converted_again(self):
         for container in ('mp4', 'mkv'):
             with self.subTest(container=container):
-                stereo = self.plan(Options(target='framerate', container=container))
+                stereo = self.plan(Options(target='framerate', fps_mode='custom', container=container))
                 execute(self.tools, stereo, threading.Event(), lambda *args: None, self.folder/'roundtrip.log')
                 again = self.plan(Options(target='anaglyph', container=container), stereo.output)
                 self.assertEqual(again.layout, 'full_sbs')

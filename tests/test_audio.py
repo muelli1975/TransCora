@@ -38,7 +38,7 @@ class AudioTests(unittest.TestCase):
                 '-metadata:s:a:0', 'language=deu', '-metadata:s:a:1', 'language=eng',
                 '-metadata:s:a:1', 'title=Surround', str(source)])
             original = capture([str(tools.ffmpeg), '-v', 'error', '-i', str(source), '-map', '0:a:1', '-f', 's16le', '-'])
-            defaults = Options(target='framerate', layout='mono', target_fps='30', container='mkv')
+            defaults = Options(target='framerate', fps_mode='custom', layout='mono', target_fps='30', container='mkv')
             cases = [replace(defaults, audio_tracks='selected', audio_selection='2'),
                      replace(defaults, container='mp4', audio_format='aac'),
                      replace(defaults, container='mp4', audio_tracks='selected', audio_selection='2', audio_channels='stereo'),

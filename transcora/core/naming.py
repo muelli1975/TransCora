@@ -2,6 +2,7 @@
 from pathlib import Path
 import re
 
+from .video import requested_rate
 from .model import Options, frame_rate
 
 
@@ -62,6 +63,7 @@ def fps_suffix(value: str) -> str:
 def suffix_choices(options: Options, method_suffix: str, layout: str | None = None, swap: bool = False) -> list[str]:
     target = layout if options.target == "framerate" else options.target
     if target == "cross_sbs": return ["-rl", ".3D.SBS-rl", "Keiner"]
+    if target == "row_interleaved": return ['_rows_' + ('rl' if options.row_first == 'right' else 'lr'), 'Keiner']
     choices = {"half_sbs": ["_half_sbs", "-lrh", "-lrq", ".3D.HSBS", ".3D.HSBS-lrh"],
                "half_ou": ["_half_ou", "-tbh", "-abq", ".3D.HTAB", ".3D.HTAB-tbh"],
                "full_sbs": ["_full_sbs", "-lr"], "full_ou": ["_full_ou", "-tb", "-ab"],
@@ -72,7 +74,7 @@ def suffix_choices(options: Options, method_suffix: str, layout: str | None = No
                        "half_ou": ["-bth", "-baq"], "full_ou": ["-bt", "-ba"]}.get(target, [])
         if target == "mono":
             choices = []
-        choices = [fps_suffix(options.target_fps)] + choices
+        choices = ([fps_suffix(options.target_fps)] if requested_rate(options) else []) + choices
     return choices + ["Keiner"]
 
 
@@ -87,8 +89,9 @@ def effective_suffix(options: Options, method_suffix: str, source: Path | None =
                   ("full_ou", False): "-tb", ("half_ou", False): "-tbh",
                   ("full_sbs", True): "-rl", ("half_sbs", True): "-rlh",
                   ("full_ou", True): "-bt", ("half_ou", True): "-bth"}.get((layout, swap), "")
-        return fps_suffix(options.target_fps) + marker
+        return (fps_suffix(options.target_fps) if requested_rate(options) else "") + marker
     if options.target == "cross_sbs": return ".3D.SBS-rl" if options.naming == "players" else "-rl"
+    if options.target == "row_interleaved": return '_rows_' + ('rl' if options.row_first == 'right' else 'lr')
     if options.target == "bd3d":
         return ""
     if options.target == "anaglyph":

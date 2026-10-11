@@ -18,6 +18,34 @@ from tkinter import ttk
 
 
 class GuiTests(unittest.TestCase):
+    def test_duration_and_source_fps_survive_option_changes_and_rows_have_exact_size(self):
+        from types import SimpleNamespace
+        self.window.add_paths([Path('Film_full_sbs.mp4')])
+        job = self.window.jobs[0]
+        job.plan = SimpleNamespace(layout='full_sbs',info={'video':{'avg_frame_rate':'60000/1001'}},duration=3723.4)
+        self.window.update_row(job)
+        self.assertEqual(self.window.tree.set(job.id,'duration'),'01:02:03')
+        self.assertEqual(self.window.tree.set(job.id,'fps'),'59.94')
+        job.plan = None
+        self.window.variables['target'].set('Zeilenverschachtelt (Polfilter)')
+        self.window.option_changed('target')
+        self.root.update()
+        self.assertTrue(self.window.screen_fields.winfo_ismapped())
+        self.assertEqual(self.window.tree.set(job.id,'duration'),'01:02:03')
+        self.window.variables['screen_width'].set('2560'); self.window.option_changed('screen_width')
+        self.window.variables['screen_height'].set('1440'); self.window.option_changed('screen_height')
+        self.assertEqual((job.options.screen_width,job.options.screen_height),(2560,1440))
+        self.assertEqual(str(self.window.combos['target_fps'].cget('state')),'disabled')
+        self.window.variables['fps_mode'].set('Zielbildrate wählen'); self.window.option_changed('fps_mode')
+        self.assertEqual(str(self.window.combos['target_fps'].cget('state')),'normal')
+        panel=self.window.images
+        panel.variables['target'].set('Zeilenverschachtelt (Polfilter)'); panel.changed('target')
+        self.assertEqual(panel.defaults.format,'png')
+        panel.variables['screen_width'].set('2560'); panel.changed('screen_width')
+        panel.variables['screen_height'].set('1440'); panel.changed('screen_height')
+        panel.variables['row_first'].set('Rechtes Auge in erster Zeile'); panel.changed('row_first')
+        self.assertEqual((panel.defaults.screen_width,panel.defaults.screen_height,panel.defaults.row_first),(2560,1440,'right'))
+
     def test_image_batch_continues_after_bad_source_and_export_failure(self):
         from PIL import Image
         from transcora.core.images import ImageOptions, mpo_jpegs
@@ -128,7 +156,7 @@ class GuiTests(unittest.TestCase):
             self.assertEqual(self.window.tree.heading('file', 'text'), 'File')
             self.assertEqual(self.window.tree.item(job.id, 'values')[0], 'Wartet_full_sbs.mp4')
             self.assertIn('_Mein_Name', self.window.output_name.get())
-            self.window.variables['target'].set('Change frame rate only'); self.window.option_changed('target')
+            self.window.variables['target'].set('Keep layout'); self.window.option_changed('target')
             self.assertEqual(job.options.target, 'framerate')
             self.window.images.set_busy(True)
             self.assertTrue(all(str(widget.cget('state')) == 'disabled' for widget in self.window.language_controls))
@@ -142,12 +170,16 @@ class GuiTests(unittest.TestCase):
             self.window.language = 'en'; self.window._load_settings()
             self.assertEqual(self.window.language, 'de')
 
-    def test_cross_view_gui_selects_mkv_and_image_preview_preserves_original_pixels(self):
+    def test_cross_view_gui_keeps_mp4_and_image_preview_preserves_original_pixels(self):
         self.window.variables['target'].set('Kreuzblick · Full-SBS R/L')
         self.window.option_changed('target')
+        self.assertEqual(self.window.defaults.container, 'mp4')
+        self.assertEqual(self.window.variables['container'].get(), 'MP4')
+        self.assertEqual(str(self.window.combos['container'].cget('state')), 'readonly')
+        self.assertTrue(self.window.output_name.get().endswith('-rl.mp4'))
+        self.window.variables['container'].set('MKV')
+        self.window.option_changed('container')
         self.assertEqual(self.window.defaults.container, 'mkv')
-        self.assertEqual(self.window.variables['container'].get(), 'MKV')
-        self.assertEqual(str(self.window.combos['container'].cget('state')), 'disabled')
         self.assertTrue(self.window.output_name.get().endswith('-rl.mkv'))
         from transcora.gui.image_view import ImageView
         from PIL import Image
@@ -253,7 +285,7 @@ class GuiTests(unittest.TestCase):
         self.assertEqual(style.lookup('Treeview', 'background', ('selected', '!focus')), GOLD_LIGHT)
         self.assertEqual(style.lookup('Treeview', 'foreground', ('selected', '!focus')), APP_BG)
         self.assertEqual(self.window.test_button.cget('style'), self.window.start_button.cget('style'))
-        self.assertFalse(self.window.fps_frame.winfo_ismapped())
+        self.assertTrue(self.window.fps_frame.winfo_ismapped())
         self.window.variables['suffix'].set('_eigene_Endung')
         self.window.option_changed('suffix')
         self.assertIn('Film_eigene_Endung.mp4', self.window.output_name.get())
@@ -262,22 +294,24 @@ class GuiTests(unittest.TestCase):
         self.assertIn('Film_eigene_Endung.mkv', self.window.output_name.get())
         self.window.variables['swap'].set(True)
         self.window.option_changed('swap')
-        self.window.variables['target'].set('Nur Framerate ändern')
+        self.window.variables['target'].set('Layout beibehalten')
         self.window.option_changed('target')
         self.root.update()
         self.assertTrue(self.window.fps_frame.winfo_ismapped())
         self.assertFalse(self.window.jobs[0].options.swap)
         self.assertFalse(self.window.variables['swap'].get())
         self.assertEqual(str(self.window.swap_control.cget('state')), 'disabled')
+        self.window.variables['fps_mode'].set('Zielbildrate wählen')
+        self.window.option_changed('fps_mode')
         self.assertIn('Film_30fps-tbh.mkv', self.window.output_name.get())
         self.window.variables['target_fps'].set('29,97')
         self.window.option_changed('target_fps')
         self.assertIn('Film_29.97fps-tbh.mkv', self.window.output_name.get())
         self.assertNotIn('-lrh', self.window.combos['suffix'].cget('values'))
-        self.window.variables['target'].set('Half-SBS · 1080p')
+        self.window.variables['target'].set('Half-SBS')
         self.window.option_changed('target')
         self.root.update()
-        self.assertFalse(self.window.fps_frame.winfo_ismapped())
+        self.assertTrue(self.window.fps_frame.winfo_ismapped())
 
     def test_rate_mode_keeps_values_and_does_not_shift_layout(self):
         self.window.toggle_advanced()

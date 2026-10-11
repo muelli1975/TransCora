@@ -125,7 +125,7 @@ def encode(tools, bd, plan, base, dependent, cancel, emit, log, estimated_frames
             '-protocol_whitelist', 'file,pipe', '-noautorotate', *input_args(plan, copyts=True),
             '-filter_complex', graph, '-map', '[packed]', '-an', '-c:v', 'rawvideo',
             '-pix_fmt', 'yuv420p', '-fps_mode', 'passthrough', '-f', 'rawvideo', 'pipe:1']
-    frim = encoder_args(bd.encoder, Path('-'), Path('-'), base, dependent)
+    frim = encoder_args(bd.encoder, Path('-'), Path('-'), base, dependent, plan.options.bd_bitrate_mbps)
     # The author's documented single-input SBS stdin mode, not two raw temp files.
     frim[frim.index('-i')+1:frim.index('-viewoutput')] = ['-']
     frim += ['-sbs', '2']

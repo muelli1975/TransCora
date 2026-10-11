@@ -93,12 +93,20 @@ Durchläufen erstellen. Fertige Jobs laufen erst nach bewusster Einstellungsänd
 | Anaglyph | Volle rekonstruierte Auflösung eines Halbbildes; 17 AnaglyphBatch-Verfahren |
 | Mono | Linkes Halbbild; mit **L/R tauschen** das andere Halbbild |
 | BD-3D · 1080p | AVC/MVC, 1920 × 1080 pro Halbbild, 23,976 fps; ISO oder M2TS |
-| Nur Framerate ändern | Auflösung, gepacktes Layout, Halbbildreihenfolge und YUV-Farbaufteilung bleiben erhalten |
+| Layout beibehalten | Gepacktes Layout, Halbbildreihenfolge, Auflösung und YUV-Farbaufteilung erhalten; Bildrate optional ändern |
+| Zeilenverschachtelt (Polfilter) | Exakte Monitorauflösung, abwechselnde Zeilen für linkes/rechtes Auge, 4:4:4 |
 
-Half-SBS/OU passen jedes Halbbild unter Erhalt seines Seitenverhältnisses in 1920 × 1080
+Standardmäßig passen Half-SBS/OU jedes Halbbild unter Erhalt seines Seitenverhältnisses in 1920 × 1080
 ein, ergänzen bei Bedarf schwarze Ränder und halbieren danach die Packachse.
 Full-Ausgaben erhalten die rekonstruierte Auflösung je Halbbild. Half → Full
 skaliert die gestauchte Achse hoch und gewinnt keine verlorenen Bilddetails zurück.
+Die Videogröße ist als **Standard / Original / 1080p / 2160p / Benutzerdefiniert** wählbar.
+Standard behält die bisherigen Größen bei. Original verwendet die rekonstruierte
+Quellgröße je Auge. Benutzerdefinierte Maße gelten bei Full-Ausgaben je Auge,
+bei Half-/Mono-/Anaglyph-Ausgaben für das Gesamtbild. Half-SBS in UHD bedeutet
+3840 × 2160 gesamt, Full-SBS mit UHD je Auge 7680 × 2160 gesamt.
+Eine größere Ausgabe stellt keine verlorenen Quelldetails wieder her.
+
 Full-/Half-SBS und Full-/Half-OU sind mögliche Quellen. Zusätzlich werden progressive
 H.264-MVC- und SDR-MV-HEVC-Quellen mit zwei vollständigen Ansichten verarbeitet.
 Anaglyphen, Frame-sequential und unabhängige Videospuren sind keine unterstützten Quellen.
@@ -113,7 +121,7 @@ Anaglyphen, Frame-sequential und unabhängige Videospuren sind keine unterstütz
 | Half-OU | `_half_ou`, `-tbh`, `-abq`, `.3D.HTAB`, `.3D.HTAB-tbh` |
 | Anaglyph | Zusatz des gewählten Batch-Verfahrens, etwa `_dubois_lcd` |
 | Mono | `_mono_l`, `-2d` |
-| Nur Framerate ändern | Standard etwa `_30fps-tbh`; passende Layout-Kürzel und eigene Zusätze |
+| Layout beibehalten | Standard etwa `_30fps-tbh`; passende Layout-Kürzel und eigene Zusätze |
 
 Erkannte alte Stereo-Kürzel werden entfernt, unbekannte Zusätze bleiben erhalten.
 Auch TransCoras eigene `_full_sbs`, `_half_sbs`, `_full_ou` und `_half_ou` werden
@@ -140,7 +148,7 @@ nummeriert, z. B. `Film_2_dubois_lcd.mkv`; auch nachträglich angelegte Ziele si
   **20 Mbit/s = 20.000 kbit/s**. Kein beliebiges Encoder-Menü.
 - Bei Layout-/Anaglyph-/Mono-Konvertierungen bleibt das Quell-Timing erhalten,
   auch variable Framerate. Container können Zeitstempel auf ihre eigene Genauigkeit
-  runden. **Nur Framerate ändern** erzeugt dagegen die gewählte konstante Bildrate.
+  runden. Bei allen normalen Videozielen lässt sich optional eine konstante **Zielbildrate** wählen. Standard ist **Quelle beibehalten**; gültige variable Bildzeiten bleiben dann erhalten. Die Bildratenwahl und die Layout-/Größenwandlung erfolgen in einem Kodierdurchlauf. BD-3D verwendet weiterhin seine feste Bildrate.
   Eingaben `23,976`, `29,97` und `59,94` stehen für die exakten Brüche
   `24000/1001`, `30000/1001` und `60000/1001`; `24`, `30`, `60` bleiben ganze Raten.
   Andere Zahlen und Brüche sind frei eingebbar (1–240 fps).
@@ -164,13 +172,13 @@ nummeriert, z. B. `Film_2_dubois_lcd.mkv`; auch nachträglich angelegte Ziele si
   Vollbereich, gewöhnliches YUV den üblichen begrenzten Videobereich. Jede Annahme
   steht unter **Testen** und im Log. Eine fehlende Kennzeichnung lässt sich nicht
   anhand der Auflösung beweisen; die Kontrollbild-/Player-Prüfung bleibt sinnvoll.
-  Erkannte HDR-Quellen werden nicht automatisch umgewandelt. Interlacing, nichtquadratische Pixel,
+  Erkannte HDR-Quellen werden nicht automatisch umgewandelt. Nicht unterstützte nichtquadratische Pixel,
   Rotation und VR-Projektion werden in dieser Version mit Hinweis blockiert.
 - Unter **Erweitert → Tonoptionen** kann Ton im Original übernommen oder als AAC ausgegeben werden.
   Alle Tonspuren, ausgewählte Spurnummern oder kein Ton sind wählbar. Die Kanalzahl
   bleibt standardmäßig erhalten; Stereo-Downmix muss ausdrücklich gewählt werden.
   Für MP4 inkompatiblen Originalton unter Erweitert als AAC ausgeben oder MKV verwenden.
-  Untertitel, Kapitel, Daten und Anhänge werden in 0.1 nicht übernommen. Dateisystem-
+  Untertitel, Kapitel, Daten und Anhänge werden in 1.0 nicht übernommen. Dateisystem-
   Zeitstempel werden noch nicht übertragen; ausgewählte globale Metadaten wie
   `creation_time` und Titel werden übernommen.
 
@@ -178,8 +186,9 @@ Stereo-Ausgaben enthalten **MKV-StereoMode** bzw. die explizite **MP4-st3d**-Box
 H.264 verwendet zusätzlich Frame-Packing-SEI (3 für SBS, 4 für OU). Ein verlustfreier
 MKV→MP4-Verpackungsschritt überträgt die Container-Kennzeichnung; das Video wird
 nur einmal kodiert. Die fertige Ausgabe wird auf diese Kennzeichnungen geprüft.
-Bei **Nur Framerate ändern** mit umgekehrter Halbbildreihenfolge ist MKV erforderlich:
-st3d kann R/L nicht ausdrücken. Anaglyph-/Mono-Ausgaben erhalten keine SBS/OU-Flags.
+Bei **Layout beibehalten** mit umgekehrter Halbbildreihenfolge speichert MKV die
+passende Augenreihenfolge. MP4 bleibt wählbar und erhält keine irreführenden L/R-Flags,
+weil st3d die Umkehrung nicht ausdrücken kann. Anaglyph-/Mono-Ausgaben erhalten keine SBS/OU-Flags.
 **Testen** zeigt die Layout-Erkennung und die geplanten Kennzeichnungen.
 
 **Kontrollbild** lädt das erste Bild automatisch und bietet einen Positionsregler und eine einzige editierbare Zeitangabe im Format mm:ss oder hh:mm:ss. Beim
@@ -293,14 +302,14 @@ Quellbildzeiten bleiben Laufzeit und Ton erhalten; ein als 24 fps eingestufter
 Stream verwendet weiterhin die oben beschriebene 0,1-%-Verlangsamung.
 Bewegungen können bei einer Framerateänderung ungleichmäßiger werden; **Testen**
 zeigt die konkrete Anpassung. Keine Bewegungsinterpolation. Fehlende, ungültige
-oder nicht aufsteigende Zeitstempel sowie Interlacing bleiben blockiert.
+oder nicht aufsteigende Zeitstempel bleiben blockiert, weil daraus keine verlässliche Quellzeitachse bestimmt werden kann. Gültige variable Bildzeiten und Interlaced-Eingaben sind zulässig.
 Die Quellzeitstempel werden während der Kodierung geprüft, ohne zusätzliche
 vollständige Dekodierung. Die strenge Ausgabebildrate sowie beide fertig
 verpackten MVC-Halbbilder werden weiterhin geprüft.
 
 FRIM 1.31 verwendet das mitgelieferte Software-SDK; Intel-Grafik, Treiberinstallation,
 AVISynth oder Netzwerkzugang werden für diesen FFmpeg-Eingabepfad nicht benötigt.
-Der geprüfte Encoder verwendet hohe Qualität, insgesamt 40/40 Mbit/s Ziel-/Maximalrate,
+Der geprüfte Encoder verwendet hohe Qualität, eine wählbare gemeinsame AVC/MVC-Ziel-/Maximalrate von 20, 25, 28, 30, 35 oder 40 Mbit/s (Standard 40),
 AVC/MVC Level 4.1, strikte GOP 24/4, CPB 3750 KB, maximal vier gepufferte Bilder und
 begrenztes 8-Bit-4:2:0-BT.709. Die qualitätsorientierte FRIM-Stufe `-u 1` bleibt erhalten. Für Blu-ray-Video ist dieses
 Profil fest; das 4:4:4-Anaglyphenprofil ist davon unabhängig.
@@ -345,7 +354,7 @@ anhand der beiden vom Decoder gemeldeten Ansichten. Manuelle Einträge
 Die Ausgabe verwendet die vorhandenen SBS/OU-, Mono-, Anaglyphen- und BD-3D-Ziele.
 Blu-ray-LPCM wird für MKV verlustfrei in FLAC gewandelt; andere freigegebene
 Audiospuren werden gemäß den Tonoptionen übernommen. Für MP4 wird die
-Kompatibilität des tatsächlich gewählten Tonformats geprüft. Nur Framerate ändern erhält weiterhin gepackte Quellen.
+Kompatibilität des tatsächlich gewählten Tonformats geprüft. Layout beibehalten erhält weiterhin gepackte Quellen.
 
 MV-HEVC-Ausgabe für Apple-Geräte ist ein späteres eigenes Ausgabeziel. Beliebigem
 Stereomaterial werden keine erfundenen Spatial-Video-Kamerametadaten beigefügt.
@@ -381,7 +390,45 @@ portablen Paket unter `source/`.
 ## Kreuzblick-Video
 
 **Kreuzblick · Full-SBS R/L** setzt das rechte Halbbild links und das linke rechts.
-Die vollständige rekonstruierte Halbbildgröße bleibt erhalten. Ausgabe als MKV mit
-StereoMode R/L; der Standardzusatz ist `-rl` (z. B. `Film-rl.mkv`). Das Ergebnis ist
-auch beim erneuten Import eindeutig erkennbar. Die Halbbildreihenfolge einer R/L-
+Die vollständige rekonstruierte Halbbildgröße bleibt standardmäßig erhalten. MP4 bleibt voreingestellt; MKV ist wählbar. MKV erhält StereoMode R/L. MP4 verwendet keine irreführende L/R-Kennzeichnung. Der Standardzusatz ist `-rl` (z. B. `Film-rl.mp4`). Die Halbbildreihenfolge einer R/L-
 Quelle wird zuerst korrekt interpretiert; „L/R tauschen“ ändert die Quellzuordnung.
+
+
+## Polfilter-Ausgabe für Bilder und Videos
+
+**Zeilenverschachtelt (Polfilter)** legt linkes und rechtes Auge auf abwechselnde
+Bildschirmzeilen. Monitorbreite und -höhe sind unabhängig von den sonstigen
+Größenoptionen frei wählbar; voreingestellt sind 1920 × 1080. Die erste Zeile kann
+dem linken oder rechten Auge zugeordnet werden. L/R tauschen bleibt die getrennte
+Quellinterpretation. Jedes Auge wird vor der Verschachtelung mit Lanczos auf sein
+Zielraster eingepasst; passende Half-OU/abq-Quellen werden nur zeilenweise umgeordnet.
+Ein 1920 × 1080 großes abq-Bild liefert dabei unverändert 1920 × 540 Zeilen je Auge.
+Bei abweichendem Seitenverhältnis bleiben schwarze Ränder innerhalb der exakten
+Bildschirmmaße. Die fertigen Zeilen werden nicht nachträglich skaliert.
+
+Bilder verwenden beim Wählen des Ziels zunächst verlustfreies PNG. JPEG bleibt mit
+4:4:4 wählbar, kann aber durch seine verlustbehaftete Kompression Zeilen beeinflussen.
+Videos verwenden 4:4:4, auch beim sonstigen Kompatibilitätsprofil, damit keine
+vertikale Farbabtastung verschiedene Augen mischt. Den Zielplayer auf 4:4:4-Unterstützung
+prüfen. MKV erhält den passenden nativen Row-Interleaved-StereoMode; linke erste Zeile
+bei H.264 zusätzlich Frame-Packing 2. MP4 wird als normales Bildraster ohne unpassende
+SBS/OU-Containerkennzeichnung ausgegeben. Dateizusätze sind `_rows_lr` oder `_rows_rl`.
+
+Zur direkten Wiedergabe müssen Bildschirmauflösung und Ausgabemaße übereinstimmen.
+Vollbild und Pixelzuordnung 1:1 verwenden; Skalierung, Overscan und eine erneute
+3D-Umwandlung im Player/Monitor vermeiden. Das ist ein Bildschirmformat, keine
+zeitliche 1080i-Ausgabe. Die Datei bleibt zeitlich progressiv. Native Augenreihenfolge
+und Sitzposition müssen am tatsächlichen Monitor geprüft werden.
+
+## Interlaced-Eingaben und Dateiliste
+
+Zeitlich interlaced SBS/OU wird je Auge mit BWDIF und einem progressiven Bild pro
+Halbbildzeit aufbereitet. Beispielsweise werden 25 interlaced Bilder mit 50
+Halbbildzeitpunkten zu 50 progressiven Bildern pro Sekunde. Eine ausdrücklich
+gewählte Zielbildrate beziehungsweise BD-3D passt die gemeinsame Bildfolge danach
+an; Ton und Laufzeit bleiben erhalten. Zeitliche Interlaced-Ausgabe gehört nicht
+zu diesem Release.
+
+Die Videoliste zeigt Quell-fps und **Dauer** (HH:MM:SS) nach der Prüfung. Diese Werte
+bleiben bei Änderungen der Ausgabeoptionen sichtbar; unbekannte Angaben erscheinen
+als Strich. Die Oberfläche und das portable Paket tragen die Version **1.0**.

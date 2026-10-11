@@ -1,72 +1,44 @@
 # TransCora 1.0
 
-## RC5
+## Video export
 
-- Image batches now isolate source and export errors per file and continue with valid images. Shared output-name reservations still prevent collisions. MPO-only batches need no FFmpeg lookup.
-- Lossless MPO splitting follows actual Pillow frame boundaries, accepts Fujifilm zero padding and ignores inaccurate image-size fields. Embedded JPEG pixels and compressed data remain unchanged; actually truncated JPEGs still fail.
-- Lossless MPO splitting no longer requires matching dimensions or EXIF orientations. Those checks apply only when composing a stereo image.
-- MPO splitting preserves each JPEG's original metadata without an unnecessary ExifTool rewrite; right-eye orientation and camera fields are no longer overwritten with left-eye values.
-- Missing SDR colour descriptions use explicit existing hints or customary HD/PAL/NTSC defaults, with visible assumptions instead of rejecting usable sources. Full-OU defaults use the height of one eye.
-- Explicit source layout selections override unsupported stereo metadata. Half-SBS/OU with matching stretched pixel ratios no longer requires redundant metadata.
-- MV-HEVC checks the actual decoded eye pairs without rejecting them solely because of a container frame-count field. MVC no longer has an arbitrary two-million-frame input limit.
-- BD-3D accepts any positive source frame rate that FFmpeg can convert. Conservative free-space estimates and missing duration metadata no longer block encoding; actual output validity checks remain.
+- MP4 remains the default. Cross-view Full-SBS R/L can use MP4 or MKV; MKV stores native right-eye-first StereoMode. MP4 omits stereo flags that would misidentify the eye order.
+- Size selection: Standard, Original, 1080p, 2160p and Custom. Standard preserves previous defaults; Full layouts retain reconstructed source size unless another size is selected. Custom Full dimensions describe one eye, other dimensions describe the packed frame.
+- Optional frame-rate conversion is available with every regular video target, in the same encoding pass as layout and resizing. Source timing is preserved by default. The former standalone frame-rate target is now Keep layout. Earlier saved frame-rate jobs retain their selected conversion.
+- Frame-rate changes drop or repeat complete stereo pairs without blending or motion interpolation. Audio and playback duration remain unchanged. Fractional NTSC choices use exact rational rates.
+- Interlaced sources are deinterlaced per eye with BWDIF at field rate. 25 interlaced frames/50 fields can become 50 progressive frames. Explicit target rates and BD-3D adapt the common pair sequence afterwards.
+- MKV writes native stereo arrangement/order and appropriate eye-display geometry. H.264 L/R SBS and OU also carry Frame-Packing SEI 3 and 4. MP4 SBS/OU uses an explicit st3d box.
+- Source fps and duration columns remain visible after output-option changes. Updated status border and version display.
 
-## RC4
+## Polarised monitor output
 
-- BD-3D accepts valid variable frame timing and timestamp jitter. Complete stereo pairs are adjusted to the fixed output clock during the single encoding pass; long frame holds retain their presentation duration.
-- Differing nominal and average source frame rates no longer trigger an automatic rejection. Constant 24 fps keeps the established 0.1% video/audio slowdown.
-- Source checks reject missing, invalid or non-increasing timestamps. Fixed output timing, encoded pictures, muxed audio and both decoded MVC views remain verified.
-- Removed the permanent technical frame-rate conversion sentence from the interface. File-specific conversion details remain under Test.
-- BD-3D time remaining now refers explicitly to the current step. Encoding and final decoding use their own progress; estimates reset between steps instead of extrapolating from arbitrary overall percentage ranges.
+- Row-interleaved output is available for both images and videos. Default screen dimensions are 1920 × 1080; width, height and first-row eye assignment are adjustable and saved per job/preset.
+- Each eye is fitted to its final per-eye screen grid before weaving. Matching 1920 × 1080 Half-OU/abq images are reordered without resampling or pixel changes. Other sizes use Lanczos, with aspect-preserving borders.
+- Images initially use lossless PNG; videos use 4:4:4 colour to keep adjacent eye rows separate. MKV writes native row-interleaved StereoMode; H.264 left-first also writes Frame-Packing 2. MP4 preserves the physical rows without misleading SBS/OU metadata.
+- Direct playback requires native screen resolution, full screen and no rescaling, overscan or second stereo conversion. Actual monitor eye order must be checked on the device. Row weaving is separate from temporal interlacing.
 
-## RC3
+## Blu-ray 3D and practical validation
 
-- Complete German/English interface with immediate switching and a saved language preference.
-- Video/image tabs now use the shared Nachtgold palette, including selected, hover and disabled states.
-- Images use the same `output` default, filename display, preset menu and selection scope as videos.
-- Ctrl+A, Ctrl+click and Shift+click select all, individual entries and a range. Changes affect every selected entry.
-- Image sizes follow AnaChroma: Original, 1080p, 2160p, 2048 long edge and Custom with long/short edge in pixels.
-- Preview requires exactly one selected file. Video and image previews retain output-resolution pixels and offer fit or scrollable 1:1 display in a dark window.
-- Keeping an image layout retains the source filename. Stereo and anaglyph conversions use descriptive suffixes; collisions never overwrite existing files.
-- Removed L/R pair preparation. Lossless MPO splitting retains the embedded JPEG data, with `_l.jpg` and `_r.jpg` filenames.
-- Temporary PNG compression and a second JPEG Huffman pass were removed to reduce avoidable preview/export work without changing decoded JPEG quality.
-- Added cross-view video: Full-SBS with right half-image first, MKV StereoMode R/L and a `-rl` filename marker.
-- Added image-only CIELAB Least Squares using AnaChroma's native, hash-pinned solver and recorded AnaglyphBatch reference checks. Lanczos resizing precedes the iterative solver; orientation, ICC and ExifTool handling remain shared.
-- Regular image transformations retain the tested FFmpeg engine. A local 24 MP comparison showed different timing by method, rather than a general advantage for replacing it with Python/NumPy.
+- BD-3D exports 1080p AVC/MVC at 24000/1001 fps to ISO or M2TS with LPCM audio. Constant 24 fps uses the established 0.1% video/audio slowdown.
+- Select aggregate AVC/MVC target/max bitrate: 20, 25, 28, 30, 35 or 40 Mbit/s; default 40. The quality-oriented FRIM stage, strict GOP 24/4, CPB 3750 KB and bounded DPB remain.
+- Valid variable source timing, timestamp jitter, differing nominal/average rates, missing duration and uncertain free-space estimates do not alone block usable sources. Output timing and stereo-pair synchronisation remain checked.
+- Concrete missing/non-finite/non-increasing source timestamps, decoder errors or invalid generated output still fail with a specific reason. Generated-output cadence errors are distinguished from source timing.
+- Final validation checks encoded pictures, ISO/M2TS structure, muxed audio and both decoded MVC views. Time remaining refers to the current export phase.
+- The previously pinned tsMuxeR remains. Version 2.7.0 passed variable-timing trials but failed the independent ISO structure check in the comparison workflow; it is not substituted without a passing full export check.
 
-## Existing 1.0 features
+## Images and existing features
 
-- Eigene Bereiche **Videos** und **Bilder** mit unabhängigen Dateilisten,
-  Auswahl-Einstellungen, Voreinstellungen, Kontrollbild, Testen, Start und Abbruch.
-- Bilder: JPEG, PNG, TIFF, BMP, WebP, JPS/PNS und MPO als Quellen; JPEG, PNG,
-  TIFF und verlustfreies WebP als Ausgabe. JPEG mit Qualität 90/95 und 4:4:4.
-- MPO mit zwei Halbbildern verlustfrei in selbständige JPEGs teilen. Der
-  obsolete MPO-Index wird entfernt, die komprimierten JPEG-Bilddaten bleiben erhalten.
-- Stereo-Bilder: Full-/Half-SBS und Full-/Half-OU, Anaglyphen mit allen 17
-  Batch-Verfahren sowie linkes/rechtes oder beide getrennte Halbbilder.
-- Bildorientierung und ICC-Farbprofile werden vor einer Wandlung berücksichtigt.
-  ExifTool übernimmt EXIF/XMP/IPTC, darunter Aufnahmezeiten, ohne eingebettete
-  Vorschaubilder. Geänderte Bilder erhalten passende Orientierung; Dateizeiten bleiben erhalten.
-- Videos zusätzlich als Full-SBS und Full-OU in rekonstruierter Quellauflösung ausgeben.
-  Half → Full ist verfügbar und weist auf Hochskalierung ohne neue Bilddetails hin.
-- Matroska-Half-Ausgaben erhalten neben StereoMode die korrekte Geometrie je
-  Halbbild. Diese Ausgaben können erneut automatisch importiert werden.
-- Weitere sView-Dateikürzel und WMV-Stereometadaten erkennen.
-- MVC-Aufbereitung erhält native BT.709-/1080p-Halbbilder pixelgenau, ohne den
-  bisherigen YUV/RGB/YUV-Umweg. Die abschließende Dekodierungsprüfung bleibt erhalten.
-- MVC-Encoding: 40/40 Mbit/s, strikte GOP 24/4, CPB 3750 KB und maximal vier
-  gepufferte Bilder; qualitätsorientierte FRIM-Stufe `-u 1`.
-- Portable Ausgabe einschließlich passendem Anwendungscode und ExifTool samt
-  Original-Supportdateien; Icon und Bereitschaftston bleiben unverändert.
+- Separate video/image lists, selected-job settings, saved presets, preview, test, start and cancellation. German/English switching and saved language preference; shared Nachtgold styling.
+- Image inputs include JPEG, PNG, TIFF, BMP, WebP, JPS/PNS and two-eye MPO. Outputs include JPEG at quality 90/95 with 4:4:4, PNG, TIFF and lossless WebP.
+- Full/Half SBS and OU, anaglyphs using all 17 AnaglyphBatch methods, image-only native CIELAB Least Squares, and separate eye exports. Original, 1080p, 2160p, 2048-long-edge and custom image sizing.
+- Lossless MPO splitting follows actual JPEG frame boundaries, tolerates Fujifilm zero padding and inaccurate size fields, and preserves each eye's compressed pixels and original metadata. Only genuinely truncated data fails. MPO-only batches need no FFmpeg.
+- Image batches isolate file errors and continue with valid entries while retaining collision-free output names.
+- Orientation and ICC profiles are handled before conversion. ExifTool retains relevant EXIF/XMP/IPTC and capture dates; output orientation and filesystem times are preserved.
+- MVC and SDR MV-HEVC decode both actual views. No arbitrary MVC frame-count limit or rejection based only on an unreliable container count. Explicit packed layouts override unsuitable stereo metadata; ordinary missing SDR tags use visible colour assumptions.
+- Portable Windows package contains application code, verified tools and ExifTool support files. The application works locally without an account, tracking or runtime network access.
 
-## Grenzen
+## Limits
 
-HDR, Interlaced-Quellen, animierte/mehrseitige Bilder, 16-Bit-Bilder und unabhängige
-L/R-Videospuren sind nicht freigegeben. StereoMode enthält keine direkte
-Full-/Half-Angabe; ohne eindeutige Metadaten oder Dateikürzel ist eine manuelle
-Quellwahl nötig. Anaglyphen bekommen keine zusätzliche spezielle Stereo-Kennzeichnung.
+HDR conversion, animated/multipage images, 16-bit image inputs, temporal interlaced export and independent L/R video tracks are outside this release. Ambiguous packed layouts require an explicit source selection. Higher output sizes cannot recreate details missing from Half sources. Hardware support for 4:4:4 video varies.
 
-Für eine 3D-Diaschau wurden Flackern und Kompressionsartefakte in der MVC-Ausgabe
-gemeldet. Der Vergleich mit dem bereitgestellten Quellausschnitt läuft; eine
-vollständige Fehlerbehebung ist noch nicht bestätigt. Die technische Abschlussprüfung
-erkennt Dekodierungs-, Halbbild- und Verpackungsfehler, bewertet aber nicht die Bildqualität.
+Reported flicker/compression artefacts in a 3D slideshow remain a visual-quality investigation. Structural verification detects decoding, view and packaging failures; it does not measure perceived image quality or certify playback on every monitor/player.

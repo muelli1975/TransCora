@@ -37,21 +37,26 @@ def main():
                                                  ('24000/1001', 'm2ts', 'Native 7.1', 8),
                                                  ('25', 'm2ts', 'Converted 25', 2),
                                                  ('30', 'm2ts', 'Converted 30', 2),
+                                                 ('50', 'm2ts', 'Interlaced 50 fields', 2),
                                                  ('60000/1001', 'm2ts', 'Converted 59.94', 2)]:
             case = container + '-' + str(channels) + ('-'+rate.replace('/', '-') if channels == 2 and container == 'm2ts' else '')
             source = OUT/f'source-{case}_full_sbs.mkv'
+            fields = rate == '50'
             tones = '|'.join(f'0.1*sin(2*PI*{997+i*173}*t)' for i in range(channels))
             audio_fixture = f"aevalsrc={tones}:s=48000:c="+{2:'stereo', 6:'5.1', 8:'7.1'}[channels]
             # Distinct animated eyes; include 997 Hz on every audio channel.
             capture([str(tools.ffmpeg), '-hide_banner', '-y', '-filter_complex_threads', '1',
                 '-f', 'lavfi', '-i', f'testsrc2=size=1920x1080:rate={rate}', '-f', 'lavfi', '-i',
                 audio_fixture, '-filter_complex',
-                '[0:v]split[a][b];[b]crop=1908:1080:12:0,pad=1920:1080:0:0:color=black[r];[a][r]hstack[v]',
-                '-map', '[v]', '-map', '1:a', '-frames:v', '48', '-t', str(48/float(Fraction(rate))),
+                '[0:v]split[a][b];[b]crop=1908:1080:12:0,pad=1920:1080:0:0:color=black[r];[a][r]hstack'+
+                ('[packed];[packed]tinterlace=mode=interleave_top[v]' if fields else '[v]'),
+                '-map', '[v]', '-map', '1:a', '-frames:v', '48', '-t', str(48*(2 if fields else 1)/float(Fraction(rate))),
                 '-c:v', 'ffv1', '-level', '3', '-pix_fmt', 'yuv420p', '-colorspace', 'bt709',
+                *(['-field_order', 'tt'] if fields else []),
                 '-color_primaries', 'bt709', '-color_trc', 'bt709', '-color_range', 'tv',
                 '-c:a', 'flac', '-sample_fmt', 's32', '-bits_per_raw_sample', '24', '-ac', str(channels), str(source)], timeout=120)
-            job = Job(source, Options(target='bd3d', container=container, disc_title=title))
+            job = Job(source, Options(target='bd3d', container=container, disc_title=title,
+                                      bd_bitrate_mbps=28 if fields else 40))
             plan = plan_job(tools, job, OUT, set(), threading.Event(), capabilities)
             png = preview(tools, plan, threading.Event(), .5)
             if not png.startswith(b'\x89PNG'):

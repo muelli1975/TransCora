@@ -22,8 +22,8 @@ class Preparation:
 def prepare(video: dict, layout: str, swap: bool = False) -> Preparation:
     if layout not in {'full_sbs', 'half_sbs', 'full_ou', 'half_ou'}:
         raise ValueError('BD-3D: Eindeutige SBS/OU-Quelle erforderlich.')
-    if video.get('field_order') not in (None, 'unknown', 'progressive'):
-        raise ValueError('BD-3D: Interlaced-Quellen sind noch nicht freigegeben.')
+    from .video import interlaced, deinterlace
+    fields = interlaced(video)
     def valid_rate(key):
         try:
             value = Fraction(video.get(key, '0/1'))
@@ -75,7 +75,7 @@ def prepare(video: dict, layout: str, swap: bool = False) -> Preparation:
     # Normalise the complete packed pair before splitting it. Even a stream
     # labelled CFR may have valid timestamp jitter or variable frame durations.
     # Exact 24-fps sources retain their established 0.1% slowdown below.
-    cadence_rate = Fraction(24) if rate == 24 and not variable else BD_RATE
+    cadence_rate = Fraction(24) if rate == 24 and not variable and not fields else BD_RATE
     conversion = (f'setpts=PTS-STARTPTS,fps=fps={cadence_rate}:'
                   'start_time=0:round=near:eof_action=pass,')
     # MVC needs BT.709 YUV, unlike anaglyph matrices it needs no sRGB working
@@ -89,14 +89,15 @@ def prepare(video: dict, layout: str, swap: bool = False) -> Preparation:
         f"transferin={colors['transfer']}:rangein={'full' if colors['range']=='pc' else 'limited'}:"
         'matrix=bt709:primaries=bt709:transfer=bt709:range=limited:dither=error_diffusion,format=yuv420p,')
     graph = [f"[0:{video['index']}]sidedata=mode=delete:type=STEREO3D,"
-             'sidedata=mode=delete:type=SPHERICAL,' + conversion + 'split[a][b]']
+             'sidedata=mode=delete:type=SPHERICAL,' + ('' if fields else conversion) + 'split[a][b]']
     for label, (x, y), eye in zip(('a', 'b'), positions, ('left', 'right')):
         sizing = (f'scale={fitw}:{fith}:flags=lanczos+accurate_rnd+full_chroma_int,'
                   'pad=1920:1080:(ow-iw)/2:(oh-ih)/2:color=black,') if (
                       (ew, eh) != (fitw, fith) or (fitw, fith) != (1920, 1080)) else ''
-        graph.append(f'[{label}]crop={ew}:{eh}:{x}:{y},' + transform + sizing +
+        graph.append(f'[{label}]crop={ew}:{eh}:{x}:{y},' +
+                     (deinterlace(video, y) + conversion if fields else '') + transform + sizing +
                      f'setsar=1,format=yuv420p,settb=1/24000,setpts=N*1001[{eye}]')
-    speed = BD_RATE / rate if rate == 24 and not variable else Fraction(1)
+    speed = BD_RATE / rate if rate == 24 and not variable and not fields else Fraction(1)
     if speed != 1:
         warnings.append('24 → 23,976 fps: Video und Ton werden um 0,1 % verlangsamt; bei konstanten Bildzeiten bleiben alle Bilder erhalten.')
     elif variable:
@@ -110,14 +111,14 @@ def prepare(video: dict, layout: str, swap: bool = False) -> Preparation:
 
 
 def check_cadence(timestamps: list[float], rate: Fraction, time_base: str) -> None:
-    """Reject VFR and broken gaps instead of silently dropping/repeating source frames."""
+    """Validate the fixed output cadence; variable source PTS use SourceClock."""
     if len(timestamps) < 2:
         raise ValueError('BD-3D: Zu wenige Bilder für eine verlässliche Timing-Prüfung.')
     period = float(1/rate)
     tolerance = min(period/8, max(float(Fraction(time_base))*1.1, 0.00001))
     if any(not math.isfinite(t) for t in timestamps) or any(
             abs((b-a)-period) > tolerance for a, b in zip(timestamps, timestamps[1:])):
-        raise ValueError('BD-3D: Variable Bildzeiten oder Bildlücken sind noch nicht freigegeben.')
+        raise ValueError('BD-3D: Die erzeugte Bildfolge entspricht nicht der festen Ausgabebildrate.')
 
 
 class Cadence:
@@ -199,11 +200,15 @@ class SourceClock(Cadence):
         return self.count, self.first
 
 
-def encoder_args(executable: Path, left: Path, right: Path, base: Path, dependent: Path) -> list[str]:
+def encoder_args(executable: Path, left: Path, right: Path, base: Path, dependent: Path, bitrate_mbps: int = 40) -> list[str]:
+    from .model import BD_BITRATES
+    if type(bitrate_mbps) is not int or bitrate_mbps not in BD_BITRATES:
+        raise ValueError('Ungültige BD-3D-Bitrate.')
+    kbps = str(bitrate_mbps * 1000)
     # FRIM rate control is the aggregate of both views, per the author's manual.
     return list(map(str, [executable, '-sw', '-i', left, right, '-viewoutput', '-o:mvc', base, dependent,
                          '-w', '1920', '-h', '1080', '-f', str(BD_RATE), '-I420',
-                         '-vbr', '40000', '40000', '-u', '1', '-profile', 'high', '-level', '4.1',
+                         '-vbr', kbps, kbps, '-u', '1', '-profile', 'high', '-level', '4.1',
                          '-gop', '24', '4', '0', 'S', '-cpbsize', '3750', '-l', '6', '-maxdpb', '4',
                          '-colormatrix', 'bt709', '-colorprim', 'bt709', '-colortransfer', 'bt709',
                          '-VuiNalHrd', 'on', '-PicTimingSEI', 'off', '-EndOfSequence', 'off']))
