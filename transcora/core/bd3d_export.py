@@ -13,7 +13,7 @@ import tempfile
 import threading
 import time
 
-from .bd3d import BD_RATE, prepare, check_cadence, encoder_args, mux_meta
+from .bd3d import BD_RATE, prepare, Cadence, encoder_args, mux_meta
 from .engine import Cancelled, stop_process, publish_without_overwrite, capture, probe
 from .model import app_root
 from .mvc import tag_generated_stream
@@ -60,7 +60,7 @@ def check_cancel(cancel):
         raise Cancelled()
 
 
-def run(args, cancel, log, env, on_output=None):
+def run(args, cancel, log, env, on_output=None, on_line=None):
     """Continuously consume subprocess output; cancel also interrupts blocked reads."""
     check_cancel(cancel)
     log.write('COMMAND '+json.dumps(list(map(str, args)), ensure_ascii=False)+'\n')
@@ -75,6 +75,8 @@ def run(args, cancel, log, env, on_output=None):
             else:
                 for line in iter(process.stdout.readline, b''):
                     text = line.decode('utf-8', 'replace')
+                    if on_line:
+                        on_line(text)
                     log.write(text)
                     tail.append(text.strip())
         except BaseException as error:
@@ -110,45 +112,17 @@ def run(args, cancel, log, env, on_output=None):
         log.flush()
 
 
-def scan(tools, plan, config, cancel, log, env):
-    count, first, previous = 0, None, None
-    def frames(pipe):
-        nonlocal count, first, previous
-        for line in iter(pipe.readline, b''):
-            value = line.decode('ascii', 'replace').strip().split(',')[0]
-            if not value:
-                continue
-            try:
-                stamp = float(value)
-            except ValueError:
-                raise ValueError('BD-3D: Fehlende Bildzeit in der Quelle.') from None
-            if previous is not None:
-                check_cadence([previous, stamp], config.source_rate, plan.info['video']['time_base'])
-            elif not math.isfinite(stamp):
-                raise ValueError('BD-3D: Ungültige Bildzeit in der Quelle.')
-            else:
-                first = stamp
-            previous = stamp
-            count += 1
-            if count % 240 == 0:
-                check_cancel(cancel)
-    run([tools.ffprobe, '-v', 'error', '-protocol_whitelist', 'file,pipe', '-select_streams', str(plan.info['video']['index']),
-         '-show_frames', '-show_entries', 'frame=best_effort_timestamp_time', '-of', 'csv=p=0', plan.source],
-        cancel, log, env, frames)
-    if count < 2:
-        raise ValueError('BD-3D: Zu wenige Bilder für eine verlässliche Timing-Prüfung.')
-    expected_span = float((count-1)/config.source_rate)
-    tolerance = min(float(1/config.source_rate)/8, max(2.2*float(Fraction(plan.info['video']['time_base'])), .00001))
-    if abs((previous-first)-expected_span) > tolerance:
-        raise ValueError('BD-3D: Die tatsächliche Bildfolge entspricht nicht der angegebenen konstanten Framerate.')
-    return count, first
-
-
-def encode(tools, bd, plan, base, dependent, cancel, emit, log, frames):
-    graph = plan.graph+';[left][right]hstack=inputs=2[packed]'
-    args = [str(tools.ffmpeg), '-hide_banner', '-nostdin', '-loglevel', 'warning',
+def encode(tools, bd, plan, base, dependent, cancel, emit, log, estimated_frames, decoder=None):
+    from .multiview import input_args, PairClock, check_decoder
+    config = prepare(plan.info['video'], plan.layout, plan.swap)
+    clock = Cadence(config.source_rate, plan.info['video']['time_base'])
+    output_clock = Cadence(BD_RATE, '1/24000', 'bd_output')
+    errors = []
+    pairs = PairClock() if plan.info.get('multiview', {}).get('kind') == 'mvhevc' else None
+    graph = plan.graph.replace(']sidedata=', ']showinfo@bd_clock=checksum=0,sidedata=', 1)+';[left][right]hstack=inputs=2,showinfo@bd_output=checksum=0[packed]'
+    args = [str(tools.ffmpeg), '-hide_banner', '-nostdin', '-loglevel', 'info', '-copyts',
             '-progress', 'pipe:2', '-stats_period', '0.5', '-filter_complex_threads', '1',
-            '-protocol_whitelist', 'file,pipe', '-noautorotate', '-i', str(plan.source),
+            '-protocol_whitelist', 'file,pipe', '-noautorotate', *input_args(plan, copyts=True),
             '-filter_complex', graph, '-map', '[packed]', '-an', '-c:v', 'rawvideo',
             '-pix_fmt', 'yuv420p', '-fps_mode', 'passthrough', '-f', 'rawvideo', 'pipe:1']
     frim = encoder_args(bd.encoder, Path('-'), Path('-'), base, dependent)
@@ -163,12 +137,18 @@ def encode(tools, bd, plan, base, dependent, cancel, emit, log, frames):
         fps = None
         for line in iter(pipe.readline, b''):
             text = line.decode('utf-8', 'replace').strip()
+            try:
+                if clock.line(text) or output_clock.line(text) or (pairs and pairs.line(text)):
+                    continue
+            except ValueError as error:
+                errors.append(error)
+                continue
             log.write(text+'\n')
             tail.append(text)
             key, _, value = text.partition('=')
             if progress and key == 'frame':
                 try:
-                    emit('progress', {'percent': min(70, 5+65*int(value)/frames), 'seconds': int(value)/float(BD_RATE)})
+                    emit('progress', {'percent': min(70, 5+65*int(value)/max(1, estimated_frames)), 'seconds': int(value)/float(BD_RATE)})
                 except ValueError:
                     pass
             elif progress and key == 'fps':
@@ -177,7 +157,7 @@ def encode(tools, bd, plan, base, dependent, cancel, emit, log, frames):
                 emit('speed', {'speed': value, 'fps': fps})
     try:
         check_cancel(cancel)
-        producer = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        producer = subprocess.Popen(args, stdin=decoder.stdout if decoder else None, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                     env=bd.environment, **process_options())
         producers.append(producer)
         encoder = subprocess.Popen(frim, stdin=producer.stdout, stdout=subprocess.PIPE,
@@ -189,14 +169,29 @@ def encode(tools, bd, plan, base, dependent, cancel, emit, log, frames):
             reader.start()
             readers.append(reader)
         while any(p.poll() is None for p in producers):
+            if errors:
+                raise errors[0]
             if cancel.wait(.1):
                 raise Cancelled()
             if any(p.poll() not in (None, 0) for p in producers):
                 raise ValueError('BD-3D: Kodierung fehlgeschlagen · '+'\n'.join(tail)[-3500:])
         for reader in readers:
             reader.join(timeout=10)
+        if errors:
+            raise errors[0]
         if any(p.returncode for p in producers):
             raise ValueError('BD-3D: Kodierung fehlgeschlagen · '+'\n'.join(tail)[-3500:])
+        check_decoder(decoder, cancel)
+        if pairs:
+            expected = plan.info['multiview']['original_video'].get('nb_frames')
+            pairs.finish(int(expected) if expected and expected.isdigit() else None)
+        source_frames, first = clock.finish()
+        frames, _ = output_clock.finish()
+        if config.source_rate in {BD_RATE, Fraction(24)} and frames != source_frames:
+            raise ValueError('BD-3D: Die native Bildfolge wurde unerwartet verändert.')
+        log.write(f'VERIFIED SOURCE CLOCK frames={source_frames} first={first} rate={config.source_rate}\n'
+                  f'VERIFIED OUTPUT CLOCK frames={frames} rate={BD_RATE}\n')
+        return frames, first
     finally:
         for p in reversed(producers):
             stop_process(p)
@@ -220,11 +215,11 @@ def decoded_digest(bd, base, dependent, frames, cancel, log):
     run([bd.decoder, '-sw', '-i:mvc', base, dependent, '-sbs', '-o', '-'],
         cancel, log, bd.environment, pictures)
     if count != frames*FRAME_BYTES:
-        raise ValueError('BD-3D: Die Dekodierung beider Augenbilder enthält nicht die erwartete Bildanzahl.')
+        raise ValueError('BD-3D: Die Dekodierung beider Halbbilder enthält nicht die erwartete Bildanzahl.')
     return digest.hexdigest()
 
 
-def verify_mux(tools, bd, plan, movie, base, dependent, frames, expected_hash, audios, cancel, log, folder):
+def verify_mux(tools, bd, plan, movie, base, dependent, frames, expected_hash, audios, cancel, log, folder, emit=None):
     info = json.loads(capture([str(tools.ffprobe), '-v', 'error', '-protocol_whitelist', 'file,pipe',
                                '-show_streams', '-show_format', '-of', 'json', str(movie)], cancel))
     base_tracks = [s for s in info.get('streams', []) if s.get('id') == '0x1011' and s.get('codec_name') == 'h264']
@@ -252,10 +247,10 @@ def verify_mux(tools, bd, plan, movie, base, dependent, frames, expected_hash, a
     run([bd.muxer, meta, demux], cancel, log, bd.environment)
     avc, mvc = list(demux.glob('*.264')), list(demux.glob('*.mvc'))
     if len(avc) != 1 or len(mvc) != 1 or decoded_digest(bd, avc[0], mvc[0], frames, cancel, log) != expected_hash:
-        raise ValueError('BD-3D: Beide Augenbilder der gemuxten Ausgabe stimmen nicht mit der Kodierung überein.')
+        raise ValueError('BD-3D: Beide Halbbilder der gemuxten Ausgabe stimmen nicht mit der Kodierung überein.')
 
 
-def export(tools, plan, cancel, emit, log_path):
+def export(tools, plan, cancel, emit, log_path, decoder=None):
     bd = BdTools.find()
     config = prepare(plan.info['video'], plan.layout, plan.swap)
     audios = [s for s in plan.info['streams'] if s.get('codec_type') == 'audio']
@@ -270,9 +265,10 @@ def export(tools, plan, cancel, emit, log_path):
             if (stat.st_mtime_ns, stat.st_size) != (plan.info['source_mtime_ns'], plan.info['source_size']):
                 raise ValueError('Quelle seit der Prüfung geändert. Erneut prüfen.')
         unchanged()
-        emit('phase', 'BD-3D: Bildzeiten vollständig prüfen')
-        frames, video_start = scan(tools, plan, config, cancel, log, bd.environment)
-        duration = frames/float(BD_RATE)
+        duration = plan.duration/float(config.speed)
+        if not duration:
+            raise ValueError('BD-3D: Laufzeit für die Platzprüfung fehlt.')
+        estimated_frames = max(2, round(duration*float(BD_RATE)))
         # Compressed views, audio, mux, extracted SSIF and demux; no raw video files.
         required = duration*(40000*1000/8*4 + sum(s['channels']*48000*3 for s in audios)) + 256*1024*1024
         if shutil.disk_usage(folder).free < required:
@@ -281,10 +277,11 @@ def export(tools, plan, cancel, emit, log_path):
             if duration*s['channels']*48000*3 >= 0xffff0000:
                 raise ValueError('BD-3D: Diese Audiospur überschreitet das geprüfte WAV-Limit von 4 GB. Kürzere Abschnitte verwenden.')
         emit('progress', {'percent': 5, 'seconds': 0})
-        emit('phase', 'BD-3D: Beide Augenbilder in hoher Qualität kodieren')
+        emit('phase', 'BD-3D: Beide Halbbilder in hoher Qualität kodieren')
         base, dependent = folder/'base.avc', folder/'dependent.mvc'
-        encode(tools, bd, plan, base, dependent, cancel, emit, log, frames)
-        emit('phase', 'BD-3D: Farbkennzeichnung und beide Augenbilder prüfen')
+        frames, video_start = encode(tools, bd, plan, base, dependent, cancel, emit, log, estimated_frames, decoder)
+        duration = frames/float(BD_RATE)
+        emit('phase', 'BD-3D: Farbkennzeichnung und beide Halbbilder prüfen')
         for p in (base, dependent):
             log.write(f'BT709 {p.name}: {tag_generated_stream(p, lambda: check_cancel(cancel))} parameter sets\n')
         expected_hash = decoded_digest(bd, base, dependent, frames, cancel, log)
@@ -296,7 +293,7 @@ def export(tools, plan, cancel, emit, log_path):
             path = folder/f'audio-{number}.wav'
             af = f'asetpts=PTS-{video_start}/TB,aresample=48000:async=1:first_pts=0,'+config.audio_filter+f',apad,atrim=end_sample={samples}'
             run([tools.ffmpeg, '-hide_banner', '-nostdin', '-v', 'error', '-n', '-copyts', '-protocol_whitelist',
-                 'file,pipe', '-i', plan.source, '-map', f"0:{audio['index']}", '-af', af, '-ar', '48000',
+                 'file,pipe', '-i', plan.info.get('runtime_input', {}).get('source', plan.source), '-map', f"0:{audio['index']}", '-af', af, '-ar', '48000',
                  '-c:a', 'pcm_s24le', path], cancel, log, bd.environment)
             audio_paths.append((path, audio.get('tags', {}).get('language', 'und')))
         emit('phase', 'BD-3D: '+('Blu-ray-ISO erstellen' if plan.options.container == 'iso' else 'M2TS erstellen'))
@@ -307,7 +304,7 @@ def export(tools, plan, cancel, emit, log_path):
                                  label=label, audios=audio_paths), encoding='utf-8')
         run([bd.muxer, meta, movie], cancel, log, bd.environment)
         emit('progress', {'percent': 90, 'seconds': duration})
-        emit('phase', 'BD-3D: Fertige Ausgabe und beide Augenbilder prüfen')
+        emit('phase', 'BD-3D: Fertige Ausgabe und beide Halbbilder prüfen')
         packed = movie
         if plan.options.container == 'iso':
             write_label(movie, label)
@@ -324,7 +321,7 @@ def export(tools, plan, cancel, emit, log_path):
                         raise ValueError('BD-3D: Blu-ray-Struktur unvollständig.')
                 packed = folder/'verified.ssif'
                 disc.extract('BDMV/STREAM/SSIF/00000.ssif', packed, lambda: check_cancel(cancel))
-        verify_mux(tools, bd, plan, packed, base, dependent, frames, expected_hash, audios, cancel, log, folder)
+        verify_mux(tools, bd, plan, packed, base, dependent, frames, expected_hash, audios, cancel, log, folder, emit)
         unchanged()
         check_cancel(cancel)
         publish_without_overwrite(movie, plan.output, cancel)

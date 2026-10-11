@@ -6,7 +6,7 @@ import subprocess
 import tempfile
 import unittest
 
-from transcora.core.bd3d import prepare, check_cadence, BD_RATE
+from transcora.core.bd3d import prepare, check_cadence, Cadence, BD_RATE
 from transcora.core.toolchain import Toolchain
 
 
@@ -57,9 +57,50 @@ class BdPreparationTests(unittest.TestCase):
                             config.audio_filter+',apad,atrim=end_sample=96096', '-ac', '2',
                             '-f', 's24le', '-'])
                         self.assertEqual(len(audio), 96096*2*3)
-            invalid = dict(info, r_frame_rate='25/1', avg_frame_rate='25/1')
+            invalid = dict(info, r_frame_rate='25/1', avg_frame_rate='24/1')
             with self.assertRaises(ValueError):
                 prepare(invalid, 'half_ou')
+
+    def test_conversion_checks_every_source_time_and_keeps_output_pair_clock(self):
+        tools = Toolchain.find()
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp)/'source.mkv'
+            for rate in ('25', '30', '50', '60000/1001'):
+                count = round(float(Fraction(rate)))
+                subprocess.run([str(tools.ffmpeg), '-y', '-v', 'error', '-f', 'lavfi', '-i',
+                    f'testsrc2=s=640x360:r={rate}', '-frames:v', str(count), '-c:v', 'ffv1',
+                    '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709', str(source)], check=True)
+                video = json.loads(subprocess.check_output([str(tools.ffprobe), '-v', 'error',
+                    '-show_streams', '-of', 'json', str(source)]))['streams'][0]
+                config = prepare(video, 'full_sbs')
+                graph = config.graph.replace(']sidedata=', ']showinfo@bd_clock=checksum=0,sidedata=', 1)
+                graph += ';[left][right]hstack,showinfo@bd_output=checksum=0[v]'
+                result = subprocess.run([str(tools.ffmpeg), '-v', 'info', '-copyts', '-filter_complex_threads', '1',
+                    '-i', str(source), '-filter_complex', graph, '-map', '[v]', '-fps_mode', 'passthrough',
+                    '-f', 'null', '-'], capture_output=True, text=True, check=True)
+                original = Cadence(config.source_rate, video['time_base'])
+                output = Cadence(BD_RATE, '1/24000', 'bd_output')
+                for line in result.stderr.splitlines():
+                    original.line(line)
+                    output.line(line)
+                self.assertEqual(original.finish()[0], count)
+                self.assertLessEqual(abs(output.finish()[0]/float(BD_RATE)-count/float(Fraction(rate))), 1/float(BD_RATE))
+                self.assertEqual(config.audio_filter, 'anull')
+                self.assertEqual(config.speed, 1)
+
+    def test_late_gap_missing_time_and_long_term_drift_are_rejected(self):
+        clock = Cadence(BD_RATE, '1/24000')
+        for n in range(1000):
+            clock.feed(float(Fraction(n*1001, 24000)))
+        with self.assertRaises(ValueError):
+            clock.feed(float(Fraction(1001*1001, 24000)))
+        with self.assertRaises(ValueError):
+            Cadence(BD_RATE, '1/24000').line('[showinfo@bd_clock] n: 0 pts: NOPTS pts_time: NOPTS')
+        drift = Cadence(BD_RATE, '1/1000')
+        for n in range(100):
+            drift.feed(n*.042)
+        with self.assertRaises(ValueError):
+            drift.finish()
 
 
 class AudioLayoutTests(unittest.TestCase):

@@ -248,7 +248,7 @@ class GuiTests(unittest.TestCase):
             self.window.update_elapsed()
             self.assertIn('Wird ermittelt', self.window.elapsed.get())
             self.window.estimate_remaining(1, 1, 50)
-            self.assertEqual(self.window.elapsed.get(), 'Restzeit: Ca. 01:10')
+            self.assertEqual(self.window.elapsed.get(), 'Restzeit: ca. 01:10')
             self.assertEqual(self.window.elapsed_time.get(), 'Vergangene Zeit: 01:10')
             self.window.abort()
             self.assertIsNotNone(self.window.run_started)
@@ -278,7 +278,7 @@ class GuiTests(unittest.TestCase):
             tools = Toolchain.find()
         except ValueError:
             self.skipTest('FFmpeg fehlt')
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory() as tmp, patch('transcora.gui.window.app_root', return_value=Path(tmp)):
             folder = Path(tmp).resolve()
             source = folder/'sample-lr.mkv'
             capture([str(tools.ffmpeg), '-v', 'error', '-f', 'lavfi', '-i', 'testsrc2=size=128x32:rate=25',
@@ -296,7 +296,7 @@ class GuiTests(unittest.TestCase):
             job = self.window.jobs[0]
             self.assertEqual(job.status, 'completed', self.window.status.get()+'\n'+job.detail)
             self.assertTrue(job.plan.output.is_file())
-            self.assertTrue(list((folder/'output/logs').glob('*.log')))
+            self.assertTrue(list((folder/'logs').glob('*.log')))
 
     def test_preview_timeline_loads_selected_frame_and_keeps_exact_entry(self):
         try:

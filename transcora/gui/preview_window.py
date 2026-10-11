@@ -22,7 +22,7 @@ class PreviewWindow:
         self.time_var = tk.StringVar(value="00:00")
         self.position_seconds = 0.0
         self.displayed_time = "00:00"
-        ttk.Label(frame, text="Zeitstelle (mm:ss / hh:mm:ss)").grid(row=0, column=0, sticky="w")
+        ttk.Label(frame, text="Zeitposition").grid(row=0, column=0, sticky="w")
         self.time_entry = ttk.Entry(frame, textvariable=self.time_var, width=16)
         self.time_entry.grid(row=0, column=1, padx=8)
         self.time_entry.bind("<Return>", lambda event: self.request())

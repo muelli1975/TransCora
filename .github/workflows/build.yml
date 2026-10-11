@@ -25,11 +25,13 @@ jobs:
           TRANSCORA_REQUIRE_FFMPEG: '1'
           TRANSCORA_REQUIRE_GUI: '1'
         run: xvfb-run -a python -m unittest discover -s tests -v
+      - name: Build and check portable MVC decoder
+        run: python scripts/build_mvc_decoder.py
 
   windows-portable:
     needs: linux-tests
     runs-on: windows-latest
-    timeout-minutes: 25
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -41,6 +43,18 @@ jobs:
         run: python scripts/fetch_ffmpeg.py
       - name: Download and verify pinned BD-3D tools
         run: python scripts/fetch_bd3d_tools.py
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: false
+          install: >-
+            git
+            make
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-python
+      - name: Build pinned portable MVC decoder
+        shell: msys2 {0}
+        run: python scripts/build_mvc_decoder.py
       - name: Test Windows codecs and GUI
         env:
           TRANSCORA_REQUIRE_FFMPEG: '1'
@@ -50,6 +64,8 @@ jobs:
         run: python scripts/gui_snapshot.py
       - name: Test actual BD-3D ISO and M2TS exports
         run: python scripts/bd3d_export_test.py
+      - name: Test MVC and MV-HEVC inputs with both views
+        run: python scripts/multiview_test.py
       - name: Build portable application
         run: python scripts/build_windows.py
       - name: Smoke test frozen executable
@@ -59,7 +75,7 @@ jobs:
           $process = Start-Process -FilePath ./dist/TransCora/TransCora.exe -ArgumentList @("--self-test", "`"$report`"") -Wait -PassThru
           if ($process.ExitCode -ne 0) { throw "TransCora self-test failed" }
           $result = Get-Content $report | ConvertFrom-Json
-          if (-not $result.ok -or $result.methods -ne 17 -or -not $result.bd3d) { throw "TransCora assets/toolchain check failed" }
+          if (-not $result.ok -or $result.methods -ne 17 -or -not $result.bd3d -or -not $result.mvc) { throw "TransCora assets/toolchain check failed" }
           Get-Content $report
       - uses: actions/upload-artifact@v4
         with:
@@ -68,6 +84,14 @@ jobs:
             dist/TransCora.zip
             dist/TransCora.zip.sha256
           if-no-files-found: error
+          retention-days: 30
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: TransCora-Multiview-Integration
+          path: output/multiview-integration/
+          if-no-files-found: warn
           retention-days: 30
 
       - uses: actions/upload-artifact@v4

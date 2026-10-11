@@ -59,3 +59,17 @@ The software SDK DLL is retained with the encoder and decoder; no HEVC plugins a
 
 The legacy tsMuxeR binary is the exact tested 2.6.12 release, not a newly compiled fork.
 Its original release notes are included. Keep third-party notices with the portable tools.
+
+## edge264-mvc and mvc-source
+
+The portable MVC input bridge statically links the BSD-licensed decoder and
+shared source core. Exact source commits are pinned in `scripts/build_mvc_decoder.py`.
+TransCora's adaptations preserve UTF-8/Unicode Windows paths and propagate
+concealment flags so missing/damaged views cannot be silently replaced.
+Original license notices and a source/binary manifest are bundled in `tools/mvc`.
+
+- Decoder source: https://github.com/jens-duttke/edge264-mvc
+- Shared source core: https://github.com/jens-duttke/mvc-source
+
+Integration tests download one SHA256-pinned MV-HEVC conformance sample from
+FFmpeg's FATE suite. It is test material, not a bundled application dependency.

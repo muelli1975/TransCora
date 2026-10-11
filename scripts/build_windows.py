@@ -19,7 +19,7 @@ def main():
     for name in ('assets', 'presets', 'tools', 'licenses'):
         shutil.copytree(root/name, output/name, ignore=shutil.ignore_patterns('__pycache__'), dirs_exist_ok=True)
     (output/'docs').mkdir(exist_ok=True)
-    shutil.copy2(root/'docs/RELEASE_NOTES_0.1.4.md', output/'docs/RELEASE_NOTES_0.1.4.md')
+    shutil.copy2(root/'docs/RELEASE_NOTES_0.1.5.md', output/'docs/RELEASE_NOTES_0.1.5.md')
     python_license = next((p for p in (Path(sys.base_prefix)/'LICENSE.txt', Path(sys.base_prefix)/'LICENSE') if p.is_file()), None)
     if python_license is None:
         raise ValueError('Python license missing from the build installation')
@@ -32,7 +32,7 @@ def main():
         path = Path(distribution.locate_file(notice))
         if path.is_file():
             shutil.copy2(path, output/'licenses'/('PYINSTALLER-'+path.name))
-    for name in ('README.md', 'LICENSE', 'THIRD_PARTY.md', 'Start-TransCora.bat'):
+    for name in ('README.md', 'LICENSE', 'THIRD_PARTY.md'):
         shutil.copy2(root/name, output/name)
     (output/'output').mkdir(exist_ok=True)
     manifest = {}

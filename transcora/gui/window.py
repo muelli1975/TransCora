@@ -274,7 +274,7 @@ class Window:
         timing = ttk.Frame(outer)
         timing.grid(row=12, column=0, sticky="ew", pady=(3, 0))
         ttk.Label(timing, textvariable=self.elapsed_time, foreground=MUTED).pack(side='left')
-        ttk.Label(timing, textvariable=self.elapsed, foreground=MUTED).pack(side='right')
+        ttk.Label(timing, textvariable=self.elapsed, foreground=MUTED).pack(side='left', padx=(24, 0))
         footer = ttk.Frame(outer)
         footer.grid(row=13, column=0, sticky="ew", pady=(8, 0))
         self.speed = tk.StringVar(value="")
@@ -508,8 +508,8 @@ class Window:
         framerate = options.target == "framerate"
         bd3d = options.target == 'bd3d'
         self.title_frame.grid() if bd3d and selected else self.title_frame.grid_remove()
-        self.option_frames['method'].grid_remove() if bd3d else self.option_frames['method'].grid()
-        self.option_frames['profile'].grid_remove() if bd3d else self.option_frames['profile'].grid()
+        self.option_frames['method'].grid()
+        self.option_frames['profile'].grid()
         self.combos['container'].configure(values=[self.mappings['container'][k] for k in
             (('iso', 'm2ts') if bd3d else ('mp4', 'mkv'))])
         self.advanced_button.configure(state='disabled' if bd3d else 'normal')
@@ -539,7 +539,7 @@ class Window:
         if bd3d:
             text = "1080p · 23,976 fps · AVC/MVC · Hohe Qualität. Konstante 23,976/24-fps-Quellen; 24 fps werden ohne Bildverlust verlangsamt."
             if options.container == 'm2ts':
-                text += " M2TS enthält beide Augenbilder, jedoch keine Blu-ray-Disc-Struktur."
+                text += " M2TS enthält beide Halbbilder, jedoch keine Blu-ray-Disc-Struktur."
         if options.codec == "h265":
             text += " H.265: MKV, längere Rechenzeit und Zielplayer prüfen; CRF ist codecabhängig."
         if options.rate_mode == "abr" and not bd3d:
@@ -751,7 +751,7 @@ class Window:
             self.elapsed.set('Restzeit: Wird ermittelt …')
         else:
             remaining = max(1, self.estimated_finish-now)
-            self.elapsed.set('Restzeit: Ca. ' + PreviewWindow.time_text(remaining))
+            self.elapsed.set('Restzeit: ca. ' + PreviewWindow.time_text(remaining))
 
     def estimate_remaining(self, index, count, percent):
         if self.run_started is None or percent is None:
@@ -839,7 +839,7 @@ class Window:
                 return
             self.events.put(("batch", [max(1, plan.duration) for _, plan in ready]))
             if ready:
-                log_path = new_run_log(output)
+                log_path = new_run_log(app_root())
             counts = {"completed": 0, "failed": 0, "cancelled": 0}
             for index, (job, plan) in enumerate(ready, 1):
                 if self.cancel.is_set():
@@ -929,7 +929,7 @@ class Window:
         if self.busy:
             return
         try:
-            count = delete_run_logs(self.output_path())
+            count = delete_run_logs(app_root())
             self.log_lines.clear()
             self.status.set(f'{count} Laufprotokolle gelöscht.')
             if text is not None:
@@ -987,6 +987,11 @@ class Window:
                     self.speed.set(" · ".join(parts))
                 elif kind == "phase":
                     self.speed.set(payload[3])
+                    self.progress.stop()
+                    self.progress.configure(mode='indeterminate')
+                    self.progress.start(15)
+                    self.estimated_finish = None
+                    self.update_elapsed()
                 elif kind == "preview":
                     viewer, png, plan = payload
                     if viewer.dialog.winfo_exists():

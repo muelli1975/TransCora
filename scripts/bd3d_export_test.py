@@ -34,8 +34,10 @@ def main():
     try:
         for rate, container, title, channels in [('24', 'iso', 'Mein 3D Film – ÄÖÜ', 2),
                                                  ('24000/1001', 'm2ts', 'Native 23.976', 6),
-                                                 ('24000/1001', 'm2ts', 'Native 7.1', 8)]:
-            case = container + '-' + str(channels)
+                                                 ('24000/1001', 'm2ts', 'Native 7.1', 8),
+                                                 ('25', 'm2ts', 'Converted 25', 2),
+                                                 ('60000/1001', 'm2ts', 'Converted 59.94', 2)]:
+            case = container + '-' + str(channels) + ('-'+rate.replace('/', '-') if channels == 2 and container == 'm2ts' else '')
             source = OUT/f'source-{case}_full_sbs.mkv'
             tones = '|'.join(f'0.1*sin(2*PI*{997+i*173}*t)' for i in range(channels))
             audio_fixture = f"aevalsrc={tones}:s=48000:c="+{2:'stereo', 6:'5.1', 8:'7.1'}[channels]
@@ -97,9 +99,13 @@ def main():
                 score = re.search(r'average:([0-9.]+)', result.stderr)
                 if not score or float(score[1]) < 40:
                     raise ValueError('Source eye identity/quality failed: '+eye)
+            frames = (raw/'left.yuv').stat().st_size//(1920*1080*3//2)
+            if (raw/'decoded-left.yuv').stat().st_size != frames*(1920*1080*3//2):
+                raise ValueError('Converted output frame count differs from prepared stereo source')
             shutil.rmtree(raw)
             # Independently decode prepared audio to match the actual muxed LPCM.
-            af = prepare(plan.info['video'], plan.layout).audio_filter+',apad,atrim=end_sample=96096'
+            samples = round(frames*48000/float(BD_RATE))
+            af = prepare(plan.info['video'], plan.layout).audio_filter+f',apad,atrim=end_sample={samples}'
             expected_audio = capture([str(tools.ffmpeg), '-v', 'error', '-i', str(source), '-map', '0:a:0',
                 '-af', af, '-ar', '48000', '-c:a', 'pcm_s24le', '-f', 's24le', 'pipe:1'], timeout=120)
             actual_audio = capture([str(tools.ffmpeg), '-v', 'error', '-i', str(packed), '-map', '0:a:0',
@@ -115,7 +121,7 @@ def main():
             if again.output == plan.output:
                 raise ValueError('Output naming collision protection failed')
             report[case] = {'file': plan.output.name, 'size': plan.output.stat().st_size,
-                                'frames': 48, 'rate': str(BD_RATE), 'channels': channels,
+                                'frames': frames, 'source_rate': rate, 'rate': str(BD_RATE), 'channels': channels,
                                 'audio_identical': True, 'preview_ok': True}
             source.unlink()
             if packed != plan.output:

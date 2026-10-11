@@ -9,3 +9,5 @@ settings.json
 *.spec
 tools/ffmpeg/*
 !tools/ffmpeg/README.md
+tools/mvc/*
+!tools/mvc/README.md

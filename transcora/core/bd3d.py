@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from fractions import Fraction
 from pathlib import Path
 import math
+import re
 
 from .engine import color_spec
 
@@ -37,8 +38,8 @@ def prepare(video: dict, layout: str, swap: bool = False) -> Preparation:
         # The average timing can be NTSC despite a rounded nominal 24-fps field.
         # A full timestamp scan below independently confirms the chosen clock.
         rate = average
-    if rate not in {BD_RATE, Fraction(24)} or abs(average-rate) > rate/1000:
-        raise ValueError('BD-3D: Diese Version unterstützt konstante 23,976 oder 24 fps.')
+    if not 1 <= rate <= 240 or abs(average-rate) > rate/1000:
+        raise ValueError('BD-3D: Eine konstante, progressive Quellbildrate zwischen 1 und 240 fps ist erforderlich.')
     colors, warnings = color_spec(video)
     w, h = video['width'], video['height']
     horizontal = layout.endswith('sbs')
@@ -64,8 +65,11 @@ def prepare(video: dict, layout: str, swap: bool = False) -> Preparation:
     positions = [(0, 0), (ew, 0)] if horizontal else [(0, 0), (0, eh)]
     if swap:
         positions.reverse()
+    conversion = '' if rate in {BD_RATE, Fraction(24)} else (
+        f'setpts=PTS-STARTPTS,fps=fps={BD_RATE}:start_time=0:round=near:eof_action=pass,')
     graph = [f"[0:{video['index']}]sidedata=mode=delete:type=STEREO3D,"
              'sidedata=mode=delete:type=SPHERICAL,'
+             + conversion +
              f"zscale=matrixin={colors['matrix']}:primariesin={colors['primaries']}:"
              f"transferin={colors['transfer']}:rangein={'full' if colors['range']=='pc' else 'limited'}:"
              'matrix=gbr:primaries=bt709:transfer=iec61966-2-1:range=full,format=gbrp16,split[a][b]']
@@ -76,9 +80,13 @@ def prepare(video: dict, layout: str, swap: bool = False) -> Preparation:
                      'zscale=matrixin=gbr:primariesin=bt709:transferin=iec61966-2-1:rangein=full:'
                      'matrix=bt709:primaries=bt709:transfer=bt709:range=limited:dither=error_diffusion,'
                      f'format=yuv420p,settb=1/24000,setpts=N*1001[{eye}]')
-    speed = BD_RATE / rate
+    speed = BD_RATE / rate if rate == 24 else Fraction(1)
     if speed != 1:
         warnings.append('24 → 23,976 fps: Alle Bilder bleiben erhalten; Ton wird um 0,1 % verlangsamt.')
+    elif rate != BD_RATE:
+        warnings.append(f'{float(rate):.3f} → 23,976 fps: Ganze Stereobildpaare werden ausgelassen oder wiederholt. '
+                        'Laufzeit und Ton bleiben erhalten; Bewegungen können ungleichmäßiger werden. '
+                        'Keine Bewegungsinterpolation; Video wird nur einmal kodiert.')
     return Preparation(';'.join(graph), rate, speed,
                        'atempo=1000/1001' if speed != 1 else 'anull', tuple(warnings))
 
@@ -92,6 +100,48 @@ def check_cadence(timestamps: list[float], rate: Fraction, time_base: str) -> No
     if any(not math.isfinite(t) for t in timestamps) or any(
             abs((b-a)-period) > tolerance for a, b in zip(timestamps, timestamps[1:])):
         raise ValueError('BD-3D: Variable Bildzeiten oder Bildlücken sind noch nicht freigegeben.')
+
+
+class Cadence:
+    """Check the original decoded clock while the encoder consumes the same frames."""
+    def __init__(self, rate, time_base, name='bd_clock'):
+        self.rate = rate
+        self.name = name
+        self.time_base = Fraction(time_base)
+        self.count = 0
+        self.first = self.previous = None
+
+    def feed(self, stamp):
+        if self.previous is None:
+            if not math.isfinite(stamp):
+                raise ValueError('BD-3D: Ungültige Bildzeit in der Quelle.')
+            self.first = stamp
+        else:
+            check_cadence([self.previous, stamp], self.rate, str(self.time_base))
+        self.previous = stamp
+        self.count += 1
+
+    def line(self, line):
+        if 'showinfo@'+self.name not in line:
+            return False
+        match = re.search(r'config in time_base:\s*(\d+/\d+)', line)
+        if match:
+            self.time_base = Fraction(match[1])
+        elif re.search(r'\bn:\s*\d+', line):
+            match = re.search(r'\bpts:\s*(-?\d+)\s+pts_time:', line)
+            if not match:
+                raise ValueError('BD-3D: Fehlende Bildzeit in der Quelle.')
+            self.feed(float(int(match[1])*self.time_base))
+        return True
+
+    def finish(self):
+        if self.count < 2:
+            raise ValueError('BD-3D: Zu wenige Bilder für eine verlässliche Timing-Prüfung.')
+        period = float(1/self.rate)
+        tolerance = min(period/8, max(2.2*float(self.time_base), .00001))
+        if abs((self.previous-self.first)-float((self.count-1)/self.rate)) > tolerance:
+            raise ValueError('BD-3D: Die tatsächliche Bildfolge entspricht nicht der angegebenen konstanten Framerate.')
+        return self.count, self.first
 
 
 def encoder_args(executable: Path, left: Path, right: Path, base: Path, dependent: Path) -> list[str]:

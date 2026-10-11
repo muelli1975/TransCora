@@ -50,8 +50,9 @@ Durchläufen erstellen. Fertige Jobs laufen erst nach bewusster Einstellungsänd
 
 Half-SBS/OU passen jedes Auge unter Erhalt seines Seitenverhältnisses in 1920 × 1080
 ein, ergänzen bei Bedarf schwarze Ränder und halbieren danach die Packachse.
-Full-/Half-SBS und Full-/Half-OU sind mögliche Quellen. MVC, Anaglyphen,
-Frame-sequential und getrennte Videospuren sind keine unterstützten Quellen.
+Full-/Half-SBS und Full-/Half-OU sind mögliche Quellen. Zusätzlich werden progressive
+H.264-MVC- und SDR-MV-HEVC-Quellen mit zwei vollständigen Ansichten verarbeitet.
+Anaglyphen, Frame-sequential und unabhängige Videospuren sind keine unterstützten Quellen.
 
 **Dateinamenszusatz · frei editierbar** bietet zum Ziel passende konkrete Zusätze,
 **Keiner** und eigene Eingaben. Darunter steht unmittelbar der vollständige
@@ -190,7 +191,7 @@ mitgelieferte Tools behalten ihre eigenen Lizenzen und Dokumente.
 
 ## Laufprotokolle und BD-3D-Probelauf
 
-Gespeicherte Laufprotokolle stehen im gewählten Ausgabeordner unter `logs`.
+Gespeicherte Laufprotokolle stehen im Programmordner von TransCora unter `logs`.
 Beim Start eines neuen Laufs bleiben die letzten zehn TransCora-Protokolle erhalten.
 **Logs löschen** im Logfenster löscht diese Protokolle und die angezeigten Meldungen;
 die Schaltfläche ist während laufender Arbeit deaktiviert.
@@ -199,7 +200,7 @@ Der separate Workflow `Windows BD3D proof` prüft FRIM 1.31 x64 im Softwaremodus
 und tsMuxeR 2.6.12 bis zur UDF-2.50-ISO mit SSIF. Er kodiert einen kurzen, gepackten
 24-fps-Testfilm mit 240 Bildern nach AVC/MVC mit exakt 24000/1001 fps und passend
 verlangsamtem LPCM-Ton. Er kontrolliert anschließend die ISO-Struktur, die
-Bildanzahl, Zeitstempel, Farbangaben, Ton und beide wieder dekodierten Augenbilder.
+Bildanzahl, Zeitstempel, Farbangaben, Ton und beide wieder dekodierten Halbbilder.
 Die daraus entwickelte Exportstrecke ist als **BD-3D · 1080p** integriert und wird
 im Windows-Build zusätzlich als ISO und M2TS geprüft. Praktische Zielplayer-Tests
 ergänzen die technischen Prüfungen.
@@ -227,11 +228,14 @@ vom Quellnamen abgeleitet und ist editierbar; er bestimmt auch den Ausgabenamen.
 Bei M2TS gibt es kein Disc-Dateisystem; die Titelangabe benennt dort die Datei.
 Ein Disc-Label wird je nach Player angezeigt, es ist keine eingeblendete Titelseite.
 
-Diese erste Freigabe nimmt SDR-Quellen in Full-/Half-SBS oder Full-/Half-OU mit
-**konstanten 23,976 oder exakt 24 fps** an. 23,976 bleibt unverändert; 24 fps werden
-mit allen Bildern um 0,1 % verlangsamt, der Ton wird unter Erhalt der Tonhöhe angepasst.
-Andere Bildraten, variable Bildzeiten und Bildlücken werden mit einem klaren Grund
-blockiert. Das Verfahren fügt keine Bilder hinzu und lässt keine aus.
+Der BD-3D-Export nimmt progressive SDR-Stereoquellen mit konstanter Quellbildrate
+an. **23,976 fps** bleiben unverändert; **24 fps** werden mit allen Bildern um
+0,1 % verlangsamt, der Ton wird unter Erhalt der Tonhöhe angepasst. Andere Raten
+werden direkt vor der einzigen MVC-Kodierung auf 23,976 fps angepasst: Ganze
+Stereobildpaare werden ausgelassen oder wiederholt, Laufzeit und Ton bleiben
+erhalten. Bewegungen können dabei ungleichmäßiger werden; Testen zeigt einen
+entsprechenden Hinweis. Keine automatische Bewegungsinterpolation. Variable
+Bildzeiten, Interlacing und Bildlücken bleiben bis zu geprüften Regeln blockiert.
 
 FRIM 1.31 verwendet das mitgelieferte Software-SDK; Intel-Grafik, Treiberinstallation,
 AVISynth oder Netzwerkzugang werden für diesen FFmpeg-Eingabepfad nicht benötigt.
@@ -251,3 +255,31 @@ dekodiert und bitgenau miteinander verglichen. Bei ISO wird der tatsächliche SS
 Prüfdaten werden im Ausgabeordner temporär angelegt und bei Erfolg/Abbruch entfernt.
 Es wird ausreichend freier Platz geprüft; es gibt keine automatische Disc-Aufteilung.
 Die technische Prüfung ersetzt keine formale Blu-ray-Zertifizierung.
+
+
+## MVC und MV-HEVC als Quelle
+
+Automatisch erkennt MVC anhand der tatsächlichen NAL-Erweiterungen und MV-HEVC
+anhand der beiden vom Decoder gemeldeten Ansichten. Manuelle Einträge
+**MVC / Blu-ray 3D** und **MV-HEVC** prüfen ebenfalls den Bitstream.
+
+- MVC: Progressive 8-Bit-4:2:0-Stereoquellen in M2TS/TS/SSIF und einer kombinierten
+  MKV/MP4-Videospur. Der portable edge264-mvc-Decoder benötigt keinen Frameserver;
+  FRIM wird bei unterstützbaren Decoder-Lücken als geprüfter Windows-Fallback verwendet.
+  Die Basisansicht wird als links interpretiert; bei rechts kodierter Basisansicht
+  muss L/R tauschen gewählt werden. Ursprüngliche CFR-Paketbildzeiten werden vollständig geprüft.
+- Blu-ray-3D-ISO: Unverschlüsselte UDF-2.50-Discs mit einer vollständigen
+  einzelnen SSIF-Filmdatei. Die längste Film-Playlist wird gewählt und genannt.
+  Seamless Branching, alternative Blickwinkel und Clip-Ausschnitte bleiben blockiert.
+- MV-HEVC: FFmpeg 7.1.1 dekodiert beide ausdrücklich als links/rechts
+  gekennzeichneten Ansichten. Die Basisansicht kann rechts oder links sein.
+  Beide Bildzeitfolgen müssen zusammenpassen. SDR einschließlich 10-Bit-Quellen
+  folgt dem bestehenden Farbpfad; HDR und immersive Projektionen bleiben blockiert.
+
+Die Ausgabe verwendet die vorhandenen SBS/OU-, Mono-, Anaglyphen- und BD-3D-Ziele.
+Blu-ray-LPCM wird für MKV verlustfrei in FLAC gewandelt; andere freigegebene
+Audiospuren werden kopiert. Für MP4 bleibt die vorhandene Audio-Kompatibilitätsprüfung
+aktiv. Nur Framerate ändern erhält weiterhin gepackte Quellen.
+
+MV-HEVC-Ausgabe für Apple-Geräte ist ein späteres eigenes Ausgabeziel. Beliebigem
+Stereomaterial werden keine erfundenen Spatial-Video-Kamerametadaten beigefügt.

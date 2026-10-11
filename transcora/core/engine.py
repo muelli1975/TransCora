@@ -191,7 +191,11 @@ class Plan:
             target = frame_rate(self.options.target_fps)
             timing = f" → {float(target):.3f} fps ({target}) · Laufzeit unverändert"
         if self.options.target == "bd3d":
-            timing = " → 23,976 fps (24000/1001) · Alle Bilder bleiben erhalten"
+            from .bd3d import prepare, BD_RATE
+            config = prepare(video, self.layout, self.swap)
+            timing = " → 23,976 fps (24000/1001) · " + (
+                "Alle Bilder bleiben erhalten" if config.source_rate in {BD_RATE, Fraction(24)}
+                else "Bildpaare auslassen/wiederholen · Laufzeit erhalten")
         codec = "AVC/MVC" if self.options.target == "bd3d" else self.options.codec.upper()
         return (f"{video['width']} × {video['height']} · {video.get('codec_name', '?')} · "
                 f"{fps} fps ({rate}){timing} → {self.size[0]} × {self.size[1]} · "
@@ -310,7 +314,8 @@ def plan_job(tools: Toolchain, job: Job, output_root: Path, reserved: set[str],
     if options.method not in catalog:
         raise ValueError("Anaglyphenverfahren nicht im geprüften Batch-Katalog.")
     before = job.source.stat() if job.source.is_file() else None
-    info = probe(tools, job.source, cancel)
+    from .multiview import inspect_source, graph_prefix
+    info = inspect_source(tools, job.source, cancel, options.layout)
     after = job.source.stat()
     if not before or (before.st_mtime_ns, before.st_size) != (after.st_mtime_ns, after.st_size):
         raise ValueError("Die Quelldatei wurde während der Prüfung geändert.")
@@ -337,9 +342,21 @@ def plan_job(tools: Toolchain, job: Job, output_root: Path, reserved: set[str],
             raise
         hint = None
         hint_warning = str(error) + " Manuelle Quellinterpretation verwendet."
-    metadata = metadata_layout(video)
+    multiview = info.get('multiview')
+    metadata = None if multiview else metadata_layout(video)
     warnings = [hint_warning] if hint_warning else []
-    if options.layout == "auto":
+    if multiview:
+        if options.layout not in {'auto', 'mvc', 'mvhevc'}:
+            raise ValueError('Diese Quelle enthält echte Multiview-Ansichten. Automatisch oder das passende Multiview-Format wählen.')
+        if options.target == 'framerate':
+            raise ValueError('Nur Framerate ändern erhält gepackte SBS/OU-Quellen. Für MVC/MV-HEVC zuerst das gewünschte Ausgabe-Layout wählen.')
+        layout, swap = 'full_sbs', options.swap
+        warnings.append('Zwei vollständige Multiview-Halbbilder werden dekodiert.')
+        if multiview['kind'] == 'mvc':
+            warnings.append('MVC: Basisansicht wird als links verwendet. Bei rechts kodierter Basisansicht L/R tauschen wählen.')
+        if multiview.get('playlist'):
+            warnings.append('Blu-ray-ISO: Längste Film-Playlist '+multiview['playlist']+' ausgewählt.')
+    elif options.layout == "auto":
         if not hint:
             raise ValueError("Full/Half-Layout nicht eindeutig erkennbar. Quelllayout für diese Datei auswählen.")
         layout, swapped = hint
@@ -347,6 +364,8 @@ def plan_job(tools: Toolchain, job: Job, output_root: Path, reserved: set[str],
             raise ValueError("Dateiname und Stereo-Metadaten widersprechen sich. Quelllayout bewusst auswählen.")
         swap = swapped ^ options.swap
     else:
+        if options.layout in {'mvc', 'mvhevc'}:
+            raise ValueError('Die Quelle enthält nicht das gewählte Multiview-Format.')
         layout, swap = options.layout, options.swap
         if hint and hint != (layout, swap):
             warnings.append("Manuell gewähltes Layout/L/R weicht vom Dateinamen ab.")
@@ -388,10 +407,11 @@ def plan_job(tools: Toolchain, job: Job, output_root: Path, reserved: set[str],
         preparation = prepare(video, layout, swap)
         validate_audio(audios)
         warnings.extend(preparation.warnings)
-        warnings.append('BD-3D: Bildzeiten und beide Augenbilder werden beim Export vollständig geprüft. Ton wird verlustfrei als LPCM gespeichert.')
+        warnings.append('BD-3D: Bildzeiten und beide Halbbilder werden beim Export vollständig geprüft. Ton wird als LPCM gespeichert.')
         graph, size, pixel_format = preparation.graph, (1920, 1080), 'yuv420p'
     else:
         graph, size, pixel_format = build_graph(video, options, layout, swap, colors, catalog[options.method])
+    graph = graph_prefix(info, graph)
     output_colors = dict(colors) if options.target == "framerate" else {
         "matrix": "bt709", "primaries": "bt709", "transfer": "bt709", "range": "tv"}
     if output_colors["matrix"] == "gbr":
@@ -416,16 +436,20 @@ def plan_job(tools: Toolchain, job: Job, output_root: Path, reserved: set[str],
             duration = 0.0
     except (ValueError, TypeError):
         pass
-    reason = f"{LAYOUTS[layout]} · " + (f"erkannt am Dateizusatz in {job.source.name}" if options.layout == "auto" else "manuell gewählt")
+    reason = (f"{multiview['kind'].upper()} · Zwei vollständige Ansichten aus dem Bitstream" if multiview else
+              f"{LAYOUTS[layout]} · " + (f"erkannt am Dateizusatz in {job.source.name}" if options.layout == "auto" else "manuell gewählt"))
     return Plan(job.source.resolve(), output, options, info, layout, swap, size, pixel_format, graph, duration, warnings, output_colors, reason)
 
 
 def command(tools: Toolchain, plan: Plan, temporary: Path) -> list[str]:
+    from .multiview import input_args
     options = plan.options
-    args = [str(tools.ffmpeg), "-hide_banner", "-nostdin", "-n", "-loglevel", "warning",
+    mv = plan.info.get('multiview', {}).get('kind') == 'mvhevc'
+    args = [str(tools.ffmpeg), "-hide_banner", "-nostdin", "-n", "-loglevel", "info" if mv else "warning",
+            *(['-xerror', '-err_detect', 'explode'] if mv else []),
             "-progress", "pipe:1", "-stats_period", "0.3",
-            "-protocol_whitelist", "file,pipe", "-noautorotate", "-i", str(plan.source),
-            "-filter_complex", plan.graph, "-map", "[v]", "-map", "0:a?", "-sn", "-dn",
+            "-protocol_whitelist", "file,pipe", "-noautorotate", *input_args(plan),
+            "-filter_complex", plan.graph, "-map", "[v]", "-map", "1:a?" if plan.info.get('runtime_input') else "0:a?", "-sn", "-dn",
             "-map_metadata", "-1", "-c:v", "libx264" if options.codec == "h264" else "libx265",
             "-preset", "slow", "-pix_fmt", plan.pixel_format,
             "-fps_mode", "passthrough", "-enc_time_base", "1/" + str(math.lcm(frame_rate(options.target_fps).numerator,
@@ -437,6 +461,9 @@ def command(tools: Toolchain, plan: Plan, temporary: Path) -> list[str]:
         args += ["-b:v", str(round(options.bitrate_mbps * 1_000_000))]
     else:
         args += ["-crf", str(options.crf)]
+    for index, audio in enumerate(s for s in plan.info['streams'] if s.get('codec_type') == 'audio'):
+        if audio.get('codec_name') == 'pcm_bluray':
+            args += [f'-c:a:{index}', 'flac', f'-sample_fmt:a:{index}', 's32', f'-bits_per_raw_sample:a:{index}', '24']
     layout = {("sbs", False): "left_right", ("sbs", True): "right_left",
               ("ou", False): "top_bottom", ("ou", True): "bottom_top"}.get(plan.stereo, "mono")
     args += ["-metadata:s:v:0", "stereo_mode=" + layout]
@@ -461,7 +488,8 @@ def verify(tools: Toolchain, plan: Plan, path: Path, cancel: threading.Event) ->
     if any(video.get(k) != plan.colors[v] for k, v in (
             ("color_space", "matrix"), ("color_transfer", "transfer"), ("color_primaries", "primaries"), ("color_range", "range"))):
         raise ValueError("Die Farbkennzeichnung der Ausgabe stimmt nicht mit dem Plan überein.")
-    expected_audio = [s.get("codec_name") for s in plan.info["streams"] if s.get("codec_type") == "audio"]
+    expected_audio = [('flac' if s.get('codec_name') == 'pcm_bluray' else s.get('codec_name'))
+                      for s in plan.info['streams'] if s.get('codec_type') == 'audio']
     actual_audio = [s.get("codec_name") for s in info["streams"] if s.get("codec_type") == "audio"]
     if actual_audio != expected_audio:
         raise ValueError("Die Audioübernahme stimmt nicht mit der Quelle überein.")
@@ -514,9 +542,15 @@ def publish_without_overwrite(temporary: Path, destination: Path, cancel: thread
 
 
 def execute(tools: Toolchain, plan: Plan, cancel: threading.Event, emit, log_path: Path) -> None:
+    from .multiview import runtime
+    with runtime(tools, plan, cancel, emit=emit) as (working, decoder):
+        return execute_prepared(tools, working, cancel, emit, log_path, decoder)
+
+
+def execute_prepared(tools: Toolchain, plan: Plan, cancel: threading.Event, emit, log_path: Path, decoder=None) -> None:
     if plan.options.target == 'bd3d':
         from .bd3d_export import export
-        return export(tools, plan, cancel, emit, log_path)
+        return export(tools, plan, cancel, emit, log_path, decoder)
     plan.output.parent.mkdir(parents=True, exist_ok=True)
     temporary = plan.output.with_name("." + plan.output.stem + "." + uuid.uuid4().hex + ".part." + plan.options.container)
     # MKV exposes StereoMode as stream side data. A lossless remux transfers it
@@ -530,6 +564,9 @@ def execute(tools: Toolchain, plan: Plan, cancel: threading.Event, emit, log_pat
     tail = deque(maxlen=24)
     process = None
     readers = []
+    from .multiview import PairClock, check_decoder
+    pair_clock = PairClock() if plan.info.get('multiview', {}).get('kind') == 'mvhevc' else None
+    errors = []
     with log_path.open("a", encoding="utf-8") as log:
         log.write("\n" + json.dumps({"source": str(plan.source), "output": str(plan.output),
                   "options": vars(plan.options), "warnings": plan.warnings, "args": args}, ensure_ascii=False) + "\n")
@@ -540,10 +577,16 @@ def execute(tools: Toolchain, plan: Plan, cancel: threading.Event, emit, log_pat
             stat = plan.source.stat()
             if (stat.st_mtime_ns, stat.st_size) != (plan.info["source_mtime_ns"], plan.info["source_size"]):
                 raise ValueError("Quelle seit der Prüfung geändert. Erneut prüfen.")
-            process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            process = subprocess.Popen(args, stdin=decoder.stdout if decoder else None, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                        text=True, encoding="utf-8", errors="replace", bufsize=1, **process_options())
             def read_errors():
                 for line in process.stderr:
+                    if pair_clock:
+                        try:
+                            if pair_clock.line(line):
+                                continue
+                        except ValueError as error:
+                            errors.append(error)
                     tail.append(line.strip())
                     log.write(line)
             def read_progress():
@@ -565,6 +608,8 @@ def execute(tools: Toolchain, plan: Plan, cancel: threading.Event, emit, log_pat
             for reader in readers:
                 reader.start()
             while process.poll() is None:
+                if errors:
+                    raise errors[0]
                 if cancel.wait(.1):
                     stop_process(process)
                     break
@@ -574,6 +619,12 @@ def execute(tools: Toolchain, plan: Plan, cancel: threading.Event, emit, log_pat
                 raise Cancelled()
             if process.returncode:
                 raise ValueError("FFmpeg: " + "\n".join(tail)[-3500:])
+            if errors:
+                raise errors[0]
+            check_decoder(decoder, cancel)
+            if pair_clock:
+                expected = plan.info['multiview']['original_video'].get('nb_frames')
+                pair_clock.finish(int(expected) if expected and expected.isdigit() else None)
             if encoded != temporary:
                 emit("phase", "MP4-3D-Kennzeichnung schreiben" if plan.stereo else "MP4-Bildzeiten schreiben")
                 remux = [str(tools.ffmpeg), "-v", "error", "-nostdin", "-n", "-i", str(encoded),
@@ -611,9 +662,33 @@ def execute(tools: Toolchain, plan: Plan, cancel: threading.Event, emit, log_pat
 def preview(tools: Toolchain, plan: Plan, cancel: threading.Event, seconds: float = 0) -> bytes:
     if not math.isfinite(seconds) or seconds < 0 or (plan.duration and seconds >= plan.duration):
         raise ValueError("Zeitstelle liegt außerhalb des Videos.")
-    graph = plan.graph + (";[right]nullsink;[left]null[v]" if plan.options.target == "bd3d" else "") + ";[v]scale=640:360:force_original_aspect_ratio=decrease:flags=lanczos,format=rgb24[preview]"
-    return capture([str(tools.ffmpeg), "-hide_banner", "-loglevel", "error", "-nostdin",
-                    "-protocol_whitelist", "file,pipe", "-noautorotate",
-                    "-ss", str(seconds), "-i", str(plan.source), "-filter_complex", graph,
-                    "-map", "[preview]", "-frames:v", "1", "-c:v", "png", "-threads", "1",
-                    "-f", "image2pipe", "pipe:1"], cancel, timeout=60)
+    from .multiview import runtime, input_args
+    with runtime(tools, plan, cancel, seconds) as (working, decoder):
+        graph = working.graph + (";[right]nullsink;[left]null[v]" if plan.options.target == "bd3d" else "") + ";[v]scale=640:360:force_original_aspect_ratio=decrease:flags=lanczos,format=rgb24[preview]"
+        if working.info.get('preview_trim'):
+            index = working.info['video']['index']
+            graph = graph.replace(f'[0:{index}]', f"[0:{index}]trim=start_frame={working.info['preview_trim']},", 1)
+        args = [str(tools.ffmpeg), "-hide_banner", "-loglevel", "error", "-nostdin",
+                "-protocol_whitelist", "file,pipe", "-noautorotate", *input_args(working, seconds=seconds),
+                "-filter_complex", graph, "-map", "[preview]", "-frames:v", "1", "-c:v", "png", "-threads", "1",
+                "-f", "image2pipe", "pipe:1"]
+        if not decoder:
+            return capture(args, cancel, timeout=60)
+        process = subprocess.Popen(args, stdin=decoder.stdout, stdout=subprocess.PIPE, stderr=subprocess.PIPE, **process_options())
+        try:
+            start = time.monotonic()
+            while True:
+                if cancel.is_set():
+                    raise Cancelled()
+                if time.monotonic()-start > 60:
+                    raise ValueError('Kontrollbild: Dekodierung dauert zu lange.')
+                try:
+                    out, err = process.communicate(timeout=.15)
+                    break
+                except subprocess.TimeoutExpired:
+                    continue
+            if process.returncode:
+                raise ValueError(err.decode('utf-8', 'replace')[-3500:])
+            return out
+        finally:
+            stop_process(process)
