@@ -66,6 +66,8 @@ class ImageTests(unittest.TestCase):
     def test_orientation_dates_icc_jpeg_sampling_and_lossless_formats(self):
         source = self.folder/'photo.jpg'; exif = Image.Exif(); exif[274] = 6; exif[36867] = '2016:08:19 22:10:11'
         self.left.save(source, exif=exif, quality=95)
+        capture(exiftool()+['-overwrite_original', '-EXIF:ColorSpace#=65535',
+                            '-EXIF:ExifImageWidth=128', '-EXIF:ExifImageHeight=72', str(source)])
         for format in ('jpeg', 'png', 'tiff', 'webp'):
             plan = self.run_job(source, ImageOptions(format=format, layout='mono', long_edge=64))
             with Image.open(plan.outputs[0]) as image:
@@ -77,6 +79,10 @@ class ImageTests(unittest.TestCase):
             tags = json.loads(capture(exiftool()+['-j', '-DateTimeOriginal', '-ThumbnailImage', '-PreviewImage', str(plan.outputs[0])]))[0]
             self.assertEqual(tags.get('DateTimeOriginal'), '2016:08:19 22:10:11')
             self.assertNotIn('ThumbnailImage', tags); self.assertNotIn('PreviewImage', tags)
+            dimensions = json.loads(capture(exiftool()+['-j', '-n', '-EXIF:ColorSpace',
+                '-ExifImageWidth', '-ExifImageHeight', str(plan.outputs[0])]))[0]
+            self.assertEqual(dimensions['ColorSpace'], 1)
+            self.assertEqual((dimensions['ExifImageWidth'], dimensions['ExifImageHeight']), (36, 64))
             self.assertEqual(plan.outputs[0].stat().st_mtime_ns, source.stat().st_mtime_ns)
 
     def test_image_lists_collision_and_cancel(self):

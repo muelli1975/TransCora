@@ -341,10 +341,17 @@ def copy_metadata(source, target, cancel, *, oriented=True):
     # Structural tags and embedded source previews must describe the new pixels.
     with Image.open(source) as original:
         orientation = 1 if oriented else original.getexif().get(274, 1)
+    with Image.open(target) as rendered:
+        width, height = rendered.size
     args = exiftool()+['-overwrite_original', '-TagsFromFile', str(source), '-EXIF:all', '-XMP:all', '-IPTC:all',
         '-Orientation#='+str(orientation), '-ThumbnailImage=', '-PreviewImage=', '-JpgFromRaw=', '-OtherImage=',
-        '-IFD1:all=', '-MakerNotes:all=', '-MPF:all=', '-ExifImageWidth=', '-ExifImageHeight=',
-        '-XMP-tiff:ImageWidth=', '-XMP-tiff:ImageHeight=', str(target)]
+        '-IFD1:all=', '-MakerNotes:all=', '-MPF:all=', f'-EXIF:ExifImageWidth={width}', f'-EXIF:ExifImageHeight={height}',
+        '-XMP-tiff:ImageWidth=', '-XMP-tiff:ImageHeight=']
+    if oriented:
+        # Transformed pixels carry an sRGB ICC profile. Source EXIF may instead
+        # name Adobe RGB or an uncalibrated space; it must describe the output.
+        args += ['-EXIF:ColorSpace#=1']
+    args.append(str(target))
     capture(args, cancel, timeout=120)
 
 
