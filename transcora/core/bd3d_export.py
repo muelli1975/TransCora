@@ -296,7 +296,9 @@ def export(tools, plan, cancel, emit, log_path, decoder=None):
             raise ValueError('BD-3D: Laufzeit für die Platzprüfung fehlt.')
         estimated_frames = max(2, round(duration*float(BD_RATE)))
         # Compressed views, audio, mux, extracted SSIF and demux; no raw video files.
-        required = duration*(40000*1000/8*4 + sum(channels(s, plan.options)*48000*3 for s in audios)) + 256*1024*1024
+        audio_copies = 3 if plan.options.container == 'iso' else 2
+        required = duration*(40000*1000/8*4 + audio_copies*sum(
+            channels(s, plan.options)*48000*3 for s in audios)) + 256*1024*1024
         if shutil.disk_usage(folder).free < required:
             raise ValueError(f'BD-3D: Für Ausgabe und Prüfdaten werden ungefähr {required/1024**3:.1f} GB freier Platz benötigt.')
         emit('progress', {'percent': 5, 'seconds': 0})

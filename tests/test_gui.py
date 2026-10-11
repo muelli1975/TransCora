@@ -282,6 +282,7 @@ class GuiTests(unittest.TestCase):
         self.assertEqual(self.window.speed.get(), '')
         self.assertEqual(self.window.elapsed.get(), 'Restzeit: —')
         self.assertEqual(str(self.window.progress.cget('mode')), 'indeterminate')
+        self.window.set_busy(False)
 
     def test_log_has_dark_surfaces_and_scrollbar(self):
         self.window.show_log()

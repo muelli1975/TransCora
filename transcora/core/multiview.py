@@ -291,7 +291,7 @@ def inspect_source(tools, source, cancel=None, explicit='auto', phase=None):
             desc = {'kind': 'mvhevc', 'source_index': video['index']}
         elif video.get('codec_name') == 'h264':
             if phase:
-                phase('MVC-Kennzeichnung und beide Halbbilder prüfen')
+                phase('MVC-Kennzeichnung der Quelle prüfen')
             if len(videos) > 1:
                 if len(videos) != 2 or any(v.get('codec_name') != 'h264' for v in videos):
                     raise ValueError('MVC: Keine eindeutige AVC/MVC-Spurkombination.')
@@ -322,6 +322,8 @@ def inspect_source(tools, source, cancel=None, explicit='auto', phase=None):
                 except (KeyError, ValueError, ZeroDivisionError):
                     raise ValueError('MVC: Verlässliche Quellframerate fehlt.') from None
                 try:
+                    if phase:
+                        phase('MVC-Decoder an beiden Halbbildern testen')
                     tested = json.loads(capture([str(decoder()), str(base), str(dep) if dep else '-',
                         str(rate.numerator), str(rate.denominator), '0', '0', '1'], cancel, timeout=120))
                     desc['decoder'] = 'edge264-mvc'

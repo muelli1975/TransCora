@@ -1038,7 +1038,7 @@ class Window:
                         widgets = {viewer.time_entry, viewer.scale}
                         self.controls = [(widget, state) for widget, state in self.controls if widget not in widgets]
                         self.controls.extend(viewer.controls())
-                        image = tk.PhotoImage(data=base64.b64encode(png))
+                        image = tk.PhotoImage(master=viewer.dialog, data=base64.b64encode(png))
                         viewer.image_label.configure(image=image, text="")
                         viewer.image_label.image = image
                 elif kind == "sound":
