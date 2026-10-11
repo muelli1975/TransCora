@@ -24,7 +24,9 @@ def main():
                         ignore=shutil.ignore_patterns('__pycache__', '*.pyc'), dirs_exist_ok=True)
     for name in ('.gitattributes', 'run_transcora.py', 'requirements-build.txt', 'BUILD.md', 'LICENSE', 'README.md', 'README_DE.md', 'THIRD_PARTY.md'):
         shutil.copy2(root/name, output/'source'/name)
-    python_license = next((p for p in (Path(sys.base_prefix)/'LICENSE.txt', Path(sys.base_prefix)/'LICENSE') if p.is_file()), None)
+    python_license = next((p for p in (Path(sys.base_prefix)/'LICENSE.txt', Path(sys.base_prefix)/'LICENSE',
+                            Path(sys.base_prefix)/'lib'/f'python{sys.version_info.major}.{sys.version_info.minor}'/'LICENSE.txt')
+                            if p.is_file()), None)
     if python_license is None:
         raise ValueError('Python license missing from the build installation')
     shutil.copy2(python_license, output/'licenses/PYTHON.txt')
