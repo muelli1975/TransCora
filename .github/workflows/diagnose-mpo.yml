@@ -22,7 +22,6 @@ jobs:
           from transcora.core.images import inspect, mpo_jpegs
           samples = {
               "pillow-fujifilm": "https://raw.githubusercontent.com/python-pillow/Pillow/11.3.0/Tests/images/fujifilm.mpo",
-              "gimp-sample1": "https://raw.githubusercontent.com/ksashikumar/file-mpo/master/sample1.mpo",
               "gimp-sample2": "https://raw.githubusercontent.com/ksashikumar/file-mpo/master/sample2.mpo",
           }
           for name, url in samples.items():
