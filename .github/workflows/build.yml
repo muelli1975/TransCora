@@ -161,7 +161,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y ffmpeg xvfb perl
       - name: Install macOS video tools
         if: runner.os == 'macOS'
-        run: brew install ffmpeg-full
+        run: brew install ffmpeg@7
       - name: Prepare image tools
         run: |
           python scripts/build_cielab.py

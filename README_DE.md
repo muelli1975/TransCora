@@ -18,7 +18,7 @@ Lade ein Paket unter [Releases](https://github.com/muelli1975/TransCora/releases
 | Linux x64 | `TransCora_1.0_Linux_x64.tar.gz` | `./TransCora` |
 | macOS Apple Silicon | `TransCora_1.0_macOS_AppleSilicon.tar.gz` | `TransCora.app` |
 
-Windows enthÃ¤lt Python, FFmpeg und die BD-3D-Werkzeuge. Linux und macOS enthalten die Programmlaufzeit und Bildwerkzeuge; **FFmpeg einschlieÃŸlich ffprobe und System-Perl mÃ¼ssen separat installiert sein**. Unter Ubuntu/Debian: `sudo apt install ffmpeg perl`. Mit Homebrew unter macOS: `brew install ffmpeg-full`. Das macOS-Paket ist nicht notarisiert.
+Windows enthÃ¤lt Python, FFmpeg und die BD-3D-Werkzeuge. Linux und macOS enthalten die Programmlaufzeit und Bildwerkzeuge; **FFmpeg einschlieÃŸlich ffprobe und System-Perl mÃ¼ssen separat installiert sein**. Unter Ubuntu/Debian: `sudo apt install ffmpeg perl`. Mit Homebrew unter macOS: `brew install ffmpeg@7`. Das macOS-Paket ist nicht notarisiert.
 
 Halte den gesamten Programmordner zusammen. Eine eigene Python-Installation ist fÃ¼r diese Pakete nicht nÃ¶tig. BD-3D-Kodierung ist im Windows-Paket verfÃ¼gbar. Das Linux-Paket enthÃ¤lt zusÃ¤tzlich den MVC-Decoder; das Apple-Silicon-Paket unterstÃ¼tzt derzeit gepacktes Stereo und normale Videos, ohne MVC-Decoder.
 

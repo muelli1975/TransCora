@@ -18,7 +18,7 @@ Download a package from [Releases](https://github.com/muelli1975/TransCora/relea
 | Linux x64 | `TransCora_1.0_Linux_x64.tar.gz` | `./TransCora` |
 | macOS Apple Silicon | `TransCora_1.0_macOS_AppleSilicon.tar.gz` | `TransCora.app` |
 
-Windows includes Python, FFmpeg and the BD-3D tools. Linux and macOS include the application runtime and image tools; **FFmpeg with ffprobe and system Perl must be installed separately**. On Ubuntu/Debian: `sudo apt install ffmpeg perl`. On macOS with Homebrew: `brew install ffmpeg-full`. macOS packages are not notarised.
+Windows includes Python, FFmpeg and the BD-3D tools. Linux and macOS include the application runtime and image tools; **FFmpeg with ffprobe and system Perl must be installed separately**. On Ubuntu/Debian: `sudo apt install ffmpeg perl`. On macOS with Homebrew: `brew install ffmpeg@7`. macOS packages are not notarised.
 
 Keep the supplied application files and tools together. No separate Python installation is needed for these packages. Blu-ray 3D encoding is available in the Windows package. The Linux package also includes the MVC reader; the Apple Silicon package currently supports packed stereo and ordinary video input, without an MVC reader.
 
