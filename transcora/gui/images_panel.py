@@ -16,7 +16,7 @@ from transcora.core.engine import Cancelled, methods
 from transcora.core.model import app_root, ROW_ORDERS
 from transcora.core.storage import write_json, new_run_log, validate_preset_name
 from transcora.core.toolchain import Toolchain
-from .theme import GOLD_LIGHT, MUTED, SECONDARY_BG, TEXT
+from .theme import checkbox, GOLD_LIGHT, MUTED, SECONDARY_BG, TEXT
 from .native import schedule_dark_titlebar
 from .localization import TextVar
 
@@ -87,7 +87,7 @@ class ImagePanel:
                 self.combos[key] = combo; self.controls.append((combo, 'readonly'))
         for col, key, label in [(0, 'swap', 'L/R tauschen'), (1, 'metadata', 'Metadaten übernehmen')]:
             var = tk.BooleanVar(value=getattr(self.defaults, key)); self.variables[key] = var
-            check = ttk.Checkbutton(fields, text=label, variable=var, command=lambda k=key: self.changed(k))
+            check = checkbox(fields, text=label, variable=var, command=lambda k=key: self.changed(k))
             check.grid(row=2, column=col, sticky='w', pady=7); self.controls.append((check, 'normal'))
             self.combos[key] = check
         size = ttk.Frame(fields); size.grid(row=2, column=2, sticky='ew', padx=(0, 8))
@@ -135,7 +135,7 @@ class ImagePanel:
         ttk.Label(row, text='Ausgabeordner').grid(row=0, column=0, padx=(0, 8))
         entry = ttk.Entry(row, textvariable=self.output); entry.grid(row=0, column=1, sticky='ew'); self.controls.append((entry, 'normal'))
         self.button(row, '…', self.choose_output, width=4).grid(row=0, column=2, padx=(6, 0))
-        check = ttk.Checkbutton(box, text='Unterordner mitverarbeiten und Struktur beibehalten', variable=self.recursive)
+        check = checkbox(box, text='Unterordner mitverarbeiten und Struktur beibehalten', variable=self.recursive)
         check.grid(row=6, column=0, sticky='w'); self.controls.append((check, 'normal'))
         self.detail = TextVar(owner.localizer, value='Dateien hinzufügen oder eine gespeicherte Liste laden.')
         ttk.Label(box, textvariable=self.detail, foreground=MUTED, wraplength=740).grid(row=7, column=0, sticky='ew', pady=6)

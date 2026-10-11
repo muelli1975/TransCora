@@ -293,15 +293,25 @@ class GuiTests(unittest.TestCase):
             self.window.save()
             dialog.assert_not_called()
 
-    def test_shared_checkbox_keeps_full_label_and_keyboard_toggle(self):
+    def test_shared_checkbox_widget_label_and_disabled_toggle(self):
+        import customtkinter as ctk
         check = self.window.recursive_control
+        self.assertIsInstance(check, ctk.CTkCheckBox)
+        self.assertEqual(check.cget('checkbox_width'), 24)
+        self.assertEqual(check.cget('corner_radius'), 4)
         self.assertEqual(check.cget('text'), 'Unterordner mitverarbeiten')
         self.assertEqual(self.window.profile_caption.get(), 'Anaglyph-Ausgabeprofil')
         before = self.window.recursive.get()
-        check.invoke()
+        check.toggle()
         self.assertNotEqual(self.window.recursive.get(), before)
-        check.state(['disabled'])
-        check.invoke()
+        self.window.language = 'en'
+        self.window.apply_language()
+        self.assertEqual(check.cget('text'), 'Include subfolders')
+        self.window.language = 'de'
+        self.window.apply_language()
+        self.assertEqual(check.cget('text'), 'Unterordner mitverarbeiten')
+        check.configure(state='disabled')
+        check.toggle()
         self.assertNotEqual(self.window.recursive.get(), before)
 
     def test_displayed_original_dimensions_follow_checked_source_and_mixed_values(self):

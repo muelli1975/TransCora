@@ -22,7 +22,7 @@ from transcora.core.storage import load_list, save_list, write_json, new_run_log
 from transcora.core.toolchain import Toolchain
 from transcora.gui.native import schedule_dark_titlebar
 from transcora.gui.preview_window import PreviewWindow
-from transcora.gui.theme import apply_theme, GOLD_LIGHT, MUTED, TEXT, PANEL_BG, APP_BG, SECONDARY_BG, BORDER
+from transcora.gui.theme import checkbox, apply_theme, GOLD_LIGHT, MUTED, TEXT, PANEL_BG, APP_BG, SECONDARY_BG, BORDER
 
 
 STATUS = {"queued": "Wartet", "checking": "Prüfung", "ready": "Bereit", "blocked": "Prüfen!",
@@ -230,7 +230,7 @@ class Window:
             self.combos[key] = widget
         combo(fields, 0, 0, "layout", "Quelllayout")
         self.variables["swap"] = tk.BooleanVar(value=self.defaults.swap)
-        swap = ttk.Checkbutton(fields, text="L/R tauschen", variable=self.variables["swap"], command=lambda: self.option_changed("swap"))
+        swap = checkbox(fields, text="L/R tauschen", variable=self.variables["swap"], command=lambda: self.option_changed("swap"))
         swap.grid(row=0, column=1, sticky="sw", padx=(0, 8), pady=5)
         self.swap_control = swap
         self.controls.append((swap, "normal"))
@@ -292,7 +292,7 @@ class Window:
         folder_checks = ttk.Frame(output)
         folder_checks.grid(row=0, column=3, sticky="w", padx=(10, 0))
         self.recursive = tk.BooleanVar(value=self.recursive_value)
-        check = ttk.Checkbutton(folder_checks, text="Unterordner mitverarbeiten", variable=self.recursive)
+        check = checkbox(folder_checks, text="Unterordner mitverarbeiten", variable=self.recursive)
         self.recursive_control = check
         check.pack(side="left", padx=(0, 10))
         self.controls.append((check, "normal"))

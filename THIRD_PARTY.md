@@ -5,6 +5,10 @@ licensed components. The MIT license does not replace their terms.
 
 ## Pillow and ExifTool
 
+The shared Stereo Tools checkbox uses CustomTkinter 5.2.2 (MIT), with darkdetect
+0.8.0 (BSD) and packaging (Apache-2.0/BSD). The package includes their installed
+license notices under `licenses/` and CustomTkinter's fonts and themes.
+
 Still-image loading, MPO indexing, EXIF orientation, ICC colour handling and
 JPEG encoding use Pillow 11.3.0. FFmpeg performs the stereo/layout/matrix transforms.
 The portable package retains Pillow's license and bundled library notices under

@@ -2,6 +2,7 @@
 import tkinter as tk
 from tkinter import ttk
 import weakref
+import customtkinter as ctk
 from transcora.i18n import translate
 
 
@@ -52,7 +53,9 @@ class Localizer:
                 if value != current:
                     setter(value)
                 saved[key] = (source, value)
-            if isinstance(widget, (ttk.Label, ttk.Button, ttk.Checkbutton, ttk.Radiobutton, ttk.Menubutton, ttk.LabelFrame)):
+            if isinstance(widget, ctk.CTkCheckBox):
+                option('text', str(widget.cget('text')), lambda value: widget.configure(text=value))
+            elif isinstance(widget, (ttk.Label, ttk.Button, ttk.Checkbutton, ttk.Radiobutton, ttk.Menubutton, ttk.LabelFrame)):
                 if not ('textvariable' in widget.keys() and widget.cget('textvariable')):
                     option('text', str(widget.cget('text')), lambda value: widget.configure(text=value))
             if isinstance(widget, tk.Toplevel):
