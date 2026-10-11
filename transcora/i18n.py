@@ -984,7 +984,7 @@ EN = {'\nFehler: {0}\n{1}\n': '\nError: {0}\n{1}\n',
                                                                                   'contrast'}
 
 EN.update({
-    'Restzeit (aktueller Schritt): -': 'Time remaining (current step): -',
+    'Restzeit (aktueller Schritt): —': 'Time remaining (current step): —',
     'Restzeit (aktueller Schritt): ca. {0}': 'Time remaining (current step): approx. {0}',
     '1080p · 23,976 fps · AVC/MVC · Hohe Qualität.': '1080p · 23.976 fps · AVC/MVC · High quality.',
     'Video und Ton um 0,1 % verlangsamen': 'Slow video and audio by 0.1%',

@@ -899,7 +899,7 @@ class Window:
         self.elapsed_time.set('Vergangene Zeit: ' + PreviewWindow.time_text(max(0, now-self.run_started)))
         prefix = 'Restzeit (aktueller Schritt): ' if self.remaining_scope == 'phase' else 'Restzeit: '
         if self.estimated_finish is None or now-(self.estimate_updated or now) > 15:
-            self.elapsed.set(prefix + '-')
+            self.elapsed.set(prefix + '—')
         else:
             remaining = max(1, self.estimated_finish-now)
             self.elapsed.set(prefix + 'ca. ' + PreviewWindow.time_text(remaining))
