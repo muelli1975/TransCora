@@ -8,7 +8,7 @@ import threading
 import time
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
-from PIL import Image, ImageTk
+from PIL import Image, ImageTk, ImageOps
 
 from transcora.core.images import (ImageJob, ImageOptions, EXTENSIONS, TASKS, LAYOUTS, TARGETS, FORMATS,
     plans, execute_image, save_images, load_images, SIZES, SIZE_EDGES, image_methods)
@@ -16,7 +16,7 @@ from transcora.core.engine import Cancelled, methods
 from transcora.core.model import app_root, ROW_ORDERS
 from transcora.core.storage import write_json, new_run_log, validate_preset_name
 from transcora.core.toolchain import Toolchain
-from .theme import GOLD_LIGHT, MUTED, SECONDARY_BG, TEXT
+from .theme import checkbox, set_control_state, GOLD_LIGHT, MUTED, SECONDARY_BG, TEXT
 from .native import schedule_dark_titlebar
 from .localization import TextVar
 
@@ -87,8 +87,9 @@ class ImagePanel:
                 self.combos[key] = combo; self.controls.append((combo, 'readonly'))
         for col, key, label in [(0, 'swap', 'L/R tauschen'), (1, 'metadata', 'Metadaten übernehmen')]:
             var = tk.BooleanVar(value=getattr(self.defaults, key)); self.variables[key] = var
-            check = ttk.Checkbutton(fields, text=label, variable=var, command=lambda k=key: self.changed(k))
+            check = checkbox(fields, text=label, variable=var, command=lambda k=key: self.changed(k))
             check.grid(row=2, column=col, sticky='w', pady=7); self.controls.append((check, 'normal'))
+            self.combos[key] = check
         size = ttk.Frame(fields); size.grid(row=2, column=2, sticky='ew', padx=(0, 8))
         ttk.Label(size, text='Größe').pack(anchor='w')
         self.mappings['size_mode'] = SIZES; self.mappings['size_edge'] = SIZE_EDGES
@@ -96,8 +97,8 @@ class ImagePanel:
         size_combo = ttk.Combobox(size, textvariable=self.variables['size_mode'], values=[self.t(v) for v in SIZES.values()], state='readonly')
         size_combo.pack(fill='x'); size_combo.bind('<<ComboboxSelected>>', lambda e: self.changed('size_mode'))
         self.combos['size_mode'] = size_combo; self.controls.append((size_combo, 'readonly'))
-        self.custom_size = ttk.Frame(fields)
-        self.custom_size.grid(row=3, column=0, columnspan=3, sticky='ew', pady=(2, 4))
+        self.custom_size = ttk.Frame(size)
+        self.custom_size.pack(fill='x', pady=(4, 0))
         self.variables['size_edge'] = tk.StringVar(value=self.t(SIZE_EDGES[self.defaults.size_edge]))
         edge = ttk.Combobox(self.custom_size, textvariable=self.variables['size_edge'], values=[self.t(v) for v in SIZE_EDGES.values()], state='readonly', width=16)
         edge.pack(side='left'); edge.bind('<<ComboboxSelected>>', lambda e: self.changed('size_edge'))
@@ -125,6 +126,7 @@ class ImagePanel:
                 self.controls.append((control, 'readonly'))
             else:
                 control = ttk.Entry(cell, textvariable=self.variables[key], width=8)
+                self.combos[key] = control
                 for event in ('<FocusOut>', '<Return>'):
                     control.bind(event, lambda e, k=key: self.changed(k))
                 self.controls.append((control, 'normal'))
@@ -133,9 +135,9 @@ class ImagePanel:
         ttk.Label(row, text='Ausgabeordner').grid(row=0, column=0, padx=(0, 8))
         entry = ttk.Entry(row, textvariable=self.output); entry.grid(row=0, column=1, sticky='ew'); self.controls.append((entry, 'normal'))
         self.button(row, '…', self.choose_output, width=4).grid(row=0, column=2, padx=(6, 0))
-        check = ttk.Checkbutton(box, text='Unterordner mitverarbeiten und Struktur beibehalten', variable=self.recursive)
+        check = checkbox(box, text='Unterordner mitverarbeiten und Struktur beibehalten', variable=self.recursive)
         check.grid(row=6, column=0, sticky='w'); self.controls.append((check, 'normal'))
-        self.detail = TextVar(owner.localizer, value='MPO-Teilung erhält die komprimierten Bilddaten unverändert.')
+        self.detail = TextVar(owner.localizer, value='Dateien hinzufügen oder eine gespeicherte Liste laden.')
         ttk.Label(box, textvariable=self.detail, foreground=MUTED, wraplength=740).grid(row=7, column=0, sticky='ew', pady=6)
         actions = ttk.Frame(box); actions.grid(row=8, column=0, sticky='ew')
         self.button(actions, 'Testen', lambda: self.run(False), style='Primary.TButton').pack(side='left')
@@ -196,24 +198,54 @@ class ImagePanel:
                 job.options = updated(job.options); job.status = 'queued'; job.detail = 'Einstellungen geändert; erneut testen.'
             self.refresh(); self.selection_changed()
         except (ValueError, StopIteration) as error:
+            if key in {'size_pixels', 'screen_width', 'screen_height'}:
+                self.status.set(str(error))
+                (self.size_entry if key == 'size_pixels' else self.combos[key]).focus_set()
+                return
             messagebox.showerror(self.t('Bildeinstellungen'), self.t(str(error)), parent=self.root); self.selection_changed()
+
+    def commit_entries(self):
+        pending = {key: self.variables[key].get() for key in ('size_pixels', 'screen_width', 'screen_height')}
+        for key, widget in [('size_pixels', self.size_entry), ('screen_width', self.combos['screen_width']),
+                            ('screen_height', self.combos['screen_height'])]:
+            if str(widget.cget('state')) == 'disabled': continue
+            raw = pending[key]
+            selection = self.selected()
+            values = [getattr(j.options, key) for j in selection] if selection else [getattr(self.defaults, key)]
+            if not raw and len(set(values)) > 1: continue
+            try:
+                value = int(raw)
+                for job in selection or [None]:
+                    replace(job.options if job else self.defaults, **{key: value}).validate()
+            except ValueError as error:
+                self.status.set(str(error))
+                widget.focus_set()
+                return False
+            if any(v != value for v in values):
+                self.variables[key].set(raw)
+                self.changed(key)
+        return True
 
     def sensitivity(self):
         opts = self.selected()[0].options if self.selected() else self.defaults
         rows = opts.task == 'convert' and opts.target == 'row_interleaved'
         self.screen_fields.grid() if rows else self.screen_fields.grid_remove()
         self.preview_button.configure(state='normal' if not self.busy and not self.owner.busy and len(self.selected()) == 1 else 'disabled')
-        self.custom_size.grid() if opts.task == 'convert' and opts.size_mode == 'custom' and not rows else self.custom_size.grid_remove()
-        self.size_entry.configure(state='normal' if opts.task == 'convert' and not self.busy else 'disabled')
+        self.custom_size.pack(fill='x', pady=(4, 0)) if opts.task == 'convert' and opts.size_mode == 'custom' and not rows else self.custom_size.pack_forget()
+        self.size_entry.configure(state='normal' if opts.task == 'convert' and opts.size_mode == 'custom' and not rows and not self.busy else 'disabled')
         for key, combo in self.combos.items():
             enabled = opts.task == 'convert' or key == 'task'
             if key == 'method': enabled = enabled and opts.target == 'anaglyph'
             if key == 'quality': enabled = enabled and opts.format == 'jpeg'
             if key == 'row_first': enabled = rows
+            if key in {'screen_width', 'screen_height'}: enabled = rows
             if key in {'size_mode', 'size_edge'}: enabled = enabled and not rows
-            combo.configure(state='readonly' if enabled and not self.busy else 'disabled')
+            set_control_state(combo, ('normal' if key in {'swap', 'metadata', 'screen_width', 'screen_height'} else 'readonly') if enabled and not self.busy else 'disabled')
         if rows:
             self.detail.set('Polfilter: Exakte Monitorauflösung, Vollbild ohne Skalierung. PNG erhält die Farbzeilen verlustfrei.')
+        elif not self.selected():
+            self.detail.set('MPO-Teilung erhält die komprimierten Bilddaten unverändert.' if opts.task == 'mpo' else
+                            'Dateien hinzufügen oder eine gespeicherte Liste laden.')
 
     def refresh(self):
         for job in self.jobs:
@@ -337,7 +369,7 @@ class ImagePanel:
         self.busy = value
         self.owner.language_sensitivity()
         self.owner.notebook.tab(self.owner.video_tab, state='disabled' if value else 'normal')
-        for widget, normal in self.controls: widget.configure(state='disabled' if value else normal)
+        for widget, normal in self.controls: set_control_state(widget, 'disabled' if value else normal)
         self.abort_button.configure(state='normal' if value else 'disabled'); self.sensitivity()
 
     def abort(self):
@@ -345,6 +377,7 @@ class ImagePanel:
 
     def run(self, convert):
         if self.busy or self.owner.busy or not self.jobs: return
+        if not self.commit_entries(): return
         snapshot = [ImageJob(j.source, replace(j.options), j.source_root, j.id) for j in self.jobs if j.status != 'completed']
         if not snapshot: self.status.set('Alle Bilder sind bereits fertig.'); return
         output = Path(self.output.get()).expanduser().resolve()
@@ -397,6 +430,7 @@ class ImagePanel:
 
     def preview(self):
         if self.busy or self.owner.busy: return
+        if not self.commit_entries(): return
         selected = self.selected()
         if len(selected) != 1:
             messagebox.showinfo(self.t('Kontrollbild'), self.t('Für das Kontrollbild genau eine Datei auswählen.'), parent=self.root)

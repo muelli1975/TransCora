@@ -309,7 +309,7 @@ verpackten MVC-Halbbilder werden weiterhin geprüft.
 
 FRIM 1.31 verwendet das mitgelieferte Software-SDK; Intel-Grafik, Treiberinstallation,
 AVISynth oder Netzwerkzugang werden für diesen FFmpeg-Eingabepfad nicht benötigt.
-Der geprüfte Encoder verwendet hohe Qualität, eine wählbare gemeinsame AVC/MVC-Ziel-/Maximalrate von 20, 25, 28, 30, 35 oder 40 Mbit/s (Standard 40),
+Der geprüfte Encoder verwendet hohe Qualität, eine wählbare gemeinsame AVC/MVC-Ziel-/Maximalrate von 20, 25, 30, 35 oder 40 Mbit/s (Standard 40),
 AVC/MVC Level 4.1, strikte GOP 24/4, CPB 3750 KB, maximal vier gepufferte Bilder und
 begrenztes 8-Bit-4:2:0-BT.709. Die qualitätsorientierte FRIM-Stufe `-u 1` bleibt erhalten. Für Blu-ray-Video ist dieses
 Profil fest; das 4:4:4-Anaglyphenprofil ist davon unabhängig.

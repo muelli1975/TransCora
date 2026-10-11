@@ -1035,7 +1035,7 @@ EN.update({'Unterordner': 'Subfolders',
                                                                                 'preserved; MP4 without '
                                                                                 'stereo metadata.'})
 
-EN.update({'Größe je Auge': 'Size per eye', 'Größe des Gesamtbildes': 'Packed frame size'})
+EN.update({'Größe je Auge': 'Size per eye', 'Größe des Gesamtbildes': 'Output frame size'})
 
 # Long messages win over prefix fragments. Captures retain filenames and values.
 PATTERNS = []
@@ -1046,7 +1046,7 @@ for source, target in EN.items():
         PATTERNS.append((re.compile('^'+pattern+'$', re.S), target))
 PATTERNS.sort(key=lambda item: len(item[0].pattern), reverse=True)
 
-EN.update({'Half-SBS': 'Half-SBS', 'Half-OU': 'Half-OU', 'Full-SBS': 'Full-SBS', 'Full-OU': 'Full-OU', 'BD-3D-Bitrate': 'BD-3D bitrate', 'Videomaße: Gerade Pixelzahlen von 2 bis 16384 verwenden.': 'Video dimensions: use even pixel counts from 2 to 16384.', 'Ungültige Video-Ausgabegröße.': 'Invalid video output size.', 'BD-3D-Bitrate: 20, 25, 28, 30, 35 oder 40 Mbit/s wählen.': 'BD-3D bitrate: choose 20, 25, 28, 30, 35 or 40 Mbit/s.', 'Ungültige BD-3D-Bitrate.': 'Invalid BD-3D bitrate.', 'Breite (Pixel)': 'Width (pixels)', 'Höhe (Pixel)': 'Height (pixels)', 'Maße je Auge': 'Dimensions per eye', 'Maße des Gesamtbildes': 'Dimensions of the complete image', 'Die deinterlacte Ausgabe ist nicht progressiv gekennzeichnet.': 'The deinterlaced output is not marked as progressive.', 'BD-3D: Die erzeugte Bildfolge entspricht nicht der festen Ausgabebildrate.': 'BD-3D: the generated frame sequence does not match the fixed output frame rate.', 'Interlaced: Ein progressives Bild je Halbbildzeit; die zeitliche Auflösung bleibt erhalten. BD-3D und die Zielbildrate passen die Bildfolge anschließend an.': 'Interlaced: one progressive frame per field time preserves temporal resolution. BD-3D and the target frame rate subsequently adapt the frame sequence.'})
+EN.update({'Half-SBS': 'Half-SBS', 'Half-OU': 'Half-OU', 'Full-SBS': 'Full-SBS', 'Full-OU': 'Full-OU', 'BD-3D-Bitrate': 'BD-3D bitrate', 'Videomaße: Gerade Pixelzahlen von 2 bis 16384 verwenden.': 'Video dimensions: use even pixel counts from 2 to 16384.', 'Ungültige Video-Ausgabegröße.': 'Invalid video output size.', 'BD-3D-Bitrate: 20, 25, 30, 35 oder 40 Mbit/s wählen.': 'BD-3D bitrate: choose 20, 25, 30, 35 or 40 Mbit/s.', 'Ungültige BD-3D-Bitrate.': 'Invalid BD-3D bitrate.', 'Breite (Pixel)': 'Width (pixels)', 'Höhe (Pixel)': 'Height (pixels)', 'Maße je Auge': 'Dimensions per eye', 'Maße des Gesamtbildes': 'Dimensions of the complete image', 'Die deinterlacte Ausgabe ist nicht progressiv gekennzeichnet.': 'The deinterlaced output is not marked as progressive.', 'BD-3D: Die erzeugte Bildfolge entspricht nicht der festen Ausgabebildrate.': 'BD-3D: the generated frame sequence does not match the fixed output frame rate.', 'Interlaced: Ein progressives Bild je Halbbildzeit; die zeitliche Auflösung bleibt erhalten. BD-3D und die Zielbildrate passen die Bildfolge anschließend an.': 'Interlaced: one progressive frame per field time preserves temporal resolution. BD-3D and the target frame rate subsequently adapt the frame sequence.'})
 
 def translate(text, language='de'):
     text = str(text)
@@ -1073,3 +1073,8 @@ def translate(text, language='de'):
         start = len(text)-len(text.lstrip()); end = len(text.rstrip())
         return text[:start]+EN[text.strip()]+text[end:]
     return text
+
+EN.update({'Erweitert \u2026': 'Advanced \u2026', 'Erweiterte Videoeinstellungen': 'Advanced video settings'})
+EN.update({'Farbformat / Farbtiefe': 'Colour format / bit depth',
+           'Polfilter: Vollbild ohne Skalierung. 4:4:4 erhält getrennte Farbzeilen; 4:2:0 würde die Farben beider Augen vermischen.':
+           'Polarised: Full screen without scaling. 4:4:4 keeps colour rows separate; 4:2:0 would mix the colours of both eyes.'})

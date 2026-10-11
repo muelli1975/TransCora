@@ -13,7 +13,7 @@ def main():
     root = Path(__file__).resolve().parents[1]
     icon_args = ['--icon', str(root/'assets/transcora.ico')] if sys.platform == 'win32' else []
     subprocess.run([sys.executable, '-m', 'PyInstaller', '--noconfirm', '--clean', '--windowed',
-                    '--onedir', '--name', 'TransCora', *icon_args,
+                    '--onedir', '--name', 'TransCora', '--collect-all=customtkinter', *icon_args,
                     str(root/'run_transcora.py')], cwd=root, check=True)
     output = root/'dist/TransCora'
     for name in ('assets', 'presets', 'tools', 'licenses'):
@@ -47,6 +47,15 @@ def main():
         target = output/'licenses/Pillow'/Path(*notice.parts[notice.parts.index('licenses')+1:])
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, target)
+    for package in ('customtkinter', 'darkdetect', 'packaging'):
+        dependency = importlib.metadata.distribution(package)
+        notices = [p for p in dependency.files or []
+                   if 'license' in p.name.lower() and Path(dependency.locate_file(p)).is_file()]
+        if not notices:
+            raise ValueError(f'{package} license notices missing')
+        for notice in notices:
+            source = Path(dependency.locate_file(notice))
+            shutil.copy2(source, output/'licenses'/(package+'-'+source.name))
     for name in ('README.md', 'README_DE.md', 'BUILD.md', 'LICENSE', 'THIRD_PARTY.md'):
         shutil.copy2(root/name, output/name)
     if sys.platform == 'darwin':

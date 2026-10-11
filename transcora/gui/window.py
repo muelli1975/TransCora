@@ -22,7 +22,7 @@ from transcora.core.storage import load_list, save_list, write_json, new_run_log
 from transcora.core.toolchain import Toolchain
 from transcora.gui.native import schedule_dark_titlebar
 from transcora.gui.preview_window import PreviewWindow
-from transcora.gui.theme import apply_theme, GOLD_LIGHT, MUTED, TEXT, PANEL_BG, APP_BG, SECONDARY_BG, BORDER
+from transcora.gui.theme import checkbox, set_control_state, apply_theme, GOLD_LIGHT, MUTED, TEXT, PANEL_BG, APP_BG, SECONDARY_BG, BORDER
 
 
 STATUS = {"queued": "Wartet", "checking": "Prüfung", "ready": "Bereit", "blocked": "Prüfen!",
@@ -33,6 +33,7 @@ class Window:
     def __init__(self, root: tk.Tk):
         self.root = root
         self.jobs: list[Job] = []
+        self.source_geometry = {}
         self.events = queue.Queue()
         self.cancel = threading.Event()
         self.busy = False
@@ -128,7 +129,7 @@ class Window:
 
     def _style(self):
         self.root.title(f"TransCora {__version__}")
-        self.root.geometry("860x700")
+        self.root.geometry("860x760")
         self.root.minsize(780, 680)
         self.root.option_add("*Font", ("Segoe UI", 9))
         try:
@@ -215,6 +216,9 @@ class Window:
             if key == 'video_size':
                 self.video_size_caption = TextVar(self.localizer, value=label)
                 ttk.Label(frame, textvariable=self.video_size_caption).pack(anchor='w')
+            elif key == 'profile':
+                self.profile_caption = TextVar(self.localizer, value=label)
+                ttk.Label(frame, textvariable=self.profile_caption).pack(anchor='w')
             else:
                 ttk.Label(frame, text=label).pack(anchor="w")
             var = tk.StringVar(value=self.t(self.mappings[key][getattr(self.defaults, key)]))
@@ -226,7 +230,7 @@ class Window:
             self.combos[key] = widget
         combo(fields, 0, 0, "layout", "Quelllayout")
         self.variables["swap"] = tk.BooleanVar(value=self.defaults.swap)
-        swap = ttk.Checkbutton(fields, text="L/R tauschen", variable=self.variables["swap"], command=lambda: self.option_changed("swap"))
+        swap = checkbox(fields, text="L/R tauschen", variable=self.variables["swap"], command=lambda: self.option_changed("swap"))
         swap.grid(row=0, column=1, sticky="sw", padx=(0, 8), pady=5)
         self.swap_control = swap
         self.controls.append((swap, "normal"))
@@ -288,18 +292,19 @@ class Window:
         folder_checks = ttk.Frame(output)
         folder_checks.grid(row=0, column=3, sticky="w", padx=(10, 0))
         self.recursive = tk.BooleanVar(value=self.recursive_value)
-        check = ttk.Checkbutton(folder_checks, text="Unterordner", variable=self.recursive)
+        check = checkbox(folder_checks, text="Unterordner mitverarbeiten", variable=self.recursive)
+        self.recursive_control = check
         check.pack(side="left", padx=(0, 10))
         self.controls.append((check, "normal"))
         self.warning = TextVar(self.localizer, )
-        ttk.Label(outer, textvariable=self.warning, foreground=GOLD_LIGHT, wraplength=800).grid(row=6, column=0, sticky="ew", pady=5)
+
         self.details = TextVar(self.localizer, value="Dateien hinzufügen oder eine gespeicherte Liste laden.")
         detail_frame = ttk.Frame(outer, style="Bordered.TFrame", padding=1)
         detail_frame.grid(row=7, column=0, sticky="ew")
         detail_frame.columnconfigure(0, weight=1)
         self.detail_text = tk.Text(detail_frame, height=4, width=1, wrap="word", background=APP_BG,
             foreground=MUTED, insertbackground=TEXT, selectbackground=GOLD_LIGHT, selectforeground=APP_BG,
-            borderwidth=0, highlightthickness=0, state="disabled")
+            borderwidth=0, highlightthickness=0, padx=8, pady=6, state="disabled")
         self.detail_text.grid(row=0, column=0, sticky="ew")
         detail_scroll = ttk.Scrollbar(detail_frame, orient="vertical", command=self.detail_text.yview)
         detail_scroll.grid(row=0, column=1, sticky="ns")
@@ -307,17 +312,30 @@ class Window:
         def show_details(*args):
             self.detail_text.configure(state="normal")
             self.detail_text.delete("1.0", "end")
-            self.detail_text.insert("1.0", self.details.get())
+            if self.warning.get():
+                self.detail_text.insert('end', self.warning.get()+'\n', 'warning')
+            self.detail_text.insert('end', self.details.get())
             self.detail_text.configure(state="disabled")
+        self.detail_text.tag_configure('warning', foreground=GOLD_LIGHT)
+        self.warning.trace_add('write', show_details)
         self.details.trace_add("write", show_details)
         show_details()
         actions = ttk.Frame(outer)
-        actions.grid(row=8, column=0, sticky="ew", pady=5)
-        self.advanced_button = self.button(actions, "Erweitert ▸", self.toggle_advanced)
+        actions.grid(row=13, column=0, sticky="ew", pady=(8, 0))
+        self.advanced_button = self.button(actions, "Erweitert …", self.toggle_advanced)
         self.advanced_button.pack(side="left")
         self.button(actions, "Kontrollbild", self.show_preview).pack(side="left", padx=5)
         ttk.Button(actions, text="Log", command=self.show_log).pack(side="left")
-        self.advanced = ttk.Frame(outer)
+        self.advanced_dialog = tk.Toplevel(self.root, background=APP_BG)
+        self.advanced_dialog.withdraw()
+        self.advanced_dialog.title('Erweiterte Videoeinstellungen')
+        self.advanced_dialog.transient(self.root)
+        self.advanced_dialog.resizable(False, False)
+        self.advanced_dialog.protocol('WM_DELETE_WINDOW', self.close_advanced)
+        self.advanced_dialog.bind('<Escape>', lambda e: self.close_advanced())
+        schedule_dark_titlebar(self.advanced_dialog)
+        self.advanced = ttk.Frame(self.advanced_dialog, padding=12)
+        self.advanced.pack(fill='both', expand=True)
         for col in (0, 1, 2):
             self.advanced.columnconfigure(col, weight=1, uniform="advanced")
         combo(self.advanced, 0, 0, "codec", "Videocodec")
@@ -344,24 +362,20 @@ class Window:
         combo(numeric, 0, 0, "bd_bitrate_mbps", "BD-3D-Bitrate")
         self.option_frames['bd_bitrate_mbps'].grid_configure(pady=0, padx=0)
         self.rate_fields["bd_bitrate_mbps"] = self.option_frames["bd_bitrate_mbps"]
-        self.video_dimensions = ttk.Frame(self.advanced)
-        self.video_dimensions.grid(row=1, column=0, columnspan=3, sticky="ew")
-        for column, (key, label) in enumerate((("video_width", "Breite (Pixel)"), ("video_height", "Höhe (Pixel)"))):
-            box = ttk.Frame(self.video_dimensions)
-            box.grid(row=0, column=column, sticky="ew", padx=(0, 8))
-            self.video_dimensions.columnconfigure(column, weight=1)
-            ttk.Label(box, text=label).pack(anchor="w")
+        self.video_dimensions = ttk.Frame(self.option_frames['video_size'])
+        self.video_dimensions.pack(fill='x', pady=(4, 0))
+        for key in ('video_width', 'video_height'):
+            if key == 'video_height':
+                ttk.Label(self.video_dimensions, text='×').pack(side='left', padx=4)
             var = tk.StringVar(value=str(getattr(self.defaults, key)))
             self.variables[key] = var
-            entry = ttk.Entry(box, textvariable=var, width=10)
-            entry.pack(fill="x")
-            for event in ("<FocusOut>", "<Return>"):
+            entry = ttk.Entry(self.video_dimensions, textvariable=var, width=7)
+            entry.pack(side='left', fill='x', expand=True)
+            for event in ('<FocusOut>', '<Return>'):
                 entry.bind(event, lambda e, k=key: self.option_changed(k))
             self.combos[key] = entry
-            self.controls.append((entry, "normal"))
-        self.video_size_note = TextVar(self.localizer)
-        ttk.Label(self.video_dimensions, textvariable=self.video_size_note, foreground=MUTED).grid(
-            row=1, column=0, columnspan=2, sticky="w", pady=(3, 0))
+            self.controls.append((entry, 'normal'))
+        ttk.Label(self.video_dimensions, text='px').pack(side='left', padx=(4, 0))
         self.screen_fields = ttk.Frame(fields)
         self.screen_fields.grid(row=2, column=1, sticky='ew', padx=(0, 8), pady=3)
         ttk.Label(self.screen_fields, text='Monitorauflösung (Pixel)').pack(anchor='w')
@@ -379,7 +393,11 @@ class Window:
             self.controls.append((entry, 'normal'))
         combo(fields, 1, 0, 'row_first', 'Erste Bildschirmzeile')
         self.advanced_audio_button = self.button(actions, 'Tonoptionen …', self.show_audio_options)
-        self.reset_button = self.button(actions, 'Standardeinstellungen', self.reset_defaults)
+        self.advanced_audio_button.pack(side='left', padx=5)
+        self.reset_button = self.button(self.advanced, 'Standardeinstellungen', self.reset_defaults)
+        self.reset_button.grid(row=1, column=0, columnspan=2, sticky='w', pady=(12, 0))
+        ttk.Button(self.advanced, text='Schließen', command=self.close_advanced).grid(
+            row=1, column=2, sticky='e', pady=(12, 0))
         # Keep the main window usable at its minimum height. Audio controls live
         # in a reusable dialog so their values and state follow the same selection.
         self.audio_dialog = tk.Toplevel(self.root, background=APP_BG)
@@ -428,10 +446,14 @@ class Window:
         timing.grid(row=12, column=0, sticky="ew", pady=(3, 0))
         ttk.Label(timing, textvariable=self.elapsed_time, foreground=MUTED).pack(side='left')
         ttk.Label(timing, textvariable=self.elapsed, foreground=MUTED).pack(side='left', padx=(24, 0))
-        footer = ttk.Frame(outer)
-        footer.grid(row=13, column=0, sticky="ew", pady=(8, 0))
+        footer = actions
         self.speed = TextVar(self.localizer, value="")
-        ttk.Label(footer, textvariable=self.speed, foreground=MUTED).pack(side="left")
+        ttk.Label(timing, textvariable=self.speed, foreground=MUTED).pack(side="right")
+        def timing_visibility(*args):
+            timing.grid() if self.elapsed.get() or self.elapsed_time.get() or self.speed.get() else timing.grid_remove()
+        for var in (self.elapsed, self.elapsed_time, self.speed):
+            var.trace_add('write', timing_visibility)
+        timing_visibility()
         self.abort_button = ttk.Button(footer, text="Abbrechen", command=self.abort, state="disabled", style="Danger.TButton")
         self.abort_button.pack(side="right")
         self.start_button = self.button(footer, "Start", lambda: self.check(True), style="Primary.TButton")
@@ -485,6 +507,8 @@ class Window:
 
     def preset_dialog(self, store=None, title='Voreinstellung speichern'):
         if self.busy or self.images.busy:
+            return
+        if not (self.images.commit_entries() if store else self.commit_entries()):
             return
         store = store or self.store_preset
         dialog = tk.Toplevel(self.root, background=APP_BG)
@@ -568,6 +592,9 @@ class Window:
         if job.plan:
             job.source_fps = job.plan.info["video"].get("avg_frame_rate")
             job.source_duration = job.plan.duration or None
+            video = job.plan.info['video']
+            if video.get('width') and video.get('height'):
+                self.source_geometry[job.id] = (video['width'], video['height'], job.plan.layout)
         rate = job.source_fps
         try:
             from fractions import Fraction
@@ -589,6 +616,7 @@ class Window:
     def selection_changed(self, event=None):
         selected = self.selected_jobs()
         if not selected:
+            self.details.set("Dateien hinzufügen oder eine gespeicherte Liste laden.")
             self.selection_text.set("Einstellungen gelten für neu hinzugefügte Dateien.")
             self.updating = True
             for key, var in self.variables.items():
@@ -627,6 +655,9 @@ class Window:
     def option_changed(self, key):
         if self.busy or self.updating:
             return
+        if key in {'video_width', 'video_height', 'screen_width', 'screen_height', 'crf', 'bitrate_mbps', 'target_fps'}:
+            if str(self.combos[key].cget('state')) == 'disabled':
+                return True
         if key == 'audio_selection':
             selected = self.selected_jobs()
             options = [job.options for job in selected] if selected else [self.defaults]
@@ -648,6 +679,10 @@ class Window:
                 value = int(value)
             elif key in {"crf", "bitrate_mbps"}:
                 value = float(value.replace(",", "."))
+            selected = self.selected_jobs()
+            current = [j.options for j in selected] if selected else [self.defaults]
+            if all(getattr(o, key) == value for o in current):
+                return True
             def changed(options, source=None):
                 result = replace(options, **{key: value})
                 if key == "target":
@@ -658,7 +693,7 @@ class Window:
                         result.container = 'mp4'
                     if value == "framerate":
                         result.swap = False
-                    if value == 'row_interleaved' and result.profile == 'compatible':
+                    if value == 'row_interleaved':
                         result.profile = 'quality'
                 if key == "suffix" and value == effective_suffix(replace(options, suffix=None), self.catalog[options.method]["suffix"], source):
                     result.suffix = None
@@ -684,12 +719,12 @@ class Window:
             self.last_suffix_display = self.variables['suffix'].get()
             self.status.set("Einstellungen übernommen. Vor dem Start wird erneut geprüft.")
             self.refresh_controls()
+            return True
         except (ValueError, StopIteration) as error:
             self.status.set(str(error) or "Ungültige Eingabe.")
             if key in {"crf", "bitrate_mbps", "target_fps", 'audio_selection', "video_width", "video_height", 'screen_width', 'screen_height'}:
-                selected = self.selected_jobs()
-                options = selected[0].options if selected else self.defaults
-                self.variables[key].set(str(getattr(options, key)))
+                self.combos[key].focus_set()
+            return False
 
     def refresh_controls(self):
         if self.busy:
@@ -707,26 +742,24 @@ class Window:
         self.title_frame.grid() if bd3d and selected else self.title_frame.grid_remove()
         self.option_frames['method'].grid_remove() if rows else self.option_frames['method'].grid()
         self.option_frames['row_first'].grid() if rows else self.option_frames['row_first'].grid_remove()
-        self.option_frames['profile'].grid()
+        self.option_frames['profile'].grid_remove() if rows else self.option_frames['profile'].grid()
         self.combos['container'].configure(values=[self.t(self.mappings['container'][k]) for k in
             (('iso', 'm2ts') if bd3d else ('mp4', 'mkv'))])
         self.advanced_button.configure(state='normal')
-        self.swap_control.configure(state="disabled" if framerate else "normal")
+        set_control_state(self.swap_control, "disabled" if framerate else "normal")
         self.fps_frame.grid_remove() if bd3d else self.fps_frame.grid()
         self.combos['fps_mode'].configure(state='disabled' if bd3d else 'readonly')
         self.combos['target_fps'].configure(state='normal' if not bd3d and options.fps_mode == 'custom' else 'disabled')
         self.option_frames["video_size"].grid_remove() if bd3d or framerate or rows else self.option_frames["video_size"].grid()
         custom_size = not bd3d and not framerate and not rows and options.video_size == "custom"
-        self.video_dimensions.grid() if custom_size else self.video_dimensions.grid_remove()
-        if custom_size and self.advanced.winfo_manager() != 'grid':
-            self.toggle_advanced()
-        self.video_size_note.set('Maße des Gesamtbildes')
-        self.video_size_caption.set('Größe je Auge' if options.target in {'full_sbs', 'full_ou', 'cross_sbs'} and not custom_size
-                                    else 'Größe des Gesamtbildes')
+        self.video_size_caption.set('Größe des Gesamtbildes')
+        for key in ('video_width', 'video_height'):
+            self.combos[key].configure(state='normal' if custom_size else 'disabled')
+        self.refresh_dimensions()
         self.combos["bd_bitrate_mbps"].configure(state="readonly" if bd3d else "disabled")
         self.combos["method"].configure(state="readonly" if anaglyph else "disabled")
-        self.combos["profile"].configure(state="readonly" if anaglyph or rows else "disabled",
-            values=[self.t(PROFILES[k]) for k in (('quality', 'quality10') if rows else PROFILES)])
+        self.combos["profile"].configure(state="readonly" if anaglyph else "disabled",
+            values=[self.t(value) for value in PROFILES.values()])
         self.combos["suffix"].configure(values=[self.t(v) for v in self.available_suffixes(options, selected[0] if selected else None)])
         self.combos["container"].configure(state="disabled" if options.codec == "h265" else "readonly")
         self.combos['codec'].configure(state='disabled' if bd3d else 'readonly')
@@ -735,8 +768,10 @@ class Window:
         self.combos["bitrate_mbps"].configure(state="normal" if options.rate_mode == "abr" and not bd3d else "disabled")
         no_audio = options.audio_tracks == 'none'
         self.combos['audio_format'].configure(state='disabled' if bd3d or no_audio or options.audio_channels == 'stereo' else 'readonly')
-        self.variables['audio_format'].set(self.t('LPCM · 24 Bit' if bd3d else AUDIO_FORMATS[
-            'aac' if options.audio_channels == 'stereo' else options.audio_format]))
+        formats = ['LPCM · 24 Bit' if o.target == 'bd3d' else AUDIO_FORMATS[
+            'aac' if o.audio_channels == 'stereo' else o.audio_format] for o in
+            ([j.options for j in selected] if selected else [options])]
+        self.variables['audio_format'].set(self.t(formats[0]) if len(set(formats)) == 1 else '')
         self.combos['audio_channels'].configure(state='disabled' if no_audio else 'readonly')
         self.combos['audio_selection'].configure(state='normal' if options.audio_tracks == 'selected' else 'disabled')
         self.audio_note.set('BD-3D: LPCM mit 48 kHz und 24 Bit.' if bd3d else (
@@ -762,7 +797,7 @@ class Window:
         if options.target == "cross_sbs":
             text = "Kreuzblick: Full-SBS mit rechtem Halbbild zuerst."
         if rows:
-            text = 'Polfilter: Exakte Monitorauflösung, Vollbild ohne Skalierung. 4:4:4 erhält getrennte Farbzeilen.'
+            text = 'Polfilter: Vollbild ohne Skalierung. 4:4:4 erhält getrennte Farbzeilen; 4:2:0 würde die Farben beider Augen vermischen.'
         if options.codec == "h265":
             text += " H.265: MKV, längere Rechenzeit und Zielplayer prüfen; CRF ist codecabhängig."
         if options.rate_mode == "abr" and not bd3d:
@@ -927,6 +962,8 @@ class Window:
     def save(self):
         if self.busy:
             return
+        if not self.commit_entries():
+            return
         value = filedialog.asksaveasfilename(title=self.t("Jobliste speichern"), initialdir=self.input_folder, defaultextension=".json",
                                             filetypes=[(self.t("TransCora-Jobliste"), "*.json")])
         if value:
@@ -946,19 +983,87 @@ class Window:
         return Path(self.output_var.get().strip()).expanduser().resolve() if self.output_var.get().strip() else app_root() / "output"
 
     def toggle_advanced(self):
-        if self.advanced.winfo_ismapped():
-            self.advanced.grid_remove()
-            self.advanced_audio_button.pack_forget()
-            self.reset_button.pack_forget()
-            self.detail_text.configure(height=4)
-        else:
-            self.detail_text.configure(height=2)
-            self.advanced_audio_button.pack(side='left', padx=5)
-            self.reset_button.pack(side='right')
-            self.advanced.grid(row=9, column=0, sticky="ew", pady=5)
+        if self.busy:
+            return
+        if self.advanced_dialog.winfo_ismapped():
+            self.close_advanced()
+            return
+        if not self.commit_entries():
+            return
+        self.refresh_controls()
+        self.advanced_dialog.geometry(f'+{self.root.winfo_rootx()+30}+{self.root.winfo_rooty()+100}')
+        self.advanced_dialog.deiconify()
+        self.advanced_dialog.lift()
+        self.advanced_dialog.grab_set()
+        self.combos['bd_bitrate_mbps' if self.selected_options().target == 'bd3d' else 'codec'].focus_set()
+
+    def close_advanced(self):
+        if not self.commit_entries(('crf', 'bitrate_mbps')):
+            return
+        self.advanced_dialog.grab_release()
+        self.advanced_dialog.withdraw()
+
+    def selected_options(self):
+        selected = self.selected_jobs()
+        return selected[0].options if selected else self.defaults
+
+    def commit_entries(self, keys=None):
+        # Buttons do not reliably take focus in Tk; commit editable entries
+        # explicitly before running, saving, or opening another dialog.
+        keys = keys or ('video_width', 'video_height', 'screen_width', 'screen_height',
+                        'target_fps', 'crf', 'bitrate_mbps', 'audio_selection')
+        pending = {key: self.variables[key].get() for key in keys}
+        for key in keys:
+            if str(self.combos[key].cget('state')) == 'disabled':
+                continue
+            raw = pending[key]
+            selected = self.selected_jobs()
+            if not raw and selected and len({str(getattr(j.options, key)) for j in selected}) > 1:
+                continue
+            self.variables[key].set(raw)
+            if self.option_changed(key) is False:
+                return False
+        return True
+
+    def refresh_dimensions(self):
+        from transcora.core.video import output_dimensions
+        selected = self.selected_jobs()
+        # Selection changes already populate custom values. Do not overwrite
+        # a second dimension still being edited when the first loses focus.
+        if all(o.video_size == 'custom' for o in ([j.options for j in selected] or [self.defaults])):
+            return
+        values = []
+        for job in selected or [None]:
+            opts = job.options if job else self.defaults
+            if opts.video_size == 'custom':
+                size = opts.video_width, opts.video_height
+            elif opts.video_size in {'1080p', '2160p'} or (opts.video_size == 'default' and opts.target.startswith('half_')):
+                if opts.target.startswith('half_') or opts.target == 'cross_sbs':
+                    h = 2160 if opts.video_size == '2160p' else 1080
+                    size = (h*16//9 * (2 if opts.target == 'cross_sbs' else 1), h)
+                else:
+                    size = None
+            else:
+                size = None
+            source = self.source_geometry.get(job.id) if job else None
+            if source and opts.video_size != 'custom':
+                w, h, layout = source
+                layout = opts.layout if opts.layout in {'full_sbs', 'half_sbs', 'full_ou', 'half_ou'} else layout
+                ew, eh = (w//2, h) if layout.endswith('sbs') else (w, h//2)
+                ew *= 2 if layout == 'half_sbs' else 1
+                eh *= 2 if layout == 'half_ou' else 1
+                size = output_dimensions(opts, ew, eh)
+                if opts.target in {'full_sbs', 'cross_sbs'}: size = size[0]*2, size[1]
+                elif opts.target == 'full_ou': size = size[0], size[1]*2
+            values.append(size)
+        for i, key in enumerate(('video_width', 'video_height')):
+            numbers = [v[i] if v else None for v in values]
+            self.variables[key].set(str(numbers[0]) if numbers[0] is not None and all(n == numbers[0] for n in numbers) else '')
 
     def show_audio_options(self):
         if self.busy:
+            return
+        if not self.commit_entries():
             return
         self.refresh_controls()
         self.audio_dialog.geometry(f'+{self.root.winfo_rootx()+30}+{self.root.winfo_rooty()+100}')
@@ -968,7 +1073,8 @@ class Window:
         self.combos['audio_tracks'].focus_set()
 
     def close_audio_options(self):
-        self.option_changed('audio_selection')
+        if self.option_changed('audio_selection') is False:
+            return
         self.audio_dialog.grab_release()
         self.audio_dialog.withdraw()
 
@@ -977,7 +1083,7 @@ class Window:
         self.language_sensitivity()
         self.notebook.tab(self.image_tab, state='disabled' if value else 'normal')
         for widget, normal in self.controls:
-            widget.configure(state="disabled" if value else normal)
+            set_control_state(widget, "disabled" if value else normal)
         self.abort_button.configure(state="normal" if value else "disabled")
         if not value:
             self.update_elapsed()
@@ -1056,6 +1162,8 @@ class Window:
 
     def check(self, run):
         if self.busy:
+            return
+        if not self.commit_entries():
             return
         self.option_changed("disc_title")
         if self.variables["disc_title"].get() != self.last_title_display:
@@ -1143,6 +1251,8 @@ class Window:
         if self.busy or len(selected) != 1:
             self.status.set("Für das Kontrollbild genau eine Datei auswählen.")
             return
+        if not self.commit_entries():
+            return
         job = selected[0]
         def request(seconds):
             if self.busy:
@@ -1223,6 +1333,7 @@ class Window:
                         job.status, job.detail, job.plan = status, detail, plan
                         self.update_row(job)
                         if id_ in self.tree.selection():
+                            self.refresh_dimensions()
                             self.details.set((plan.summary + "\n" if plan else str(job.source) + "\n") + detail)
                 elif kind in {"notice", "error"}:
                     self.status.set(payload)

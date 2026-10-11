@@ -56,7 +56,7 @@ def main():
                 '-color_primaries', 'bt709', '-color_trc', 'bt709', '-color_range', 'tv',
                 '-c:a', 'flac', '-sample_fmt', 's32', '-bits_per_raw_sample', '24', '-ac', str(channels), str(source)], timeout=120)
             job = Job(source, Options(target='bd3d', container=container, disc_title=title,
-                                      bd_bitrate_mbps=28 if fields else 40))
+                                      bd_bitrate_mbps=30 if fields else 40))
             plan = plan_job(tools, job, OUT, set(), threading.Event(), capabilities)
             png = preview(tools, plan, threading.Event(), .5)
             if not png.startswith(b'\x89PNG'):

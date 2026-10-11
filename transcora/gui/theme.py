@@ -1,5 +1,7 @@
 """Stereo tools' shared Nachtgold palette and ttk widget states."""
 from tkinter import ttk
+import customtkinter as ctk
+import sys
 
 APP_BG = "#111111"
 SECONDARY_BG = "#181818"
@@ -15,7 +17,26 @@ DANGER = "#7f3939"
 DANGER_HOVER = "#944545"
 
 
+def checkbox(parent, text, variable, command=None):
+    """Use the same checkbox widget and settings as Freeda and AnaChroma."""
+    return ctk.CTkCheckBox(parent, text=text, variable=variable, command=command,
+                           bg_color=APP_BG, fg_color=GOLD, hover_color=GOLD_LIGHT,
+                           border_color=BORDER, checkmark_color=TEXT, text_color=TEXT,
+                           text_color_disabled=DISABLED, corner_radius=4,
+                           font=('Segoe UI' if sys.platform == 'win32' else 'Helvetica', 13))
+
+
+def set_control_state(widget, state):
+    """Apply the same disabled checkbox colors as the other Stereo tools."""
+    if isinstance(widget, ctk.CTkCheckBox):
+        widget.configure(state=state, fg_color=DISABLED if state == 'disabled' else GOLD,
+                         hover_color=DISABLED if state == 'disabled' else GOLD_LIGHT)
+    else:
+        widget.configure(state=state)
+
+
 def apply_theme(root):
+    ctk.set_appearance_mode('dark')
     root.configure(background=APP_BG)
     style = ttk.Style(root)
     style.theme_use("clam")
@@ -30,6 +51,7 @@ def apply_theme(root):
     tab_colors = [("disabled", SECONDARY_BG), ("selected", "active", GOLD_LIGHT),
                   ("selected", GOLD), ("active", HOVER_BG)]
     style.map("TNotebook.Tab", background=tab_colors,
+              padding=[("selected", (18, 4)), ("!selected", (18, 4))],
               foreground=[("disabled", DISABLED), ("selected", APP_BG)],
               lightcolor=[("selected", GOLD), ("!selected", BORDER)],
               darkcolor=[("selected", GOLD), ("!selected", BORDER)])

@@ -25,7 +25,7 @@ jobs:
       - name: Install test tools
         run: |
           sudo apt-get update && sudo apt-get install -y ffmpeg xvfb
-          python -m pip install Pillow==11.3.0 cmake==4.4.4
+          python -m pip install Pillow==11.3.0 cmake==4.4.4 customtkinter==5.2.2 darkdetect==0.8.0
           python scripts/prepare_exiftool.py
       - name: Build pinned native CIELab image method
         run: python scripts/build_cielab.py
