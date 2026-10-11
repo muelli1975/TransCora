@@ -53,7 +53,7 @@ def mvc_mkv_fixture(tools, source, base, dependent, destination):
             + b''.join(len(n).to_bytes(2, 'big')+n for n in pps))
     header = element('1a45dfa3', integer('4286', 1)+integer('42f7', 1)+integer('42f2', 4)
         +integer('42f3', 8)+element('4282', b'matroska')+integer('4287', 4)+integer('4285', 2))
-    info = element('1549a966', integer('2ad7b1', 1000000)+element('4d80', b'Test')+element('5741', b'Test'))
+    info = element('1549a966', integer('2ad7b1', 1000)+element('4d80', b'Test')+element('5741', b'Test'))
     track = element('1654ae6b', element('ae', integer('d7', 1)+integer('73c5', 1)+integer('83', 1)
         +element('86', b'V_MPEG4/ISO/AVC')+element('63a2', avcc)+integer('23e383', 41708333)
         +element('e0', integer('b0', 1920)+integer('ba', 1080))))
@@ -61,11 +61,11 @@ def mvc_mkv_fixture(tools, source, base, dependent, destination):
         '-show_entries', 'packet=pts', '-of', 'json', str(source)]))['packets']
     blocks = []
     for (left, right), packet in zip(zip(*groups), packets):
-        stamp = round((int(packet['pts'])-int(packets[0]['pts']))*Fraction(1, 90))
+        stamp = round((int(packet['pts'])-int(packets[0]['pts']))*Fraction(100, 9))
         payload = b''.join(len(n).to_bytes(4, 'big')+n for n in left+right if n[0]&31 != 24)
-        blocks.append(element('a0', element('a1', b'\x81'+stamp.to_bytes(2, 'big', signed=True)+b'\0'+payload)))
-    cluster = element('1f43b675', integer('e7', 0)+b''.join(blocks))
-    destination.write_bytes(header+element('18538067', info+track+cluster))
+        block = element('a0', element('a1', b'\x81\0\0\0'+payload))
+        blocks.append(element('1f43b675', integer('e7', stamp)+block))
+    destination.write_bytes(header+element('18538067', info+track+b''.join(blocks)))
 
 
 def main():
@@ -139,6 +139,13 @@ def main():
                 while process.stdout.read(1024*1024):
                     pass
             report['combined_mvc_mkv'] = True
+            mp4 = Path(tmp)/'Combined MVC.mp4'
+            capture([str(tools.ffmpeg), '-v', 'error', '-i', str(mkv), '-c', 'copy', str(mp4)])
+            mp4_plan = plan_job(tools, Job(mp4, Options(target='mono', container='mkv')), OUT, set(), cancel)
+            assert mp4_plan.info['multiview']['kind'] == 'mvc'
+            assert preview(tools, mp4_plan, cancel, .5).startswith(b'\x89PNG')
+            execute(tools, mp4_plan, cancel, lambda k, v: None, OUT/'mvc-mp4.log')
+            report['combined_mvc_mp4'] = True
         sample = OUT/'Apple-multiview.mov'
         with urllib.request.urlopen('https://fate-suite.ffmpeg.org/hevc/multiview.mov', timeout=60) as response:
             data = response.read(2*1024*1024)
