@@ -75,9 +75,15 @@ def output_dimensions(options, eye_width, eye_height):
     if mode == 'original':
         return eye_width, eye_height
     if mode == 'custom':
+        if options.target in {'full_sbs', 'cross_sbs'}:
+            return options.video_width//2, options.video_height
+        if options.target == 'full_ou':
+            return options.video_width, options.video_height//2
         return options.video_width, options.video_height
     height = 1080 if mode == '1080p' else 2160
-    if half:
+    if half or options.target == 'cross_sbs':
+        # Cross-view presets specify a standard screen raster per eye.
+        # Letterboxing in build_graph preserves the original picture shape.
         return height*16//9, height
     # Full layouts, mono and anaglyph keep the source eye's aspect ratio.
     return max(2, 2*round(Fraction(eye_width*height, 2*eye_height))), height

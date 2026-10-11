@@ -34,11 +34,13 @@ class Toolchain:
     def find(cls) -> "Toolchain":
         ext = ".exe" if os.name == "nt" else ""
         roots = [app_root() / "tools" / "ffmpeg"]
+        if os.name != 'nt':
+            roots += [Path('/opt/homebrew'), Path('/usr/local'), Path('/usr')]
         for root in roots:
             for folder in (root, root / "bin"):
                 if all((folder / (name + ext)).is_file() for name in ("ffmpeg", "ffprobe")):
                     return cls((folder / ("ffmpeg" + ext)).resolve(), (folder / ("ffprobe" + ext)).resolve())
-        if not getattr(sys, "frozen", False):
+        if not getattr(sys, "frozen", False) or os.name != 'nt':
             paths = [shutil.which(x) for x in ("ffmpeg", "ffprobe")]
             if all(paths):
                 return cls(Path(paths[0]), Path(paths[1]))

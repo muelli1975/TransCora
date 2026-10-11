@@ -1035,6 +1035,8 @@ EN.update({'Unterordner': 'Subfolders',
                                                                                 'preserved; MP4 without '
                                                                                 'stereo metadata.'})
 
+EN.update({'Größe je Auge': 'Size per eye', 'Größe des Gesamtbildes': 'Packed frame size'})
+
 # Long messages win over prefix fragments. Captures retain filenames and values.
 PATTERNS = []
 for source, target in EN.items():

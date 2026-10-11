@@ -209,7 +209,11 @@ class Window:
             frame = ttk.Frame(parent)
             self.option_frames[key] = frame
             frame.grid(row=row, column=col, sticky="ew", padx=(0, 8), pady=3)
-            ttk.Label(frame, text=label).pack(anchor="w")
+            if key == 'video_size':
+                self.video_size_caption = TextVar(self.localizer, value=label)
+                ttk.Label(frame, textvariable=self.video_size_caption).pack(anchor='w')
+            else:
+                ttk.Label(frame, text=label).pack(anchor="w")
             var = tk.StringVar(value=self.t(self.mappings[key][getattr(self.defaults, key)]))
             self.variables[key] = var
             widget = ttk.Combobox(frame, textvariable=var, values=[self.t(v) for v in self.mappings[key].values()], state="readonly", width=22)
@@ -335,6 +339,7 @@ class Window:
             self.controls.append((number, "normal"))
             self.combos[key] = number
         combo(numeric, 0, 0, "bd_bitrate_mbps", "BD-3D-Bitrate")
+        self.option_frames['bd_bitrate_mbps'].grid_configure(pady=0, padx=0)
         self.rate_fields["bd_bitrate_mbps"] = self.option_frames["bd_bitrate_mbps"]
         self.video_dimensions = ttk.Frame(self.advanced)
         self.video_dimensions.grid(row=1, column=0, columnspan=3, sticky="ew")
@@ -708,7 +713,11 @@ class Window:
         self.option_frames["video_size"].grid_remove() if bd3d or framerate or rows else self.option_frames["video_size"].grid()
         custom_size = not bd3d and not framerate and not rows and options.video_size == "custom"
         self.video_dimensions.grid() if custom_size else self.video_dimensions.grid_remove()
-        self.video_size_note.set("Maße je Auge" if options.target in {"full_sbs", "full_ou", "cross_sbs"} else "Maße des Gesamtbildes")
+        if custom_size and self.advanced.winfo_manager() != 'grid':
+            self.toggle_advanced()
+        self.video_size_note.set('Maße des Gesamtbildes')
+        self.video_size_caption.set('Größe je Auge' if options.target in {'full_sbs', 'full_ou', 'cross_sbs'} and not custom_size
+                                    else 'Größe des Gesamtbildes')
         self.combos["bd_bitrate_mbps"].configure(state="readonly" if bd3d else "disabled")
         self.combos["method"].configure(state="readonly" if anaglyph else "disabled")
         self.combos["profile"].configure(state="readonly" if anaglyph or rows else "disabled",

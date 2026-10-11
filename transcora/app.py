@@ -18,9 +18,9 @@ def main():
             root.update()
             capabilities = Toolchain.find().inspect()
             from transcora.core.bd3d_export import BdTools
-            bd = BdTools.find()
+            bd = BdTools.find() if sys.platform == 'win32' else None
             from transcora.core.multiview import decoder
-            mvc_decoder = decoder()
+            mvc_decoder = decoder() if sys.platform == 'win32' or (app_root()/'tools/mvc/TransCoraMVC').is_file() else None
             from transcora.core.images import exiftool
             from transcora.core.engine import capture
             image_tools = bool(capture(exiftool()+['-ver']).strip())
@@ -29,8 +29,8 @@ def main():
             if not (app_root() / "assets" / "ready.wav").is_file():
                 raise ValueError("Completion sound is missing")
             Path(sys.argv[2]).write_text(json.dumps({"ok": True, "methods": len(window.catalog),
-                "root": str(app_root()), "ffmpeg": capabilities["version"], "mvc": mvc_decoder.is_file(),
-                "bd3d": bd.encoder.is_file() and bd.muxer.is_file(), "images": image_tools,
+                "root": str(app_root()), "ffmpeg": capabilities["version"], "mvc": bool(mvc_decoder and mvc_decoder.is_file()),
+                "bd3d": bool(bd and bd.encoder.is_file() and bd.muxer.is_file()), "images": image_tools,
                 "cielab": cielab_tool.is_file()}), encoding="utf-8")
             root.destroy()
             return

@@ -6,14 +6,14 @@ import json
 import shutil
 import subprocess
 import sys
+import platform
 
 
 def main():
     root = Path(__file__).resolve().parents[1]
-    if sys.platform != 'win32':
-        raise SystemExit('Build on Windows to produce a Windows application.')
+    icon_args = ['--icon', str(root/'assets/transcora.ico')] if sys.platform == 'win32' else []
     subprocess.run([sys.executable, '-m', 'PyInstaller', '--noconfirm', '--clean', '--windowed',
-                    '--onedir', '--name', 'TransCora', '--icon', str(root/'assets/transcora.ico'),
+                    '--onedir', '--name', 'TransCora', *icon_args,
                     str(root/'run_transcora.py')], cwd=root, check=True)
     output = root/'dist/TransCora'
     for name in ('assets', 'presets', 'tools', 'licenses'):
@@ -23,7 +23,7 @@ def main():
     for name in ('transcora', 'native', 'scripts', 'tests', 'reference', 'assets', 'presets', 'licenses', 'docs', '.github'):
         shutil.copytree(root/name, output/'source'/name,
                         ignore=shutil.ignore_patterns('__pycache__', '*.pyc'), dirs_exist_ok=True)
-    for name in ('.gitattributes', 'run_transcora.py', 'requirements-build.txt', 'BUILD.md', 'LICENSE', 'README.md', 'THIRD_PARTY.md'):
+    for name in ('.gitattributes', 'run_transcora.py', 'requirements-build.txt', 'BUILD.md', 'LICENSE', 'README.md', 'README_DE.md', 'THIRD_PARTY.md'):
         shutil.copy2(root/name, output/'source'/name)
     python_license = next((p for p in (Path(sys.base_prefix)/'LICENSE.txt', Path(sys.base_prefix)/'LICENSE') if p.is_file()), None)
     if python_license is None:
@@ -46,8 +46,15 @@ def main():
         target = output/'licenses/Pillow'/Path(*notice.parts[notice.parts.index('licenses')+1:])
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, target)
-    for name in ('README.md', 'LICENSE', 'THIRD_PARTY.md'):
+    for name in ('README.md', 'README_DE.md', 'LICENSE', 'THIRD_PARTY.md'):
         shutil.copy2(root/name, output/name)
+    if sys.platform == 'darwin':
+        subprocess.run(['ditto', str(root/'dist/TransCora.app'), str(output/'TransCora.app')], check=True)
+        app_files = output/'TransCora.app/Contents/MacOS'
+        for name in ('assets', 'presets', 'tools', 'licenses', 'docs'):
+            shutil.copytree(output/name, app_files/name, dirs_exist_ok=True)
+        for name in ('README.md', 'README_DE.md', 'LICENSE', 'THIRD_PARTY.md'):
+            shutil.copy2(output/name, app_files/name)
     (output/'output').mkdir(exist_ok=True)
     manifest = {}
     for path in sorted(output.rglob('*')):
@@ -55,10 +62,13 @@ def main():
             with path.open('rb') as source:
                 manifest[path.relative_to(output).as_posix()] = hashlib.file_digest(source, 'sha256').hexdigest()
     (output/'BUILD_HASHES.json').write_text(json.dumps(manifest, indent=2), encoding='utf-8')
-    archive = Path(shutil.make_archive(str(root/'dist/TransCora'), 'zip', root/'dist', 'TransCora'))
+    label = ('Windows_x64' if sys.platform == 'win32' else 'Linux_x64' if sys.platform == 'linux'
+             else 'macOS_AppleSilicon' if platform.machine() == 'arm64' else 'macOS_Intel')
+    name = 'TransCora_1.0_'+label
+    archive = Path(shutil.make_archive(str(root/'dist'/name), 'zip' if sys.platform == 'win32' else 'gztar', root/'dist', 'TransCora'))
     with archive.open('rb') as source:
         digest = hashlib.file_digest(source, 'sha256').hexdigest()
-    (root/'dist/TransCora.zip.sha256').write_text(digest+'  TransCora.zip\n', encoding='utf-8')
+    archive.with_name(archive.name+'.sha256').write_text(digest+'  '+archive.name+'\n', encoding='utf-8')
     print(archive)
 
 

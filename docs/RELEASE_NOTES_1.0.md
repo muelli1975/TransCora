@@ -3,7 +3,7 @@
 ## Video export
 
 - MP4 remains the default. Cross-view Full-SBS R/L can use MP4 or MKV; MKV stores native right-eye-first StereoMode. MP4 omits stereo flags that would misidentify the eye order.
-- Size selection: Standard, Original, 1080p, 2160p and Custom. Standard preserves previous defaults; Full layouts retain reconstructed source size unless another size is selected. Custom Full dimensions describe one eye, other dimensions describe the packed frame.
+- Size selection: Standard, Original, 1080p, 2160p and Custom. Full layouts retain reconstructed source size by default. Custom width and height describe the complete output picture for every layout. Cross-view 1080p is 3840 Ã— 1080 total; custom 1920 Ã— 540 preserves two proportional 960 Ã— 540 eyes. Actual MP4/MKV raster, square pixels, eye order and round-circle geometry are tested.
 - Optional frame-rate conversion is available with every regular video target, in the same encoding pass as layout and resizing. Source timing is preserved by default. The former standalone frame-rate target is now Keep layout. Earlier saved frame-rate jobs retain their selected conversion.
 - Frame-rate changes drop or repeat complete stereo pairs without blending or motion interpolation. Audio and playback duration remain unchanged. Fractional NTSC choices use exact rational rates.
 - Interlaced sources are deinterlaced per eye with BWDIF at field rate. 25 interlaced frames/50 fields can become 50 progressive frames. Explicit target rates and BD-3D adapt the common pair sequence afterwards.
@@ -12,8 +12,8 @@
 
 ## Polarised monitor output
 
-- Row-interleaved output is available for both images and videos. Default screen dimensions are 1920 × 1080; width, height and first-row eye assignment are adjustable and saved per job/preset.
-- Each eye is fitted to its final per-eye screen grid before weaving. Matching 1920 × 1080 Half-OU/abq images are reordered without resampling or pixel changes. Other sizes use Lanczos, with aspect-preserving borders.
+- Row-interleaved output is available for both images and videos. Default screen dimensions are 1920 Ã— 1080; width, height and first-row eye assignment are adjustable and saved per job/preset.
+- Each eye is fitted to its final per-eye screen grid before weaving. Matching 1920 Ã— 1080 Half-OU/abq images are reordered without resampling or pixel changes. Other sizes use Lanczos, with aspect-preserving borders.
 - Images initially use lossless PNG; videos use 4:4:4 colour to keep adjacent eye rows separate. MKV writes native row-interleaved StereoMode; H.264 left-first also writes Frame-Packing 2. MP4 preserves the physical rows without misleading SBS/OU metadata.
 - Direct playback requires native screen resolution, full screen and no rescaling, overscan or second stereo conversion. Actual monitor eye order must be checked on the device. Row weaving is separate from temporal interlacing.
 
@@ -36,6 +36,10 @@
 - Orientation and ICC profiles are handled before conversion. ExifTool retains relevant EXIF/XMP/IPTC and capture dates; output orientation and filesystem times are preserved.
 - MVC and SDR MV-HEVC decode both actual views. No arbitrary MVC frame-count limit or rejection based only on an unreliable container count. Explicit packed layouts override unsuitable stereo metadata; ordinary missing SDR tags use visible colour assumptions.
 - Portable Windows package contains application code, verified tools and ExifTool support files. The application works locally without an account, tracking or runtime network access.
+
+## Platform packages
+
+Windows x64 includes all required runtimes and the BD-3D encoder. Linux x64 and macOS Apple Silicon include the application runtime, CIELAB and ExifTool; FFmpeg/ffprobe and Perl are installed separately. Linux includes the independent MVC decoder. Apple Silicon currently supports packed stereo and ordinary video input without an MVC decoder. Native Linux/macOS BD-3D encoding is not released; this is a limitation of the current FRIM integration, not a general restriction of Blu-ray 3D.
 
 ## Limits
 

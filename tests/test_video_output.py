@@ -16,6 +16,52 @@ from transcora.core.bd3d import encoder_args
 
 
 class VideoOutputTests(unittest.TestCase):
+    def test_cross_view_full_hd_keeps_circles_round_in_mp4_and_mkv(self):
+        import io
+        from PIL import Image, ImageDraw
+        from transcora.core.engine import metadata_layout, preview
+        tools = Toolchain.find()
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            image = Image.new('RGB', (5120, 1440))
+            draw = ImageDraw.Draw(image)
+            for x, colour in ((0, 'red'), (2560, 'blue')):
+                draw.rectangle((x, 0, x+2559, 1439), fill=colour)
+                draw.ellipse((x+960, 400, x+1600, 1040), fill='white')
+            picture = folder/'circles.png'; image.save(picture)
+            source = folder/'circles_full_sbs.mkv'
+            capture([str(tools.ffmpeg), '-v', 'error', '-y', '-i', str(picture),
+                     '-frames:v', '1', '-c:v', 'ffv1', '-pix_fmt', 'gbrp',
+                     '-colorspace', 'rgb', '-color_primaries', 'bt709',
+                     '-color_trc', 'iec61966-2-1', '-color_range', 'pc', str(source)])
+            for container in ('mp4', 'mkv'):
+                for mode, expected in (('original', (5120,1440)), ('1080p', (3840,1080)), ('custom', (1920,540))):
+                    with self.subTest(container=container, mode=mode):
+                        plan = plan_job(tools, Job(source, Options(target='cross_sbs', container=container,
+                                            video_size=mode, video_width=1920, video_height=540, crf=18)), folder/'out', set())
+                        self.assertEqual(plan.size, expected)
+                        execute(tools, plan, threading.Event(), lambda *a:None, folder/'export.log')
+                        video = probe(tools, plan.output)['video']
+                        self.assertEqual((video['width'], video['height']), expected)
+                        self.assertEqual(video['sample_aspect_ratio'], '1:1')
+                        self.assertEqual(Fraction(video['display_aspect_ratio'].replace(':','/')), Fraction(32,9))
+                        self.assertEqual(metadata_layout(video), ('sbs',True) if container=='mkv' else None)
+                        decoded = capture([str(tools.ffmpeg), '-v', 'error', '-i', str(plan.output),
+                                           '-frames:v', '1', '-c:v', 'png', '-f', 'image2pipe', '-'])
+                        # Check decoded eye shape, rather than only the stored raster.
+                        with Image.open(io.BytesIO(decoded)) as frame:
+                            eye_width = expected[0]//2
+                            for x, blue in ((0, True), (eye_width, False)):
+                                eye = frame.crop((x, 0, x+eye_width, expected[1])).convert('RGB')
+                                r,g,b = eye.split()
+                                white = g.point(lambda value: 255 if value > 220 else 0)
+                                box = white.getbbox(); self.assertIsNotNone(box)
+                                self.assertAlmostEqual(box[2]-box[0], box[3]-box[1], delta=4)
+                                pixel = eye.getpixel((eye_width//8, expected[1]//2))
+                                self.assertGreater(pixel[2] if blue else pixel[0], 200)
+                        with Image.open(io.BytesIO(preview(tools, plan, threading.Event()))) as frame:
+                            self.assertEqual(frame.size, expected)
+
     def test_abq_image_rows_are_reordered_without_resampling(self):
         from PIL import Image
         from transcora.core.images import ImageOptions, ImageJob, plans, execute_image
@@ -97,6 +143,7 @@ class VideoOutputTests(unittest.TestCase):
             with self.assertRaises(ValueError): replace(Options(), **changes).validate()
 
     def test_geometry_and_bitrate_limits(self):
+        self.assertEqual(output_dimensions(Options(target='cross_sbs',video_size='1080p'),1440,1080),(1920,1080))
         self.assertEqual(output_dimensions(Options(video_size='2160p'), 1920, 1080), (3840, 2160))
         self.assertEqual(output_dimensions(Options(target='full_sbs', video_size='2160p'), 1920, 1080), (3840, 2160))
         self.assertEqual(output_dimensions(Options(target='full_sbs'), 960, 540), (960, 540))
@@ -148,7 +195,7 @@ class VideoOutputTests(unittest.TestCase):
                      '-colorspace','bt709','-color_primaries','bt709','-color_trc','bt709','-color_range','tv',str(source)])
             for opts, expected in [
                 (Options(video_size='2160p',container='mkv'),(3840,2160)),
-                (Options(target='cross_sbs',container='mkv',video_size='custom',video_width=640,video_height=360),(1280,360))]:
+                (Options(target='cross_sbs',container='mkv',video_size='custom',video_width=1280,video_height=360),(1280,360))]:
                 plan=plan_job(tools,Job(source,opts),folder,set())
                 self.assertEqual(plan.size,expected)
                 execute(tools,plan,threading.Event(),lambda *a:None,folder/(opts.target+'.log'))

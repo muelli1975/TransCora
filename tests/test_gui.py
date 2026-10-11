@@ -181,6 +181,14 @@ class GuiTests(unittest.TestCase):
         self.window.option_changed('container')
         self.assertEqual(self.window.defaults.container, 'mkv')
         self.assertTrue(self.window.output_name.get().endswith('-rl.mkv'))
+        self.window.variables['video_size'].set('Benutzerdefiniert')
+        self.window.option_changed('video_size')
+        self.root.update()
+        self.assertTrue(self.window.advanced.winfo_ismapped())
+        self.assertEqual(self.window.video_size_caption.get(), 'Größe des Gesamtbildes')
+        self.window.variables['video_width'].set('1920'); self.window.option_changed('video_width')
+        self.window.variables['video_height'].set('540'); self.window.option_changed('video_height')
+        self.assertEqual((self.window.defaults.video_width, self.window.defaults.video_height), (1920,540))
         from transcora.gui.image_view import ImageView
         from PIL import Image
         dialog = tk.Toplevel(self.root); dialog.geometry('600x400')
