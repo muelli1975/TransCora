@@ -9,6 +9,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: transcora-build-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   linux-tests:
     runs-on: ubuntu-latest
@@ -218,8 +222,23 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           python -c "from transcora import __version__; assert __version__ == '1.0'"
+          current_head=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')
+          if [ "$current_head" != "$GITHUB_SHA" ]; then
+            echo 'A newer revision is being tested; skipping this superseded publication.'
+            exit 0
+          fi
           if gh release view v1.0 >/dev/null 2>&1; then
-            echo 'Release v1.0 already exists; leaving published files unchanged.'
+            release_head=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v1.0" --jq '.object.sha')
+            # Only replace this release's initial candidates from the same session.
+            case "$release_head" in
+              "$GITHUB_SHA"|35d7ea128d37358b847c1007d1b1f7bf20392986|b77593433e2495c1b89bf713e18ee0c70e069065) ;;
+              *) echo 'Release v1.0 belongs to a different revision; leaving it unchanged.'; exit 1 ;;
+            esac
+            gh release upload v1.0 release-files/* --clobber
+            if [ "$release_head" != "$GITHUB_SHA" ]; then
+              gh api --method PATCH "repos/$GITHUB_REPOSITORY/git/refs/tags/v1.0" -f sha="$GITHUB_SHA" -F force=true
+            fi
+            gh release edit v1.0 --title 'TransCora 1.0' --notes-file docs/RELEASE_NOTES_1.0.md --latest
           else
             gh release create v1.0 release-files/* --target "$GITHUB_SHA" --title 'TransCora 1.0' --notes-file docs/RELEASE_NOTES_1.0.md --latest
           fi

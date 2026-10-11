@@ -38,12 +38,12 @@ The default output folder is `output` beside the program. Folder batches preserv
 | --- | --- |
 | Full-SBS / Full-OU | Two complete eye images, beside or above each other |
 | Half-SBS / Half-OU | Compact stereo formats for compatible players and displays |
-| Cross-view Â· Full-SBS R/L | Free-viewing: right eye on the left, left eye on the right |
+| Cross-view · Full-SBS R/L | Free-viewing: right eye on the left, left eye on the right |
 | Anaglyph | Stereo through coloured glasses; 17 AnaglyphBatch methods |
 | Mono | Export the left eye as an ordinary video |
 | Keep layout | Re-encode with the existing arrangement, optionally changing frame rate |
 | Row-interleaved | Direct output for a compatible polarised monitor |
-| BD-3D Â· 1080p | Blu-ray 3D ISO or AVC/MVC M2TS, 1920 Ã— 1080 per eye |
+| BD-3D · 1080p | Blu-ray 3D ISO or AVC/MVC M2TS, 1920 × 1080 per eye |
 
 **MP4 is the default; MKV is selectable**, including cross-view. MKV carries the appropriate stereo metadata. Cross-view MP4 keeps the R/L picture arrangement without a misleading L/R marker. Player support varies; check the first output on the intended device.
 
@@ -53,10 +53,10 @@ Choose **Original**, **1080p**, **2160p** or **Custom**. Standard retains the re
 
 | Example | Complete picture | Stored pixels per eye |
 | --- | --- | --- |
-| Cross-view, 1080p per eye | 3840 Ã— 1080 | 1920 Ã— 1080 |
-| Cross-view, custom 1920 Ã— 540 | 1920 Ã— 540 | 960 Ã— 540 |
-| Half-SBS in UHD | 3840 Ã— 2160 | 1920 Ã— 2160 |
-| Full-SBS with UHD per eye | 7680 Ã— 2160 | 3840 Ã— 2160 |
+| Cross-view, 1080p per eye | 3840 × 1080 | 1920 × 1080 |
+| Cross-view, custom 1920 × 540 | 1920 × 540 | 960 × 540 |
+| Half-SBS in UHD | 3840 × 2160 | 1920 × 2160 |
+| Full-SBS with UHD per eye | 7680 × 2160 | 3840 × 2160 |
 
 Cross-view stays Full-SBS at every size: the eyes are scaled proportionally rather than squeezed to half width. A larger output cannot restore details missing from the source. For free cross-viewing, show both images together in ordinary 2D mode; disable any automatic stereo conversion in the player.
 
@@ -68,13 +68,13 @@ Temporal interlaced sources are converted to progressive pictures while retainin
 
 Under **Advanced**, select H.264 or H.265 (MKV), CRF quality or a target bitrate. Anaglyph quality modes use 4:4:4 colour; a 4:2:0 compatibility mode is available for players that need it. Row-interleaved video uses 4:4:4 to preserve the separate eye rows.
 
-**Audio options** select all tracks, individual tracks or no audio. Keep the original audio, convert to AAC, or downmix to stereo. BD-3D uses LPCM audio and a fixed 23.976 fps output; its selectable total AVC/MVC target bitrate is 20â€“40 Mbit/s.
+**Audio options** select all tracks, individual tracks or no audio. Keep the original audio, convert to AAC, or downmix to stereo. BD-3D uses LPCM audio and a fixed 23.976 fps output; its selectable total AVC/MVC target bitrate is 20–40 Mbit/s.
 
 ## Polarised monitors
 
-Choose **Row-interleaved** for either videos or images. Enter the monitor's native width and height, initially 1920 Ã— 1080, and select which eye occupies the first screen row. The picture alternates left and right eye lines.
+Choose **Row-interleaved** for either videos or images. Enter the monitor's native width and height, initially 1920 × 1080, and select which eye occupies the first screen row. The picture alternates left and right eye lines.
 
-Display the result at the exact native resolution, full screen, with no scaling or second stereo conversion. If depth is reversed, switch the first-row eye. Lossless PNG is recommended for images. An existing 1920 Ã— 1080 Half-OU/abq image already has 1920 Ã— 540 pixels per eye and can be woven directly for a Full-HD monitor.
+Display the result at the exact native resolution, full screen, with no scaling or second stereo conversion. If depth is reversed, switch the first-row eye. Lossless PNG is recommended for images. An existing 1920 × 1080 Half-OU/abq image already has 1920 × 540 pixels per eye and can be woven directly for a Full-HD monitor.
 
 ## Images and MPO
 
@@ -98,4 +98,4 @@ Shortcuts: **Ctrl+O** adds files; **Ctrl+A** selects the list; **Ctrl+click** se
 
 Release packages include the matching application source. Build instructions: [BUILD.md](BUILD.md). Detailed format notes: [technical reference](docs/TECHNICAL_REFERENCE.md).
 
-Copyright Christoph MÃ¼ller. TransCora uses the MIT License; supplied third-party tools retain their own licences. See [LICENSE](LICENSE) and [THIRD_PARTY.md](THIRD_PARTY.md).
+Copyright Christoph Müller. TransCora uses the MIT License; supplied third-party tools retain their own licences. See [LICENSE](LICENSE) and [THIRD_PARTY.md](THIRD_PARTY.md).
