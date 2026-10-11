@@ -16,7 +16,7 @@ from transcora.core.engine import Cancelled, methods
 from transcora.core.model import app_root, ROW_ORDERS
 from transcora.core.storage import write_json, new_run_log, validate_preset_name
 from transcora.core.toolchain import Toolchain
-from .theme import checkbox, GOLD_LIGHT, MUTED, SECONDARY_BG, TEXT
+from .theme import checkbox, set_control_state, GOLD_LIGHT, MUTED, SECONDARY_BG, TEXT
 from .native import schedule_dark_titlebar
 from .localization import TextVar
 
@@ -240,7 +240,7 @@ class ImagePanel:
             if key == 'row_first': enabled = rows
             if key in {'screen_width', 'screen_height'}: enabled = rows
             if key in {'size_mode', 'size_edge'}: enabled = enabled and not rows
-            combo.configure(state=('normal' if key in {'swap', 'metadata', 'screen_width', 'screen_height'} else 'readonly') if enabled and not self.busy else 'disabled')
+            set_control_state(combo, ('normal' if key in {'swap', 'metadata', 'screen_width', 'screen_height'} else 'readonly') if enabled and not self.busy else 'disabled')
         if rows:
             self.detail.set('Polfilter: Exakte Monitorauflösung, Vollbild ohne Skalierung. PNG erhält die Farbzeilen verlustfrei.')
         elif not self.selected():
@@ -369,7 +369,7 @@ class ImagePanel:
         self.busy = value
         self.owner.language_sensitivity()
         self.owner.notebook.tab(self.owner.video_tab, state='disabled' if value else 'normal')
-        for widget, normal in self.controls: widget.configure(state='disabled' if value else normal)
+        for widget, normal in self.controls: set_control_state(widget, 'disabled' if value else normal)
         self.abort_button.configure(state='normal' if value else 'disabled'); self.sensitivity()
 
     def abort(self):

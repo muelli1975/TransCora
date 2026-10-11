@@ -26,6 +26,15 @@ def checkbox(parent, text, variable, command=None):
                            font=('Segoe UI' if sys.platform == 'win32' else 'Helvetica', 13))
 
 
+def set_control_state(widget, state):
+    """Apply the same disabled checkbox colors as the other Stereo tools."""
+    if isinstance(widget, ctk.CTkCheckBox):
+        widget.configure(state=state, fg_color=DISABLED if state == 'disabled' else GOLD,
+                         hover_color=DISABLED if state == 'disabled' else GOLD_LIGHT)
+    else:
+        widget.configure(state=state)
+
+
 def apply_theme(root):
     ctk.set_appearance_mode('dark')
     root.configure(background=APP_BG)

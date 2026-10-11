@@ -22,7 +22,7 @@ from transcora.core.storage import load_list, save_list, write_json, new_run_log
 from transcora.core.toolchain import Toolchain
 from transcora.gui.native import schedule_dark_titlebar
 from transcora.gui.preview_window import PreviewWindow
-from transcora.gui.theme import checkbox, apply_theme, GOLD_LIGHT, MUTED, TEXT, PANEL_BG, APP_BG, SECONDARY_BG, BORDER
+from transcora.gui.theme import checkbox, set_control_state, apply_theme, GOLD_LIGHT, MUTED, TEXT, PANEL_BG, APP_BG, SECONDARY_BG, BORDER
 
 
 STATUS = {"queued": "Wartet", "checking": "Prüfung", "ready": "Bereit", "blocked": "Prüfen!",
@@ -746,7 +746,7 @@ class Window:
         self.combos['container'].configure(values=[self.t(self.mappings['container'][k]) for k in
             (('iso', 'm2ts') if bd3d else ('mp4', 'mkv'))])
         self.advanced_button.configure(state='normal')
-        self.swap_control.configure(state="disabled" if framerate else "normal")
+        set_control_state(self.swap_control, "disabled" if framerate else "normal")
         self.fps_frame.grid_remove() if bd3d else self.fps_frame.grid()
         self.combos['fps_mode'].configure(state='disabled' if bd3d else 'readonly')
         self.combos['target_fps'].configure(state='normal' if not bd3d and options.fps_mode == 'custom' else 'disabled')
@@ -1083,7 +1083,7 @@ class Window:
         self.language_sensitivity()
         self.notebook.tab(self.image_tab, state='disabled' if value else 'normal')
         for widget, normal in self.controls:
-            widget.configure(state="disabled" if value else normal)
+            set_control_state(widget, "disabled" if value else normal)
         self.abort_button.configure(state="normal" if value else "disabled")
         if not value:
             self.update_elapsed()
