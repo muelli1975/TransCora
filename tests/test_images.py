@@ -2,6 +2,7 @@ from dataclasses import replace
 from pathlib import Path
 import hashlib
 import json
+import os
 import tempfile
 import threading
 import unittest
@@ -81,6 +82,7 @@ class ImageTests(unittest.TestCase):
     def test_pair_validation_numbering_lists_collision_and_cancel(self):
         left, right = self.folder/'photo_l.jpg', self.folder/'photo_r.jpg'
         self.left.save(left); self.right.save(right)
+        os.utime(right, ns=(right.stat().st_atime_ns, left.stat().st_mtime_ns - 10_000_000_000))
         opts = ImageOptions(task='pairs'); jobs = [ImageJob(left, opts), ImageJob(right, replace(opts))]
         with self.assertRaises(ValueError): plans(jobs[:1], self.folder/'pairs', self.cancel)
         prepared = plans(jobs, self.folder/'pairs', self.cancel)
@@ -88,6 +90,7 @@ class ImageTests(unittest.TestCase):
         self.assertEqual(prepared[0].outputs[0].name, '0001_l.jpg')
         for source, output in zip(prepared[0].sources, prepared[0].outputs):
             self.assertEqual(hashlib.sha256(source.read_bytes()).digest(), hashlib.sha256(output.read_bytes()).digest())
+            self.assertEqual(source.stat().st_mtime_ns, output.stat().st_mtime_ns)
         next_plan = plans(jobs, self.folder/'pairs', self.cancel)[0]
         self.assertNotEqual(next_plan.outputs, prepared[0].outputs)
         listing = self.folder/'list.json'; save_images(listing, jobs); restored = load_images(listing)

@@ -407,8 +407,9 @@ def execute_image(tools, plan, cancel, emit, log_path):
                         if verified.size != pixels.size:
                             raise ValueError('Ausgabemaße stimmen nicht mit dem Bildplan überein.')
                     staged.append(target)
-            for target in staged:
-                stat = plan.sources[0].stat(); os.utime(target, ns=(stat.st_atime_ns, stat.st_mtime_ns))
+            for i, target in enumerate(staged):
+                source = plan.sources[i] if opts.task == 'pairs' else plan.sources[0]
+                stat = source.stat(); os.utime(target, ns=(stat.st_atime_ns, stat.st_mtime_ns))
             for source, stamp in zip(plan.sources, plan.stamps):
                 stat = source.stat()
                 if (stat.st_size, stat.st_mtime_ns) != stamp:
