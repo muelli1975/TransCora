@@ -188,7 +188,8 @@ class GuiTests(unittest.TestCase):
         self.window.variables['video_size'].set('Benutzerdefiniert')
         self.window.option_changed('video_size')
         self.root.update()
-        self.assertTrue(self.window.advanced.winfo_ismapped())
+        self.assertFalse(self.window.advanced.winfo_ismapped())
+        self.assertTrue(self.window.video_dimensions.winfo_ismapped())
         self.assertEqual(self.window.video_size_caption.get(), 'Größe des Gesamtbildes')
         self.window.variables['video_width'].set('1920'); self.window.option_changed('video_width')
         self.window.variables['video_height'].set('540'); self.window.option_changed('video_height')
@@ -226,6 +227,97 @@ class GuiTests(unittest.TestCase):
         self.window.set_busy(True)
         self.assertEqual(self.window.notebook.tab(self.window.image_tab, 'state'), 'disabled')
         self.window.set_busy(False)
+
+    def test_inline_dimensions_dialog_and_tabs_keep_main_layout(self):
+        from tkinter import ttk
+        self.root.geometry('780x680')
+        self.root.update()
+        height = self.window.tree.winfo_height()
+        detail = self.window.detail_text.winfo_height()
+        self.assertGreaterEqual(height, 135)
+        self.assertGreaterEqual(int(self.window.detail_text.cget('padx')), 6)
+        self.window.toggle_advanced()
+        self.root.update()
+        self.assertEqual(self.window.tree.winfo_height(), height)
+        self.assertEqual(self.window.detail_text.winfo_height(), detail)
+        self.window.close_advanced()
+        self.window.variables['video_size'].set(self.window.t('Benutzerdefiniert'))
+        self.window.option_changed('video_size')
+        self.root.update()
+        self.assertFalse(self.window.advanced_dialog.winfo_ismapped())
+        self.assertEqual(self.window.tree.winfo_height(), height)
+        self.assertEqual(self.window.video_dimensions.master, self.window.option_frames['video_size'])
+        self.window.variables['video_width'].set('2560')
+        self.window.variables['video_height'].set('1440')
+        self.assertTrue(self.window.commit_entries())
+        self.assertEqual(self.window.defaults.video_width, 2560)
+        self.assertEqual(self.window.defaults.video_height, 1440)
+        self.window.variables['video_width'].set('2559')
+        self.assertFalse(self.window.commit_entries())
+        self.assertEqual(self.window.variables['video_width'].get(), '2559')
+        self.assertEqual(self.window.defaults.video_width, 2560)
+        self.window.variables['video_width'].set('2560')
+        self.window.variables['video_size'].set(self.window.t('Standard'))
+        self.window.option_changed('video_size')
+        self.assertEqual(self.window.variables['video_width'].get(), '1920')
+        self.assertEqual(str(self.window.combos['video_width'].cget('state')), 'disabled')
+        style = ttk.Style()
+        self.assertEqual(style.lookup('TNotebook.Tab', 'padding', ('selected',)),
+                         style.lookup('TNotebook.Tab', 'padding', ('!selected',)))
+
+    def test_polarised_target_has_fixed_eight_bit_and_no_profile_selector(self):
+        from transcora.core.model import BD_BITRATES
+        self.assertEqual(BD_BITRATES, (20, 25, 30, 35, 40))
+        self.assertEqual(Options.from_dict({'target': 'row_interleaved', 'profile': 'quality10'}).profile, 'quality')
+        self.window.variables['profile'].set(self.window.t('Hohe Farbtiefe · 10 Bit / 4:4:4'))
+        self.window.option_changed('profile')
+        self.window.variables['target'].set(self.window.t('Zeilenverschachtelt (Polfilter)'))
+        self.window.option_changed('target')
+        self.root.update()
+        self.assertEqual(self.window.defaults.profile, 'quality')
+        self.assertFalse(self.window.option_frames['profile'].winfo_ismapped())
+        self.assertFalse(self.window.option_frames['method'].winfo_ismapped())
+        self.assertTrue(self.window.screen_fields.winfo_ismapped())
+
+    def test_displayed_original_dimensions_follow_checked_source_and_mixed_values(self):
+        from types import SimpleNamespace
+        self.window.add_paths([Path('A_full_sbs.mp4'), Path('B_full_sbs.mp4')])
+        a, b = self.window.jobs
+        for job, size in [(a, (3840, 1080)), (b, (2560, 720))]:
+            job.plan = SimpleNamespace(layout='full_sbs', duration=1,
+                info={'video': {'width': size[0], 'height': size[1], 'avg_frame_rate': '25/1'}})
+            self.window.update_row(job)
+            job.options = replace(job.options, target='anaglyph', video_size='original')
+            job.plan = None
+        self.window.tree.selection_set(a.id)
+        self.window.selection_changed()
+        self.assertEqual((self.window.variables['video_width'].get(), self.window.variables['video_height'].get()), ('1920', '1080'))
+        self.window.tree.selection_set(a.id, b.id)
+        self.window.selection_changed()
+        self.assertEqual(self.window.variables['video_width'].get(), '')
+        self.assertEqual(self.window.variables['video_height'].get(), '')
+
+    def test_actual_image_preview_and_pending_custom_edge(self):
+        from PIL import Image
+        panel = self.window.images
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp)/'test_full_sbs.png'
+            Image.new('RGB', (64, 24), 'red').save(source)
+            panel.add_paths([source])
+            panel.tree.selection_set(panel.jobs[0].id)
+            panel.selection_changed()
+            panel.variables['size_mode'].set(self.window.t('Benutzerdefiniert'))
+            panel.changed('size_mode')
+            panel.variables['size_pixels'].set('100')
+            panel.preview()
+            deadline = time.monotonic()+20
+            while panel.busy and time.monotonic() < deadline:
+                self.root.update()
+                time.sleep(.01)
+            self.assertFalse(panel.busy, panel.status.get())
+            self.assertEqual(panel.jobs[0].options.size_pixels, 100)
+            self.assertIsNotNone(panel.preview_dialog, panel.status.get())
+            panel.preview_dialog.destroy()
 
     def setUp(self):
         try:

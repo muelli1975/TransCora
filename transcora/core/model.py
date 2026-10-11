@@ -26,7 +26,7 @@ COMPATIBILITY_NOTE = ("Breitere Player-Unterstützung, jedoch mit deutlich gerin
 FPS_CHOICES = ("23,976", "24", "25", "29,97", "30", "50", "59,94", "60")
 FPS_MODES = {'source': 'Quelle beibehalten', 'custom': 'Zielbildrate wählen'}
 VIDEO_SIZES = {'default': 'Standard', 'original': 'Original', '1080p': '1080p', '2160p': '2160p', 'custom': 'Benutzerdefiniert'}
-BD_BITRATES = (20, 25, 28, 30, 35, 40)
+BD_BITRATES = (20, 25, 30, 35, 40)
 ROW_ORDERS = {'left': 'Linkes Auge in erster Zeile', 'right': 'Rechtes Auge in erster Zeile'}
 AUDIO_FORMATS = {'copy': 'Original beibehalten', 'aac': 'AAC · Hohe Kompatibilität'}
 AUDIO_TRACKS = {'all': 'Alle übernehmen', 'selected': 'Ausgewählte Spuren', 'none': 'Ohne Ton'}
@@ -102,6 +102,8 @@ class Options:
         allowed = cls.__dataclass_fields__
         if set(data) - set(allowed):
             raise ValueError("Unbekannte Einstellungen in der Jobliste.")
+        if data.get('target') == 'row_interleaved':
+            data['profile'] = 'quality'
         result = cls(**data)
         result.validate()
         return result
@@ -120,7 +122,7 @@ class Options:
             if type(value) is not int or not 2 <= value <= 16384 or value % 2:
                 raise ValueError('Videomaße: Gerade Pixelzahlen von 2 bis 16384 verwenden.')
         if type(self.bd_bitrate_mbps) is not int or self.bd_bitrate_mbps not in BD_BITRATES:
-            raise ValueError('BD-3D-Bitrate: 20, 25, 28, 30, 35 oder 40 Mbit/s wählen.')
+            raise ValueError('BD-3D-Bitrate: 20, 25, 30, 35 oder 40 Mbit/s wählen.')
         if not isinstance(self.swap, bool):
             raise ValueError("Ungültige L/R-Einstellung.")
         if not isinstance(self.method, str):

@@ -30,6 +30,7 @@ def apply_theme(root):
     tab_colors = [("disabled", SECONDARY_BG), ("selected", "active", GOLD_LIGHT),
                   ("selected", GOLD), ("active", HOVER_BG)]
     style.map("TNotebook.Tab", background=tab_colors,
+              padding=[("selected", (18, 4)), ("!selected", (18, 4))],
               foreground=[("disabled", DISABLED), ("selected", APP_BG)],
               lightcolor=[("selected", GOLD), ("!selected", BORDER)],
               darkcolor=[("selected", GOLD), ("!selected", BORDER)])

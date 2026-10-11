@@ -49,7 +49,8 @@ class Localizer:
                 if current != previous:
                     source = current
                 value = self.t(source)
-                setter(value)
+                if value != current:
+                    setter(value)
                 saved[key] = (source, value)
             if isinstance(widget, (ttk.Label, ttk.Button, ttk.Checkbutton, ttk.Radiobutton, ttk.Menubutton, ttk.LabelFrame)):
                 if not ('textvariable' in widget.keys() and widget.cget('textvariable')):
