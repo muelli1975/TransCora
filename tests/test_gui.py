@@ -31,8 +31,15 @@ class GuiTests(unittest.TestCase):
 
     def tearDown(self):
         if hasattr(self, 'root'):
+            def descendants(widget):
+                yield widget
+                for child in widget.winfo_children():
+                    yield from descendants(child)
+            widgets = list(descendants(self.root))
             for callback in self.root.tk.call('after', 'info'):
-                self.root.after_cancel(callback)
+                script = self.root.tk.splitlist(self.root.tk.call('after', 'info', callback))[0]
+                owner = next((w for w in widgets if script in (w._tclCommands or [])), self.root)
+                owner.after_cancel(callback)
             self.root.destroy()
 
     def test_file_list_selection_and_option_scope(self):

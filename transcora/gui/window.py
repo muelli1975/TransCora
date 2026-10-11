@@ -272,6 +272,7 @@ class Window:
         self.audio_dialog.resizable(False, False)
         self.audio_dialog.protocol('WM_DELETE_WINDOW', self.close_audio_options)
         self.audio_dialog.bind('<Escape>', lambda e: self.close_audio_options())
+        schedule_dark_titlebar(self.audio_dialog)
         audio_fields = ttk.Frame(self.audio_dialog, padding=12)
         audio_fields.pack(fill='both', expand=True)
         for col in (0, 1, 2):
@@ -791,7 +792,6 @@ class Window:
         self.refresh_controls()
         self.audio_dialog.geometry(f'+{self.root.winfo_rootx()+30}+{self.root.winfo_rooty()+100}')
         self.audio_dialog.deiconify()
-        schedule_dark_titlebar(self.audio_dialog)
         self.audio_dialog.lift()
         self.audio_dialog.grab_set()
         self.combos['audio_tracks'].focus_set()
