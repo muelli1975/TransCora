@@ -1,5 +1,6 @@
 """CI-only Windows snapshots of the actual Tk application for visual review."""
 from pathlib import Path
+import ctypes
 import sys
 import tkinter as tk
 import time
@@ -13,6 +14,9 @@ from transcora.gui.preview_window import PreviewWindow
 
 OUT = ROOT/'output/gui-check'
 OUT.mkdir(parents=True, exist_ok=True)
+# The CI desktop is only 720 pixels high; keep its taskbar off the captures.
+taskbar = ctypes.windll.user32.FindWindowW('Shell_TrayWnd', None)
+ctypes.windll.user32.ShowWindow(taskbar, 0)
 root = tk.Tk()
 window = Window(root)
 root.geometry('860x680+20+0')
@@ -56,3 +60,4 @@ viewer.dialog.update()
 snap(viewer.dialog, 'preview.png')
 viewer.dialog.destroy()
 root.destroy()
+ctypes.windll.user32.ShowWindow(taskbar, 5)

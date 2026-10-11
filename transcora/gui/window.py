@@ -537,7 +537,7 @@ class Window:
         if framerate:
             text = "Layout, Auflösung und Augenreihenfolge bleiben erhalten. Video wird neu kodiert; Ton wird kopiert."
         if bd3d:
-            text = "1080p · 23,976 fps · AVC/MVC · Hohe Qualität. Konstante 23,976/24-fps-Quellen; 24 fps werden ohne Bildverlust verlangsamt."
+            text = "1080p · 23,976 fps · AVC/MVC · Hohe Qualität. Andere konstante Quellbildraten werden direkt angepasst."
             if options.container == 'm2ts':
                 text += " M2TS enthält beide Halbbilder, jedoch keine Blu-ray-Disc-Struktur."
         if options.codec == "h265":
