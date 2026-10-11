@@ -37,6 +37,8 @@ class Window:
         self.cancel = threading.Event()
         self.busy = False
         self.run_started = None
+        self.phase_started = None
+        self.remaining_scope = None
         self.estimate_weights = []
         self.estimated_finish = None
         self.estimate_updated = None
@@ -660,7 +662,7 @@ class Window:
         if framerate:
             text = "Layout, Auflösung und Halbbildreihenfolge bleiben erhalten. Video wird neu kodiert; Ton gemäß Erweitert."
         if bd3d:
-            text = "1080p · 23,976 fps · AVC/MVC · Hohe Qualität. Andere konstante Quellbildraten werden direkt angepasst."
+            text = "1080p · 23,976 fps · AVC/MVC · Hohe Qualität."
             if options.container == 'm2ts':
                 text += " M2TS enthält beide Halbbilder, jedoch keine Blu-ray-Disc-Struktur."
         if options.target == "cross_sbs":
@@ -895,11 +897,25 @@ class Window:
             return
         now = time.monotonic()
         self.elapsed_time.set('Vergangene Zeit: ' + PreviewWindow.time_text(max(0, now-self.run_started)))
+        prefix = 'Restzeit (aktueller Schritt): ' if self.remaining_scope == 'phase' else 'Restzeit: '
         if self.estimated_finish is None or now-(self.estimate_updated or now) > 15:
-            self.elapsed.set('Restzeit: —')
+            self.elapsed.set(prefix + '-')
         else:
             remaining = max(1, self.estimated_finish-now)
-            self.elapsed.set('Restzeit: ca. ' + PreviewWindow.time_text(remaining))
+            self.elapsed.set(prefix + 'ca. ' + PreviewWindow.time_text(remaining))
+
+    def estimate_phase_remaining(self, percent):
+        if self.run_started is None or self.phase_started is None:
+            return
+        now = time.monotonic()
+        elapsed, fraction = now-self.phase_started, percent/100
+        if .01 <= fraction < 1 and elapsed >= 2:
+            predicted = now+elapsed*(1-fraction)/fraction
+            self.estimated_finish = predicted if self.estimated_finish is None else .25*predicted+.75*self.estimated_finish
+            self.estimate_updated = now
+        elif fraction >= 1:
+            self.estimated_finish = None
+        self.update_elapsed()
 
     def estimate_remaining(self, index, count, percent):
         if self.run_started is None or percent is None:
@@ -920,6 +936,8 @@ class Window:
         self.cancel.clear()
         if track_time:
             self.run_started = time.monotonic()
+            self.remaining_scope = None
+            self.phase_started = None
             self.estimated_finish = None
             self.estimate_updated = None
             self.estimate_weights = []
@@ -1124,13 +1142,23 @@ class Window:
                 elif kind == "progress":
                     _, index, count, value = payload
                     if value["percent"] is not None:
-                        if 'remaining_seconds' in value and index == count:
+                        if value.get('remaining_scope') == 'phase':
+                            self.remaining_scope = 'phase'
+                            if 'remaining_seconds' in value:
+                                now = time.monotonic()
+                                remaining = value['remaining_seconds']
+                                self.estimated_finish = now+remaining if remaining is not None else None
+                                self.estimate_updated = now
+                                self.update_elapsed()
+                            elif 'phase_percent' in value:
+                                self.estimate_phase_remaining(value['phase_percent'])
+                        elif 'remaining_seconds' in value and index == count:
                             now = time.monotonic()
                             remaining = value['remaining_seconds']
                             self.estimated_finish = now+remaining if remaining is not None else None
                             self.estimate_updated = now
                             self.update_elapsed()
-                        else:
+                        elif self.remaining_scope != 'phase':
                             self.estimate_remaining(index, count, value["percent"])
                         self.progress.stop()
                         self.progress.configure(mode="determinate")
@@ -1152,6 +1180,9 @@ class Window:
                     self.progress.configure(mode='indeterminate')
                     self.progress.start(15)
                     self.estimated_finish = None
+                    self.phase_started = time.monotonic()
+                    job = next((j for j in self.jobs if j.id == payload[0]), None)
+                    self.remaining_scope = 'phase' if job and job.options.target == 'bd3d' else None
                     self.update_elapsed()
                 elif kind == "preview":
                     viewer, png, plan = payload

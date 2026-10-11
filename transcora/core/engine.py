@@ -222,8 +222,8 @@ class Plan:
             from .bd3d import prepare, BD_RATE
             config = prepare(video, self.layout, self.swap)
             timing = " → 23,976 fps (24000/1001) · " + (
-                "Alle Bilder bleiben erhalten" if config.source_rate in {BD_RATE, Fraction(24)}
-                else "Bildpaare auslassen/wiederholen · Laufzeit erhalten")
+                "Video und Ton um 0,1 % verlangsamen" if config.speed != 1
+                else "Bildzeiten bei Bedarf anpassen · Laufzeit erhalten")
         codec = "AVC/MVC" if self.options.target == "bd3d" else self.options.codec.upper()
         return (f"{video['width']} × {video['height']} · {video.get('codec_name', '?')} · "
                 f"{fps} fps ({rate}){timing} → {self.size[0]} × {self.size[1]} · "

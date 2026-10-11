@@ -6,7 +6,7 @@ import subprocess
 import tempfile
 import unittest
 
-from transcora.core.bd3d import prepare, check_cadence, Cadence, BD_RATE
+from transcora.core.bd3d import prepare, check_cadence, Cadence, SourceClock, BD_RATE
 from transcora.core.toolchain import Toolchain
 
 
@@ -79,9 +79,79 @@ class BdPreparationTests(unittest.TestCase):
                             config.audio_filter+',apad,atrim=end_sample=96096', '-ac', '2',
                             '-f', 's24le', '-'])
                         self.assertEqual(len(audio), 96096*2*3)
-            invalid = dict(info, r_frame_rate='25/1', avg_frame_rate='24/1')
+            invalid = dict(info, r_frame_rate='0/0', avg_frame_rate='0/0')
             with self.assertRaises(ValueError):
                 prepare(invalid, 'half_ou')
+
+    def test_valid_variable_source_times_are_accepted_but_missing_or_reversed_are_not(self):
+        clock = SourceClock(Fraction(25), '1/1000000')
+        for stamp in (7.0, 7.041, 7.079, 7.160, 7.201):
+            clock.feed(stamp)
+        self.assertEqual(clock.finish(), (5, 7.0))
+        self.assertFalse(clock.constant)
+        for stamp in (7.201, 7.200, float('nan'), float('inf')):
+            with self.assertRaises(ValueError):
+                clock.feed(stamp)
+        with self.assertRaises(ValueError):
+            SourceClock(Fraction(25), '1/1000').line('[showinfo@bd_clock] n: 0 pts: NOPTS pts_time: NOPTS')
+        drift = SourceClock(BD_RATE, '1/1000')
+        for n in range(100):
+            drift.feed(n*.042)
+        self.assertEqual(drift.finish()[0], 100)
+        self.assertFalse(drift.constant)
+
+    def test_vfr_metadata_and_missing_nominal_rate_do_not_block_preparation(self):
+        video = dict(index=0, width=128, height=64, r_frame_rate='25/1',
+                     avg_frame_rate='200/11', color_space='bt709', color_primaries='bt709',
+                     color_transfer='bt709', color_range='tv', pix_fmt='yuv420p')
+        for nominal in ('25/1', '0/0', None):
+            config = prepare(dict(video, r_frame_rate=nominal), 'full_sbs')
+            self.assertEqual(config.speed, 1)
+            self.assertEqual(config.audio_filter, 'anull')
+
+    def test_variable_frame_durations_preserve_timeline_eye_identity_and_exact_output_clock(self):
+        tools = Toolchain.find()
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp)/'variable_full_sbs.mkv'
+            # Every source pair has a unique luminance per eye. Long holds must
+            # repeat the same pair, rather than compressing time to frame count.
+            raw = b''.join(bytes([40+n*10])*64*64 + bytes([180-n*10])*64*64
+                           for n in range(8))
+            # raw is planar gray: reshape the two half planes into SBS rows.
+            raw = b''.join(raw[n*8192+y*64:n*8192+(y+1)*64] +
+                           raw[n*8192+4096+y*64:n*8192+4096+(y+1)*64]
+                           for n in range(8) for y in range(64))
+            subprocess.run([str(tools.ffmpeg), '-v', 'error', '-f', 'rawvideo', '-pix_fmt', 'gray',
+                '-s', '128x64', '-r', '25', '-i', 'pipe:0', '-vf',
+                "format=yuv420p,settb=1/1000,setpts='7000+N*40+floor(N/3)*40',"
+                'setparams=colorspace=bt709:color_primaries=bt709:color_trc=bt709:range=limited',
+                '-fps_mode', 'passthrough', '-c:v', 'ffv1', str(source)], input=raw, check=True)
+            video = json.loads(subprocess.check_output([str(tools.ffprobe), '-v', 'error',
+                '-show_streams', '-of', 'json', str(source)]))['streams'][0]
+            config = prepare(video, 'full_sbs')
+            self.assertEqual(config.speed, 1)
+            graph = config.graph.replace(']sidedata=', ']showinfo@bd_clock=checksum=0,sidedata=', 1)
+            graph += ';[left][right]hstack,showinfo@bd_output=checksum=0,scale=128:64:flags=neighbor,format=gray[v]'
+            result = subprocess.run([str(tools.ffmpeg), '-v', 'info', '-copyts', '-filter_complex_threads', '1',
+                '-i', str(source), '-filter_complex', graph, '-map', '[v]', '-fps_mode', 'passthrough',
+                '-c:v', 'rawvideo', '-pix_fmt', 'gray', '-f', 'rawvideo', '-'], capture_output=True, check=True)
+            original, output = SourceClock(config.source_rate, video['time_base']), Cadence(BD_RATE, '1/24000', 'bd_output')
+            for line in result.stderr.decode().splitlines():
+                original.line(line)
+                output.line(line)
+            self.assertEqual(original.finish(), (8, 7.0))
+            self.assertFalse(original.constant)
+            count, first = output.finish()
+            self.assertEqual(first, 0)
+            self.assertAlmostEqual(count/float(BD_RATE), .40, delta=1/float(BD_RATE))
+            # Independently round source presentation times to target ticks.
+            ticks = [round((n*.04+(n//3)*.04)*float(BD_RATE)) for n in range(8)]
+            expected = [max(n for n, tick in enumerate(ticks) if tick <= i) for i in range(count)]
+            for i, n in enumerate(expected):
+                frame = result.stdout[i*8192:(i+1)*8192]
+                self.assertAlmostEqual(frame[32*128+32], 40+n*10, delta=2)
+                self.assertAlmostEqual(frame[32*128+96], 180-n*10, delta=2)
+            self.assertGreater(count, 8)
 
     def test_conversion_checks_every_source_time_and_keeps_output_pair_clock(self):
         tools = Toolchain.find()

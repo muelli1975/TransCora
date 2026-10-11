@@ -984,6 +984,15 @@ EN = {'\nFehler: {0}\n{1}\n': '\nError: {0}\n{1}\n',
                                                                                   'contrast'}
 
 EN.update({
+    'Restzeit (aktueller Schritt): -': 'Time remaining (current step): -',
+    'Restzeit (aktueller Schritt): ca. {0}': 'Time remaining (current step): approx. {0}',
+    '1080p · 23,976 fps · AVC/MVC · Hohe Qualität.': '1080p · 23.976 fps · AVC/MVC · High quality.',
+    'Video und Ton um 0,1 % verlangsamen': 'Slow video and audio by 0.1%',
+    'Bildzeiten bei Bedarf anpassen · Laufzeit erhalten': 'Adjust frame timing when needed · keep duration',
+    '24 → 23,976 fps: Video und Ton werden um 0,1 % verlangsamt; bei konstanten Bildzeiten bleiben alle Bilder erhalten.': '24 → 23.976 fps: video and audio are slowed by 0.1%; all frames are retained for constant frame timing.',
+    'Variable Bildzeiten → 23,976 fps: Ganze Stereobildpaare werden bei Bedarf ausgelassen oder wiederholt. Laufzeit und Ton bleiben erhalten.': 'Variable frame timing → 23.976 fps: complete stereo pairs are dropped or repeated when needed. Duration and audio are retained.',
+    'BD-3D: Nicht aufsteigende Bildzeit bei Bild {0}: {1} s nach {2} s.': 'BD-3D: non-increasing timestamp at frame {0}: {1} s after {2} s.',
+    'BD-3D: Variable Bildzeiten auf die feste Ausgabebildrate angepasst; beide Halbbilder bleiben synchron.': 'BD-3D: variable frame timing adjusted to the fixed output frame rate; both views remain synchronised.',
     'Dubois LCD (Sanders/McAllister) + rot': 'Dubois LCD (Sanders/McAllister) + red',
     'Dubois grün/magenta (GM)': 'Dubois green/magenta (GM)',
     'Dubois amber/blau (YB)': 'Dubois amber/blue (YB)',

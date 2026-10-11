@@ -1,3 +1,3 @@
 """TransCora: local, curated stereo video conversion."""
 
-__version__ = "1.0.0-rc3"
+__version__ = "1.0.0-rc4"

@@ -282,14 +282,21 @@ vom Quellnamen abgeleitet und ist editierbar; er bestimmt auch den Ausgabenamen.
 Bei M2TS gibt es kein Disc-Dateisystem; die Titelangabe benennt dort die Datei.
 Ein Disc-Label wird je nach Player angezeigt, es ist keine eingeblendete Titelseite.
 
-Der BD-3D-Export nimmt progressive SDR-Stereoquellen mit konstanter Quellbildrate
-an. **23,976 fps** bleiben unverändert; **24 fps** werden mit allen Bildern um
+Der BD-3D-Export nimmt progressive SDR-Stereoquellen auch mit variablen Bildzeiten
+an. Konstante **23,976 fps** bleiben unverändert; konstante **24 fps** werden um
 0,1 % verlangsamt, der Ton wird unter Erhalt der Tonhöhe angepasst. Andere Raten
-werden direkt vor der einzigen MVC-Kodierung auf 23,976 fps angepasst: Ganze
-Stereobildpaare werden ausgelassen oder wiederholt, Laufzeit und Ton bleiben
-erhalten. Bewegungen können dabei ungleichmäßiger werden; Testen zeigt einen
-entsprechenden Hinweis. Keine automatische Bewegungsinterpolation. Variable
-Bildzeiten, Interlacing und Bildlücken bleiben bis zu geprüften Regeln blockiert.
+und variable Bildzeiten werden direkt vor der einzigen MVC-Kodierung anhand der
+Quellzeitstempel auf die feste Bildrate angepasst: Ganze Stereobildpaare werden
+bei Bedarf ausgelassen oder wiederholt. Lange Bildhaltezeiten bleiben erhalten,
+statt die Laufzeit auf die Anzahl der Quellbilder zu verkürzen. Bei variablen
+Quellbildzeiten bleiben Laufzeit und Ton erhalten; ein als 24 fps eingestufter
+Stream verwendet weiterhin die oben beschriebene 0,1-%-Verlangsamung.
+Bewegungen können bei einer Framerateänderung ungleichmäßiger werden; **Testen**
+zeigt die konkrete Anpassung. Keine Bewegungsinterpolation. Fehlende, ungültige
+oder nicht aufsteigende Zeitstempel sowie Interlacing bleiben blockiert.
+Die Quellzeitstempel werden während der Kodierung geprüft, ohne zusätzliche
+vollständige Dekodierung. Die strenge Ausgabebildrate sowie beide fertig
+verpackten MVC-Halbbilder werden weiterhin geprüft.
 
 FRIM 1.31 verwendet das mitgelieferte Software-SDK; Intel-Grafik, Treiberinstallation,
 AVISynth oder Netzwerkzugang werden für diesen FFmpeg-Eingabepfad nicht benötigt.

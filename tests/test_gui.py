@@ -18,6 +18,33 @@ from tkinter import ttk
 
 
 class GuiTests(unittest.TestCase):
+    def test_bd_remaining_time_is_per_phase_and_resets_between_steps(self):
+        window = self.window
+        window.add_paths([Path('test_full_sbs.mp4')])
+        job = window.jobs[0]
+        job.options = replace(job.options, target='bd3d', container='iso')
+        window.run_started = 10
+        with patch('transcora.gui.window.time.monotonic', return_value=100):
+            window.events.put(('phase', (job.id, 1, 2, 'BD-3D: Beide Halbbilder in hoher Qualität kodieren')))
+            window.poll()
+        with patch('transcora.gui.window.time.monotonic', return_value=200):
+            window.events.put(('progress', (job.id, 1, 2, {'percent': 18, 'phase_percent': 20,
+                                                       'remaining_scope': 'phase'})))
+            window.poll()
+        self.assertEqual(window.estimated_finish, 600)
+        self.assertEqual(window.remaining_scope, 'phase')
+        self.assertIn('aktueller Schritt', window.elapsed.get())
+        with patch('transcora.gui.window.time.monotonic', return_value=300):
+            window.events.put(('phase', (job.id, 1, 2, 'BD-3D: Blu-ray-ISO erstellen')))
+            window.events.put(('progress', (job.id, 1, 2, {'percent': 90})))
+            window.poll()
+        self.assertIsNone(window.estimated_finish)
+        with patch('transcora.gui.window.time.monotonic', return_value=400):
+            window.events.put(('progress', (job.id, 1, 2, {'percent': 95, 'remaining_seconds': 30,
+                                                       'remaining_scope': 'phase'})))
+            window.poll()
+        self.assertEqual(window.estimated_finish, 430)
+
     def test_image_extended_selection_and_changes_apply_to_all_selected(self):
         panel = self.window.images
         self.window.notebook.select(self.window.image_tab)

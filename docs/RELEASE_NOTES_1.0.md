@@ -1,5 +1,13 @@
 # TransCora 1.0
 
+## RC4
+
+- BD-3D accepts valid variable frame timing and timestamp jitter. Complete stereo pairs are adjusted to the fixed output clock during the single encoding pass; long frame holds retain their presentation duration.
+- Differing nominal and average source frame rates no longer trigger an automatic rejection. Constant 24 fps keeps the established 0.1% video/audio slowdown.
+- Source checks reject missing, invalid or non-increasing timestamps. Fixed output timing, encoded pictures, muxed audio and both decoded MVC views remain verified.
+- Removed the permanent technical frame-rate conversion sentence from the interface. File-specific conversion details remain under Test.
+- BD-3D time remaining now refers explicitly to the current step. Encoding and final decoding use their own progress; estimates reset between steps instead of extrapolating from arbitrary overall percentage ranges.
+
 ## RC3
 
 - Complete German/English interface with immediate switching and a saved language preference.

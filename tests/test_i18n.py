@@ -6,6 +6,10 @@ from transcora.core.images import ImageOptions, resized_dimensions
 
 class LocalisationTests(unittest.TestCase):
     def test_message_values_and_paths_remain_user_data(self):
+        self.assertEqual(translate('1080p · 23,976 fps · AVC/MVC · Hohe Qualität.', 'en'),
+                         '1080p · 23.976 fps · AVC/MVC · High quality.')
+        self.assertEqual(translate('BD-3D: Nicht aufsteigende Bildzeit bei Bild 12: 7.040000 s nach 7.080000 s.', 'en'),
+                         'BD-3D: non-increasing timestamp at frame 12: 7.040000 s after 7.080000 s.')
         self.assertEqual(translate('Dubois LCD (Sanders/McAllister) + rot', 'en'), 'Dubois LCD (Sanders/McAllister) + red')
         self.assertEqual(translate('Dubois grün/magenta (GM)', 'en'), 'Dubois green/magenta (GM)')
         self.assertEqual(translate('Dubois amber/blau (YB)', 'en'), 'Dubois amber/blue (YB)')

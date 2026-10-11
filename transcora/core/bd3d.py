@@ -24,22 +24,29 @@ def prepare(video: dict, layout: str, swap: bool = False) -> Preparation:
         raise ValueError('BD-3D: Eindeutige SBS/OU-Quelle erforderlich.')
     if video.get('field_order') not in (None, 'unknown', 'progressive'):
         raise ValueError('BD-3D: Interlaced-Quellen sind noch nicht freigegeben.')
-    try:
-        rate = Fraction(video['r_frame_rate'])
-        average = Fraction(video['avg_frame_rate'])
-    except (KeyError, ValueError, ZeroDivisionError):
-        raise ValueError('BD-3D: Quellbildrate fehlt oder ist ungültig.') from None
-    # Container rationals may round 24000/1001. Actual cadence must also be scanned.
+    def valid_rate(key):
+        try:
+            value = Fraction(video.get(key, '0/1'))
+            return value if 1 <= value <= 240 else None
+        except (ValueError, ZeroDivisionError, TypeError):
+            return None
+    rate, average = valid_rate('r_frame_rate'), valid_rate('avg_frame_rate')
+    if rate is None and average is None:
+        raise ValueError('BD-3D: Quellbildrate fehlt oder ist ungültig.')
+    rate, average = rate or average, average or rate
+    # Container rationals may round 24000/1001. Inspect actual PTS while encoding.
     if abs(rate - BD_RATE) <= BD_RATE / 1_000_000:
         rate = BD_RATE
     if abs(average - BD_RATE) <= BD_RATE / 1_000_000:
         average = BD_RATE
     if rate in {BD_RATE, Fraction(24)} and average in {BD_RATE, Fraction(24)}:
         # The average timing can be NTSC despite a rounded nominal 24-fps field.
-        # A full timestamp scan below independently confirms the chosen clock.
+        # Source PTS are checked independently while encoding.
         rate = average
-    if not 1 <= rate <= 240 or abs(average-rate) > rate/1000:
-        raise ValueError('BD-3D: Eine konstante, progressive Quellbildrate zwischen 1 und 240 fps ist erforderlich.')
+    # A differing average is normal for VFR, not evidence of damaged video.
+    variable = abs(average-rate) > rate/1000
+    if variable:
+        rate = average
     colors, warnings = color_spec(video)
     w, h = video['width'], video['height']
     horizontal = layout.endswith('sbs')
@@ -65,8 +72,12 @@ def prepare(video: dict, layout: str, swap: bool = False) -> Preparation:
     positions = [(0, 0), (ew, 0)] if horizontal else [(0, 0), (0, eh)]
     if swap:
         positions.reverse()
-    conversion = '' if rate in {BD_RATE, Fraction(24)} else (
-        f'setpts=PTS-STARTPTS,fps=fps={BD_RATE}:start_time=0:round=near:eof_action=pass,')
+    # Normalise the complete packed pair before splitting it. Even a stream
+    # labelled CFR may have valid timestamp jitter or variable frame durations.
+    # Exact 24-fps sources retain their established 0.1% slowdown below.
+    cadence_rate = Fraction(24) if rate == 24 and not variable else BD_RATE
+    conversion = (f'setpts=PTS-STARTPTS,fps=fps={cadence_rate}:'
+                  'start_time=0:round=near:eof_action=pass,')
     # MVC needs BT.709 YUV, unlike anaglyph matrices it needs no sRGB working
     # space. Preserve native Blu-ray samples instead of resampling chroma and
     # dithering twice in a YUV -> RGB -> YUV round trip.
@@ -85,9 +96,11 @@ def prepare(video: dict, layout: str, swap: bool = False) -> Preparation:
                       (ew, eh) != (fitw, fith) or (fitw, fith) != (1920, 1080)) else ''
         graph.append(f'[{label}]crop={ew}:{eh}:{x}:{y},' + transform + sizing +
                      f'setsar=1,format=yuv420p,settb=1/24000,setpts=N*1001[{eye}]')
-    speed = BD_RATE / rate if rate == 24 else Fraction(1)
+    speed = BD_RATE / rate if rate == 24 and not variable else Fraction(1)
     if speed != 1:
-        warnings.append('24 → 23,976 fps: Alle Bilder bleiben erhalten; Ton wird um 0,1 % verlangsamt.')
+        warnings.append('24 → 23,976 fps: Video und Ton werden um 0,1 % verlangsamt; bei konstanten Bildzeiten bleiben alle Bilder erhalten.')
+    elif variable:
+        warnings.append('Variable Bildzeiten → 23,976 fps: Ganze Stereobildpaare werden bei Bedarf ausgelassen oder wiederholt. Laufzeit und Ton bleiben erhalten.')
     elif rate != BD_RATE:
         warnings.append(f'{float(rate):.3f} → 23,976 fps: Ganze Stereobildpaare werden ausgelassen oder wiederholt. '
                         'Laufzeit und Ton bleiben erhalten; Bewegungen können ungleichmäßiger werden. '
@@ -146,6 +159,43 @@ class Cadence:
         tolerance = min(period/8, max(2.2*float(self.time_base), .00001))
         if abs((self.previous-self.first)-float((self.count-1)/self.rate)) > tolerance:
             raise ValueError('BD-3D: Die tatsächliche Bildfolge entspricht nicht der angegebenen konstanten Framerate.')
+        return self.count, self.first
+
+
+class SourceClock(Cadence):
+    """Validate source timestamps without treating valid VFR as corruption.
+
+    Collected during encoding; no separate full decode or timestamp scan.
+    The output still uses the strict Cadence checker on its fixed BD clock.
+    """
+    def __init__(self, rate, time_base):
+        super().__init__(rate, time_base)
+        self.constant = True
+        self.max_interval = 0.0
+
+    def feed(self, stamp):
+        if not math.isfinite(stamp):
+            raise ValueError('BD-3D: Ungültige Bildzeit in der Quelle.')
+        if self.previous is None:
+            self.first = stamp
+        else:
+            interval = stamp-self.previous
+            if interval <= 0:
+                raise ValueError(f'BD-3D: Nicht aufsteigende Bildzeit bei Bild {self.count+1}: {stamp:.6f} s nach {self.previous:.6f} s.')
+            self.max_interval = max(self.max_interval, interval)
+            try:
+                check_cadence([self.previous, stamp], self.rate, str(self.time_base))
+            except ValueError:
+                self.constant = False
+        self.previous = stamp
+        self.count += 1
+
+    def finish(self):
+        if self.count < 2:
+            raise ValueError('BD-3D: Zu wenige Bilder für eine verlässliche Timing-Prüfung.')
+        tolerance = min(float(1/self.rate)/8, max(2.2*float(self.time_base), .00001))
+        if abs((self.previous-self.first)-float((self.count-1)/self.rate)) > tolerance:
+            self.constant = False
         return self.count, self.first
 
 

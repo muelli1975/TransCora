@@ -13,7 +13,7 @@ import tempfile
 import threading
 import time
 
-from .bd3d import BD_RATE, prepare, Cadence, encoder_args, mux_meta
+from .bd3d import BD_RATE, prepare, Cadence, SourceClock, encoder_args, mux_meta
 from .engine import Cancelled, stop_process, publish_without_overwrite, capture, probe
 from .model import app_root
 from .mvc import tag_generated_stream, coded_fingerprint
@@ -115,7 +115,7 @@ def run(args, cancel, log, env, on_output=None, on_line=None):
 def encode(tools, bd, plan, base, dependent, cancel, emit, log, estimated_frames, decoder=None):
     from .multiview import input_args, PairClock, check_decoder
     config = prepare(plan.info['video'], plan.layout, plan.swap)
-    clock = Cadence(config.source_rate, plan.info['video']['time_base'])
+    clock = SourceClock(config.source_rate, plan.info['video']['time_base'])
     output_clock = Cadence(BD_RATE, '1/24000', 'bd_output')
     errors = []
     pairs = PairClock() if plan.info.get('multiview', {}).get('kind') == 'mvhevc' else None
@@ -148,7 +148,10 @@ def encode(tools, bd, plan, base, dependent, cancel, emit, log, estimated_frames
             key, _, value = text.partition('=')
             if progress and key == 'frame':
                 try:
-                    emit('progress', {'percent': min(70, 5+65*int(value)/max(1, estimated_frames)), 'seconds': int(value)/float(BD_RATE)})
+                    emit('progress', {'percent': min(70, 5+65*int(value)/max(1, estimated_frames)),
+                                      'seconds': int(value)/float(BD_RATE),
+                                      'phase_percent': min(100, 100*int(value)/max(1, estimated_frames)),
+                                      'remaining_scope': 'phase'})
                 except ValueError:
                     pass
             elif progress and key == 'fps':
@@ -187,10 +190,15 @@ def encode(tools, bd, plan, base, dependent, cancel, emit, log, estimated_frames
             pairs.finish(int(expected) if expected and expected.isdigit() else None)
         source_frames, first = clock.finish()
         frames, _ = output_clock.finish()
-        if config.source_rate in {BD_RATE, Fraction(24)} and frames != source_frames:
-            raise ValueError('BD-3D: Die native Bildfolge wurde unerwartet verändert.')
+        # The timestamp-based fps filter may legitimately repeat/drop pairs,
+        # including a shortened final source frame. Validate its output clock
+        # and the actual encoded frame count, not an assumed source count.
         log.write(f'VERIFIED SOURCE CLOCK frames={source_frames} first={first} rate={config.source_rate}\n'
+                  f'SOURCE TIMING constant={clock.constant} max_interval={clock.max_interval:.6f} '
+                  f'output_frame_delta={frames-source_frames}\n'
                   f'VERIFIED OUTPUT CLOCK frames={frames} rate={BD_RATE}\n')
+        if not clock.constant:
+            emit('phase', 'BD-3D: Variable Bildzeiten auf die feste Ausgabebildrate angepasst; beide Halbbilder bleiben synchron.')
         return frames, first
     finally:
         for p in reversed(producers):
@@ -220,7 +228,8 @@ def decoded_digest(bd, base, dependent, frames, cancel, log, emit=None):
                 elapsed = now-started
                 remaining = max(0, frames*FRAME_BYTES-count)*elapsed/count if elapsed >= 2 else None
                 emit('progress', {'percent': 93+6*min(1, count/(frames*FRAME_BYTES)),
-                                  'seconds': count/FRAME_BYTES/float(BD_RATE), 'remaining_seconds': remaining})
+                                  'seconds': count/FRAME_BYTES/float(BD_RATE), 'remaining_seconds': remaining,
+                                  'remaining_scope': 'phase'})
     run([bd.decoder, '-sw', '-i:mvc', base, dependent, '-sbs', '-o', '-'],
         cancel, log, bd.environment, pictures)
     if count != frames*FRAME_BYTES:
