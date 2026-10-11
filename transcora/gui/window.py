@@ -93,7 +93,13 @@ class Window:
         return button
 
     def _build(self):
-        outer = ttk.Frame(self.root, padding=12)
+        self.notebook = ttk.Notebook(self.root)
+        self.notebook.pack(fill='both', expand=True)
+        self.video_tab = ttk.Frame(self.notebook)
+        self.image_tab = ttk.Frame(self.notebook)
+        self.notebook.add(self.video_tab, text='Videos')
+        self.notebook.add(self.image_tab, text='Bilder')
+        outer = ttk.Frame(self.video_tab, padding=10)
         outer.pack(fill="both", expand=True)
         outer.columnconfigure(0, weight=1)
         outer.rowconfigure(2, weight=1)
@@ -321,9 +327,12 @@ class Window:
         self.start_button.pack(side="right", padx=5)
         self.test_button = self.button(footer, "Testen", lambda: self.check(False), style="Primary.TButton")
         self.test_button.pack(side="right")
-        self.root.bind("<Control-o>", lambda event: self.add_files() if not self.busy else None)
+        from .images_panel import ImagePanel
+        self.images = ImagePanel(self.image_tab, self)
+        self.root.bind("<Control-o>", lambda event: (self.images.add_files() if self.notebook.select() == str(self.image_tab)
+            else self.add_files()) if not self.busy and not self.images.busy else None)
         self.root.bind("<Delete>", lambda event: self.remove() if not self.busy and self.root.focus_get() == self.tree else None)
-        self.root.bind("<Escape>", lambda event: self.abort() if self.busy else None)
+        self.root.bind("<Escape>", lambda event: self.images.abort() if self.images.busy else self.abort() if self.busy else None)
         self.selection_changed()
 
     def dark_menu(self, parent):
@@ -587,7 +596,7 @@ class Window:
                 if options.profile == "quality10":
                     text += " 10 Bit: Feinere Abstufungen; kein HDR-Modus."
         if framerate:
-            text = "Layout, Auflösung und Augenreihenfolge bleiben erhalten. Video wird neu kodiert; Ton gemäß Erweitert."
+            text = "Layout, Auflösung und Halbbildreihenfolge bleiben erhalten. Video wird neu kodiert; Ton gemäß Erweitert."
         if bd3d:
             text = "1080p · 23,976 fps · AVC/MVC · Hohe Qualität. Andere konstante Quellbildraten werden direkt angepasst."
             if options.container == 'm2ts':
@@ -803,6 +812,7 @@ class Window:
 
     def set_busy(self, value):
         self.busy = value
+        self.notebook.tab(self.image_tab, state='disabled' if value else 'normal')
         for widget, normal in self.controls:
             widget.configure(state="disabled" if value else normal)
         self.abort_button.configure(state="normal" if value else "disabled")
@@ -1024,6 +1034,8 @@ class Window:
             self.status.set("Abbruch angefordert; laufenden Prozess beenden …")
 
     def poll(self):
+        if self.images.poll():
+            return
         self.update_elapsed()
         try:
             while True:
@@ -1102,15 +1114,17 @@ class Window:
         self.root.after(100, self.poll)
 
     def close(self):
-        if self.busy:
+        if self.busy or self.images.busy:
             if messagebox.askyesno("TransCora", "Laufende Arbeit abbrechen und TransCora schließen?", parent=self.root):
                 self.closing = True
                 self.abort()
+                self.images.abort()
         else:
             self.finish_close()
 
     def finish_close(self):
         try:
+            self.images.persist()
             write_json(app_root() / "settings.json", {"schema_version": 2,
                        "defaults": asdict(replace(self.defaults, layout="auto", swap=False, disc_title=None)),
                        "output_folder": str(self.output_path()), "input_folder": self.input_folder,

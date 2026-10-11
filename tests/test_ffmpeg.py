@@ -84,6 +84,19 @@ class FFmpegTests(unittest.TestCase):
                 self.assertEqual(info['video']['pix_fmt'], 'yuv444p')
                 self.assertTrue(plan.output.stem.endswith('_'+key))
 
+    def test_full_outputs_and_mkv_half_geometry_roundtrip(self):
+        for container in ('mp4', 'mkv'):
+            for target, size in [('full_sbs', (128, 32)), ('full_ou', (64, 64))]:
+                plan, info = self.export(Options(target=target, container=container))
+                self.assertEqual(plan.size, size)
+                self.assertEqual(info['video']['sample_aspect_ratio'], '1:1')
+            for target, sar in [('half_sbs', '2:1'), ('half_ou', '1:2')]:
+                plan, info = self.export(Options(target=target, container=container))
+                self.assertEqual(info['video']['sample_aspect_ratio'], sar if container == 'mkv' else '1:1')
+                converted = self.plan(Options(target='full_sbs'), plan.output)
+                self.assertEqual(converted.size, (3840, 1080))
+                self.assertTrue(any('keine' in warning.lower() or 'nicht wiederhergestellt' in warning for warning in converted.warnings))
+
     def test_original_batch_pixel_consistency_all_17(self):
         batch = (app_root()/'reference/AnaglyphBatch_DE.bat').read_text(encoding='utf-8-sig')
         templates = dict(re.findall(r'if "%MATRIXMODE%"=="(\w+)" \(\s*set "VF=(.*?)"', batch))

@@ -18,6 +18,25 @@ from tkinter import ttk
 
 
 class GuiTests(unittest.TestCase):
+    def test_images_tab_has_independent_selection_and_operation_guard(self):
+        panel = self.window.images
+        self.window.notebook.select(self.window.image_tab)
+        panel.add_paths([Path('/photos/one_full_sbs.jpg'), Path('/photos/two.mpo')])
+        self.assertEqual(len(panel.jobs), 2)
+        self.assertEqual(len(self.window.jobs), 0)
+        first, second = panel.jobs
+        panel.tree.selection_set(first.id); panel.selection_changed()
+        panel.variables['target'].set('Full-OU'); panel.changed('target')
+        self.assertEqual(first.options.target, 'full_ou'); self.assertEqual(second.options.target, 'keep')
+        panel.set_busy(True)
+        self.assertEqual(self.window.notebook.tab(self.window.video_tab, 'state'), 'disabled')
+        panel.set_busy(False)
+        self.assertEqual(self.window.notebook.tab(self.window.video_tab, 'state'), 'normal')
+        self.window.notebook.select(self.window.video_tab)
+        self.window.set_busy(True)
+        self.assertEqual(self.window.notebook.tab(self.window.image_tab, 'state'), 'disabled')
+        self.window.set_busy(False)
+
     def setUp(self):
         try:
             self.root = tk.Tk()

@@ -11,6 +11,28 @@ from transcora.core.toolchain import Toolchain
 
 
 class BdPreparationTests(unittest.TestCase):
+    def test_native_bd_samples_are_preserved_in_both_halves_and_swapped_order(self):
+        tools = Toolchain.find()
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp)/'native.mkv'
+            subprocess.run([str(tools.ffmpeg), '-v', 'error', '-f', 'lavfi', '-i',
+                'testsrc2=s=3840x1080:r=24000/1001', '-frames:v', '3', '-c:v', 'ffv1',
+                '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709',
+                '-color_range', 'tv', str(source)], check=True)
+            video = json.loads(subprocess.check_output([str(tools.ffprobe), '-v', 'error',
+                '-show_streams', '-of', 'json', str(source)]))['streams'][0]
+            def hashes(graph):
+                return subprocess.check_output([str(tools.ffmpeg), '-v', 'error', '-i', str(source),
+                    '-filter_complex', graph, '-map', '[left]', '-map', '[right]',
+                    '-fps_mode', 'passthrough', '-c:v', 'rawvideo', '-f', 'framemd5', '-']).decode().splitlines()
+            for swap in (False, True):
+                config = prepare(video, 'full_sbs', swap)
+                expected = ('[0:v]split[a][b];[a]crop=1920:1080:'+str(1920 if swap else 0)+':0[left];'
+                            '[b]crop=1920:1080:'+str(0 if swap else 1920)+':0[right]')
+                # Ignore clocks: compare every plane of every output half-image.
+                samples = lambda rows: [r.rsplit(',', 1)[-1] for r in rows if not r.startswith('#')]
+                self.assertEqual(samples(hashes(config.graph)), samples(hashes(expected)))
+
     def test_ntsc_average_is_not_slowed_again_when_nominal_rate_is_rounded(self):
         video = dict(index=0, width=3840, height=1080, r_frame_rate='24/1',
                      avg_frame_rate='24000/1001', color_space='bt709', color_primaries='bt709',

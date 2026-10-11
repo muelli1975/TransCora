@@ -66,7 +66,7 @@ def probe(tools: Toolchain, path: Path, cancel: threading.Event | None = None) -
     if not videos:
         raise ValueError("Keine nutzbare Videospur gefunden.")
     if len(videos) > 1:
-        raise ValueError("Mehrere Videospuren: Getrennte L/R-Spuren sind in Version 0.1 noch nicht freigegeben.")
+        raise ValueError("Mehrere Videospuren: Getrennte L/R-Spuren sind in dieser Version noch nicht freigegeben.")
     result["video"] = videos[0]
     return result
 
@@ -78,11 +78,19 @@ def methods() -> dict:
 
 
 def metadata_layout(video: dict) -> tuple[str, bool] | None:
-    tag = video.get("tags", {}).get("stereo_mode", "").lower()
+    source_tags = {k.lower().rsplit('/', 1)[-1]: str(v).lower() for k, v in video.get('tags', {}).items()}
+    tag = source_tags.get('stereo_mode', '')
     tags = {"left_right": ("sbs", False), "right_left": ("sbs", True),
             "top_bottom": ("ou", False), "bottom_top": ("ou", True)}
     if tag in tags:
         return tags[tag]
+    numeric = {'1': ('sbs', False), '11': ('sbs', True), '3': ('ou', False), '2': ('ou', True)}
+    if tag in numeric:
+        return numeric[tag]
+    wmv = {'sidebysidelf': ('sbs', False), 'sidebysiderf': ('sbs', True),
+           'overunderlt': ('ou', False), 'overunderrt': ('ou', True)}
+    if source_tags.get('stereoscopiclayout') in wmv:
+        return wmv[source_tags['stereoscopiclayout']]
     for side in video.get("side_data_list", []):
         if side.get("side_data_type") == "Stereo 3D":
             kind = {"side by side": "sbs", "top and bottom": "ou"}.get(side.get("type"))
@@ -90,6 +98,24 @@ def metadata_layout(video: dict) -> tuple[str, bool] | None:
                 return kind, bool(side.get("inverted", 0))
             if side.get("type") not in (None, "2D", "unspecified"):
                 raise ValueError("Dieses Stereo-Layout ist noch nicht freigegeben. SBS/OU-Quelle verwenden.")
+    return None
+
+
+def metadata_full_half(video: dict) -> tuple[str, bool] | None:
+    stereo = metadata_layout(video)
+    if not stereo:
+        return None
+    axis, swap = stereo
+    tags = {k.lower().rsplit('/', 1)[-1]: str(v).lower() for k, v in video.get('tags', {}).items()}
+    half = tags.get('stereoscopichalfwidth' if axis == 'sbs' else 'stereoscopichalfheight')
+    if half in {'1', 'true', 'yes'}:
+        return ('half_'+axis, swap)
+    if half in {'0', 'false', 'no'}:
+        return ('full_'+axis, swap)
+    sar = video.get('sample_aspect_ratio')
+    if sar == ('2:1' if axis == 'sbs' else '1:2'):
+        return ('half_'+axis, swap)
+    # StereoMode alone specifies arrangement/order, not Full versus Half.
     return None
 
 
@@ -169,7 +195,7 @@ class Plan:
     @property
     def stereo_summary(self) -> str:
         if self.options.target == "bd3d":
-            return "3D-Kennzeichnung: AVC-Basis + MVC-Zweitansicht · Linkes Auge zuerst"
+            return "3D-Kennzeichnung: AVC-Basis + zweites MVC-Halbbild · Linkes Halbbild zuerst"
         if not self.stereo:
             return "3D-Kennzeichnung: Keine SBS/OU-Kennzeichnung"
         axis, inverted = self.stereo
@@ -269,6 +295,11 @@ def build_graph(video: dict, options: Options, layout: str, swap: bool, colors: 
         stack = "hstack" if options.target == "half_sbs" else "vstack"
         graph.append(f"[lp][rp]{stack}=inputs=2[composite]")
         size = (1920, 1080)
+    elif options.target in {"full_sbs", "full_ou"}:
+        stack = "hstack" if options.target == "full_sbs" else "vstack"
+        graph.append(f"[l][r]{stack}=inputs=2[composite]")
+        size = (display_w * (2 if options.target == 'full_sbs' else 1),
+                display_h * (2 if options.target == 'full_ou' else 1))
     elif options.target == "mono":
         graph.append("[r]nullsink")
         graph.append("[l]null[composite]")
@@ -302,9 +333,13 @@ def build_graph(video: dict, options: Options, layout: str, swap: bool, colors: 
         pixel_format = "yuv444p10le" if options.profile == "quality10" else "yuv444p"
     if pixel_format == "yuv420p" and (size[0] % 2 or size[1] % 2):
         raise ValueError("4:2:0 benötigt gerade Ausgabemaße; diese Quelle muss zuerst passend vorbereitet werden.")
+    # Matroska DisplayWidth/Height describe one reconstructed half-image.
+    # FFmpeg divides the display axis by two when StereoMode is present.
+    output_sar = ('2' if options.target == 'half_sbs' else '1/2') if (
+        options.container == 'mkv' and options.target in {'half_sbs', 'half_ou'}) else '1'
     graph.append("[composite]zscale=matrixin=gbr:primariesin=bt709:transferin=iec61966-2-1:rangein=full:"
                  "matrix=bt709:primaries=bt709:transfer=bt709:range=limited:dither=error_diffusion,"
-                 f"format={pixel_format},setsar=1[v]")
+                 f"format={pixel_format},setsar={output_sar}[v]")
     return ";".join(graph), size, pixel_format
 
 
@@ -326,6 +361,8 @@ def plan_job(tools: Toolchain, job: Job, output_root: Path, reserved: set[str],
     info["source_mtime_ns"] = after.st_mtime_ns
     info["source_size"] = after.st_size
     video = info["video"]
+    # ASF/WMV may carry stereo tags at container level; stream tags win.
+    video['tags'] = {**info.get('format', {}).get('tags', {}), **video.get('tags', {})}
     video["_start_offset"] = max(0, float(video.get("start_time") or 0) - float(info.get("format", {}).get("start_time") or 0))
     width, height = video.get("width", 0), video.get("height", 0)
     if not width or not height:
@@ -333,8 +370,6 @@ def plan_job(tools: Toolchain, job: Job, output_root: Path, reserved: set[str],
     if video.get("field_order", "unknown") not in {"progressive", "unknown"}:
         raise ValueError("Interlaced-Quelle: Eine geprüfte Deinterlacing-Regel ist noch nicht verfügbar.")
     sar = video.get("sample_aspect_ratio", "1:1")
-    if options.target != "framerate" and sar not in {"1:1", "0:1", "N/A", None}:
-        raise ValueError(f"Nichtquadratische Pixel (SAR {sar}) sind in dieser ersten Version noch nicht freigegeben.")
     for side in video.get("side_data_list", []):
         if side.get("side_data_type") in {"Spherical Mapping", "Display Matrix"}:
             raise ValueError("Gedrehte oder VR-projizierte Quelle: In dieser Version bitte vorher als normales SBS/OU vorbereiten.")
@@ -348,21 +383,24 @@ def plan_job(tools: Toolchain, job: Job, output_root: Path, reserved: set[str],
         hint_warning = str(error) + " Manuelle Quellinterpretation verwendet."
     multiview = info.get('multiview')
     metadata = None if multiview else metadata_layout(video)
+    geometry_hint = None if multiview else metadata_full_half(video)
     warnings = [hint_warning] if hint_warning else []
     if multiview:
         if options.layout not in {'auto', 'mvc', 'mvhevc'}:
-            raise ValueError('Diese Quelle enthält echte Multiview-Ansichten. Automatisch oder das passende Multiview-Format wählen.')
+            raise ValueError('Diese Quelle enthält echte Multiview-Halbbilder. Automatisch oder das passende Multiview-Format wählen.')
         if options.target == 'framerate':
             raise ValueError('Nur Framerate ändern erhält gepackte SBS/OU-Quellen. Für MVC/MV-HEVC zuerst das gewünschte Ausgabe-Layout wählen.')
         layout, swap = 'full_sbs', options.swap ^ bool(multiview.get('base_view_right', False))
         warnings.append('Zwei vollständige Multiview-Halbbilder werden dekodiert.')
         if multiview['kind'] == 'mvc':
-            warnings.append('MVC: Basisansicht laut Blu-ray-Playlist '+('rechts' if multiview['base_view_right'] else 'links')+'.'
+            warnings.append('MVC: Basis-Halbbild laut Blu-ray-Playlist '+('rechts' if multiview['base_view_right'] else 'links')+'.'
                 if 'base_view_right' in multiview else
-                'MVC: Basisansicht als links angenommen. Reihenfolge im Kontrollbild prüfen; L/R tauschen ist verfügbar.')
+                'MVC: Basis-Halbbild als links angenommen. Reihenfolge im Kontrollbild prüfen; L/R tauschen ist verfügbar.')
         if multiview.get('playlist'):
             warnings.append('Blu-ray-ISO: Längste Film-Playlist '+multiview['playlist']+' ausgewählt.')
     elif options.layout == "auto":
+        if not hint:
+            hint = geometry_hint
         if not hint:
             raise ValueError("Full/Half-Layout nicht eindeutig erkennbar. Quelllayout für diese Datei auswählen.")
         layout, swapped = hint
@@ -377,11 +415,17 @@ def plan_job(tools: Toolchain, job: Job, output_root: Path, reserved: set[str],
             warnings.append("Manuell gewähltes Layout/L/R weicht vom Dateinamen ab.")
         if metadata and metadata != ("sbs" if layout.endswith("sbs") else "ou", swap):
             warnings.append("Manuelle Quellinterpretation ersetzt abweichende Stereo-Metadaten.")
+    if options.target != 'framerate' and sar not in {'1:1', '0:1', 'N/A', None}:
+        if metadata and (layout, sar) in {('half_sbs', '2:1'), ('half_ou', '1:2')}:
+            video['sample_aspect_ratio'] = '1:1'
+            warnings.append('Stereo-Metadaten: Gestauchte Achse wird je Halbbild rekonstruiert.')
+        else:
+            raise ValueError(f'Nichtquadratische Pixel (SAR {sar}): Quelllayout und Stereo-Metadaten prüfen.')
     if layout == "mono" and options.target != "framerate":
         raise ValueError("Mono/2D ist als Quelle für ‚Nur Framerate ändern‘ verfügbar; andere Ziele benötigen SBS/OU.")
     if options.target == "framerate":
         if options.swap:
-            raise ValueError("Nur Framerate ändern erhält die Augenreihenfolge. L/R tauschen ausschalten.")
+            raise ValueError("Nur Framerate ändern erhält die Halbbildreihenfolge. L/R tauschen ausschalten.")
         orientation = "sbs" if layout.endswith("sbs") else "ou"
         swap = metadata[1] if metadata and metadata[0] == orientation else hint[1] if hint and hint[0] == layout else False
         if layout == "mono":
@@ -389,15 +433,17 @@ def plan_job(tools: Toolchain, job: Job, output_root: Path, reserved: set[str],
                 raise ValueError("Stereo-Kennzeichnung an einer als Mono/2D gewählten Quelle; Quelllayout prüfen.")
             swap = False
         if swap and options.container == "mp4":
-            raise ValueError("R/L-Quelle: Für unveränderte Augenreihenfolge MKV wählen; MP4-st3d unterstützt diese Umkehrung nicht.")
+            raise ValueError("R/L-Quelle: Für unveränderte Halbbildreihenfolge MKV wählen; MP4-st3d unterstützt diese Umkehrung nicht.")
         warnings.append("Ganze Bilder werden ausgelassen/wiederholt; keine Überblendung oder Bewegungsinterpolation. "
                         "Video wird neu kodiert; Ton und Wiedergabegeschwindigkeit bleiben erhalten.")
     if layout != "mono" and (width if layout.endswith("sbs") else height) % 2:
-        raise ValueError("Das gepackte Raster lässt sich nicht in zwei gleich große Ansichten teilen.")
+        raise ValueError("Das gepackte Raster lässt sich nicht in zwei gleich große Halbbilder teilen.")
     colors, color_warnings = color_spec(video)
     warnings.extend(color_warnings)
+    if layout.startswith('half_') and options.target in {'full_sbs', 'full_ou'}:
+        warnings.append('Half → Full: Die gestauchte Achse wird hochskaliert. Verlorene Bilddetails werden nicht wiederhergestellt.')
     if any(s.get("codec_type") == "subtitle" for s in info["streams"]):
-        warnings.append("Untertitel werden in Version 0.1 nicht übernommen.")
+        warnings.append("Untertitel werden nicht übernommen.")
     from .audio import validate
     stage('Auflösung, Bildrate und Tonoptionen prüfen')
     audios = validate(info, options)
@@ -440,8 +486,9 @@ def plan_job(tools: Toolchain, job: Job, output_root: Path, reserved: set[str],
             duration = 0.0
     except (ValueError, TypeError):
         pass
-    reason = (f"{multiview['kind'].upper()} · Zwei vollständige Ansichten aus dem Bitstream" if multiview else
-              f"{LAYOUTS[layout]} · " + (f"erkannt am Dateizusatz in {job.source.name}" if options.layout == "auto" else "manuell gewählt"))
+    reason = (f"{multiview['kind'].upper()} · Zwei vollständige Halbbilder aus dem Bitstream" if multiview else
+              f"{LAYOUTS[layout]} · " + ((f"erkannt am Dateizusatz in {job.source.name}" if filename_layout(job.source.stem)
+                  else 'erkannt an Stereo-Metadaten und Halbbildgeometrie') if options.layout == "auto" else "manuell gewählt"))
     return Plan(job.source.resolve(), output, options, info, layout, swap, size, pixel_format, graph, duration, warnings, output_colors, reason)
 
 

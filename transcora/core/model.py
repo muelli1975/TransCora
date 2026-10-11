@@ -8,12 +8,13 @@ import sys
 import uuid
 
 
-VIDEO_EXTENSIONS = {".mp4", ".mkv", ".mk3d", ".mov", ".m2ts", ".mts", ".ts", ".ssif", ".iso", ".avi"}
+VIDEO_EXTENSIONS = {".mp4", ".mkv", ".mk3d", ".mkv3d", ".mov", ".m2ts", ".mts", ".ts", ".ssif", ".iso", ".avi", ".wmv"}
 LAYOUTS = {"auto": "Automatisch", "full_sbs": "Full-SBS", "half_sbs": "Half-SBS",
            "full_ou": "Full-OU", "half_ou": "Half-OU", "mono": "Mono / 2D",
            "mvc": "MVC / Blu-ray 3D", "mvhevc": "MV-HEVC"}
 TARGETS = {"half_sbs": "Half-SBS · 1080p", "half_ou": "Half-OU · 1080p",
-           "anaglyph": "Anaglyph", "mono": "Mono · linkes Auge", "framerate": "Nur Framerate ändern", "bd3d": "BD-3D · 1080p"}
+           "full_sbs": "Full-SBS · Quellauflösung", "full_ou": "Full-OU · Quellauflösung",
+           "anaglyph": "Anaglyph", "mono": "Mono · linkes Halbbild", "framerate": "Nur Framerate ändern", "bd3d": "BD-3D · 1080p"}
 NAMING = {"original": "Kein Layout-Zusatz", "layout": "Layout-Zusatz",
           "players": "Player-Kürzel (Kodi/Bino)"}
 PROFILES = {"quality": "Qualität · 8 Bit / 4:4:4", "quality10": "Hohe Farbtiefe · 10 Bit / 4:4:4",

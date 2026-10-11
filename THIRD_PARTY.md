@@ -3,6 +3,19 @@
 TransCora's source is MIT licensed. Its portable distribution contains separately
 licensed components. The MIT license does not replace their terms.
 
+## Pillow and ExifTool
+
+Still-image loading, MPO indexing, EXIF orientation, ICC colour handling and
+JPEG encoding use Pillow 11.3.0. FFmpeg performs the stereo/layout/matrix transforms.
+The portable package retains Pillow's license and bundled library notices under
+`licenses/Pillow/`. Source: https://github.com/python-pillow/Pillow/tree/11.3.0
+
+Metadata copying uses official ExifTool 13.59 as a separate process. Its pinned
+Windows executable, all `exiftool_files` support files, original source archive,
+license notices and checksum record are included. The Windows package contains
+its own Perl runtime; it does not require the user to install Perl.
+Source and licensing: https://exiftool.org/ . Pins: `scripts/prepare_exiftool.py`.
+
 ## FFmpeg
 
 FFmpeg 7.1.1 full shared Windows build from Gyan.dev, pinned with SHA256 in

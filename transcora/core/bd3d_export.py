@@ -235,7 +235,7 @@ def verify_mux(tools, bd, plan, movie, base, dependent, frames, fingerprints, au
     base_tracks = [s for s in info.get('streams', []) if s.get('id') == '0x1011' and s.get('codec_name') == 'h264']
     dependent_tracks = [s for s in info.get('streams', []) if s.get('id') == '0x1012']
     if len(base_tracks) != 1 or len(dependent_tracks) != 1:
-        raise ValueError('BD-3D: AVC-Basis oder MVC-Zweitansicht fehlt im Multiplex.')
+        raise ValueError('BD-3D: AVC-Basis oder zweites MVC-Halbbild fehlt im Multiplex.')
     video = base_tracks[0]
     if (video.get('width'), video.get('height'), video.get('pix_fmt'), video.get('level')) != (1920, 1080, 'yuv420p', 41):
         raise ValueError('BD-3D: Ausgaberaster, Farbauflösung oder AVC-Level falsch.')

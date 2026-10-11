@@ -57,7 +57,7 @@ def prepare(video: dict, layout: str, swap: bool = False) -> Preparation:
         aspect *= 2
     elif layout == 'half_ou':
         aspect /= 2
-    # Fit each reconstructed eye; never crop content or stretch mismatched aspect ratios.
+    # Fit each reconstructed half-image without cropping or stretching.
     if aspect >= Fraction(16, 9):
         fitw, fith = 1920, max(2, 2*int(Fraction(1920, 2)/aspect))
     else:
@@ -67,19 +67,24 @@ def prepare(video: dict, layout: str, swap: bool = False) -> Preparation:
         positions.reverse()
     conversion = '' if rate in {BD_RATE, Fraction(24)} else (
         f'setpts=PTS-STARTPTS,fps=fps={BD_RATE}:start_time=0:round=near:eof_action=pass,')
+    # MVC needs BT.709 YUV, unlike anaglyph matrices it needs no sRGB working
+    # space. Preserve native Blu-ray samples instead of resampling chroma and
+    # dithering twice in a YUV -> RGB -> YUV round trip.
+    native = (colors == {'matrix': 'bt709', 'primaries': 'bt709',
+                        'transfer': 'bt709', 'range': 'tv'}
+              and video.get('pix_fmt') == 'yuv420p')
+    transform = '' if native else (
+        f"zscale=matrixin={colors['matrix']}:primariesin={colors['primaries']}:"
+        f"transferin={colors['transfer']}:rangein={'full' if colors['range']=='pc' else 'limited'}:"
+        'matrix=bt709:primaries=bt709:transfer=bt709:range=limited:dither=error_diffusion,format=yuv420p,')
     graph = [f"[0:{video['index']}]sidedata=mode=delete:type=STEREO3D,"
-             'sidedata=mode=delete:type=SPHERICAL,'
-             + conversion +
-             f"zscale=matrixin={colors['matrix']}:primariesin={colors['primaries']}:"
-             f"transferin={colors['transfer']}:rangein={'full' if colors['range']=='pc' else 'limited'}:"
-             'matrix=gbr:primaries=bt709:transfer=iec61966-2-1:range=full,format=gbrp16,split[a][b]']
+             'sidedata=mode=delete:type=SPHERICAL,' + conversion + 'split[a][b]']
     for label, (x, y), eye in zip(('a', 'b'), positions, ('left', 'right')):
-        graph.append(f'[{label}]crop={ew}:{eh}:{x}:{y},'
-                     f'scale={fitw}:{fith}:flags=lanczos+accurate_rnd+full_chroma_int,'
-                     'pad=1920:1080:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1,'
-                     'zscale=matrixin=gbr:primariesin=bt709:transferin=iec61966-2-1:rangein=full:'
-                     'matrix=bt709:primaries=bt709:transfer=bt709:range=limited:dither=error_diffusion,'
-                     f'format=yuv420p,settb=1/24000,setpts=N*1001[{eye}]')
+        sizing = (f'scale={fitw}:{fith}:flags=lanczos+accurate_rnd+full_chroma_int,'
+                  'pad=1920:1080:(ow-iw)/2:(oh-ih)/2:color=black,') if (
+                      (ew, eh) != (fitw, fith) or (fitw, fith) != (1920, 1080)) else ''
+        graph.append(f'[{label}]crop={ew}:{eh}:{x}:{y},' + transform + sizing +
+                     f'setsar=1,format=yuv420p,settb=1/24000,setpts=N*1001[{eye}]')
     speed = BD_RATE / rate if rate == 24 else Fraction(1)
     if speed != 1:
         warnings.append('24 → 23,976 fps: Alle Bilder bleiben erhalten; Ton wird um 0,1 % verlangsamt.')

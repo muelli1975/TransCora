@@ -1,7 +1,44 @@
-# TransCora 0.1.6
+# TransCora 1.0
 
-Portabler, lokaler 3D-Video-Konverter mit kompakter Python-Oberfläche und FFmpeg.
-**Erste Testversion:** Video-Konvertierung ist umgesetzt; BD-3D-Ausgabe als ISO oder M2TS ist enthalten. Bild-/MPO-Werkzeuge folgen später. Kein Account, Tracking oder Netzwerkzugriff im Programm.
+Portabler, lokaler Konverter für 3D-Videos und Bilder mit Python-Oberfläche und FFmpeg.
+Videos und Bilder haben eigene Listen und Einstellungen. BD-3D-Ausgabe als ISO/M2TS,
+MPO-Teilung, Bildkonvertierung und L/R-Vorbereitung sind enthalten.
+Kein Account, Tracking oder Netzwerkzugriff im Programm.
+
+## Bilder verarbeiten
+
+Im Bereich **Bilder** Dateien oder Ordner hinzufügen, gewünschte Einträge auswählen
+und die Aufgabe festlegen. Einstellungen gelten für die Auswahl und als Vorgabe
+für neue Dateien. **Testen** prüft den gesamten Stapel vor dem Start; **Details**
+zeigt Quellinterpretation, Ausgabeziele und Hinweise. **Kontrollbild** hilft bei der
+Prüfung der Halbbildreihenfolge. Listen und eigene Voreinstellungen sind speicherbar.
+
+- **Bilder konvertieren:** JPEG/JPS, PNG/PNS, TIFF, BMP, WebP und MPO als Quellen;
+  JPEG, PNG, TIFF oder verlustfreies WebP als Ausgabe. Layout beibehalten,
+  Full-/Half-SBS, Full-/Half-OU, Anaglyph oder einzelne Halbbilder wählen.
+- **MPO verlustfrei teilen:** Genau zwei JPEG-Halbbilder extrahieren, mit `_l`/`_r`
+  benennen und den obsoleten MPO-Index entfernen. Keine JPEG-Neukodierung und
+  keine Größenänderung; EXIF-Orientierung bleibt für die ungedrehten Pixel passend.
+- **L/R-Paare vorbereiten:** Dateinamen `_l`/`_r` beziehungsweise Ordner `L`/`R`
+  erkennen. Nur vollständige Paare mit gleichen Maßen und Einstellungen starten.
+  Unverändert in `L/0001_l…` und `R/0001_r…` kopieren; vorhandene Ziele schützen.
+- **Lange Kante:** 0 erhält die ursprüngliche/re-konstruierte Größe; eine Zahl
+  setzt die längste Ausgabekante. Beim Teilen gilt die Größe je Halbbild.
+  Eine größere Zahl skaliert hoch, ohne neue Details zu erzeugen.
+- JPEG: Qualität **90** (optional 95), **4:4:4**, optimierte Kodierung.
+  PNG/TIFF/WebP erhalten Transparenz beim Beibehalten des Layouts. JPEG und
+  Stereo-Transformationen setzen transparente Bereiche auf Weiß.
+- Bei einer Wandlung EXIF-Orientierung anwenden und eingebettete ICC-Profile
+  nach sRGB wandeln. Ohne Profil sRGB annehmen. Optional EXIF/XMP/IPTC mit
+  ExifTool übernehmen, einschließlich Aufnahmezeiten, ohne eingebettete
+  Vorschaubilder/Thumbnails oder veraltete Größen. Dateizeiten bleiben erhalten.
+- JPS/PNS ohne eindeutiges Kürzel werden als Full-SBS mit rechtem Halbbild zuerst
+  angenommen; MPO als erstes Halbbild links. Reihenfolge im Kontrollbild prüfen.
+  Für gewöhnliche JPG/PNG mit Stereo-Inhalt das Quelllayout bewusst wählen.
+
+Animierte/mehrseitige Bilder, MPO mit mehr als zwei Halbbildern sowie 16-Bit-/HDR-
+Bilder sind nicht freigegeben. Bildsequenzen, Diaschau-Erstellung und L/R → SBS
+sind spätere Erweiterungen.
 
 ## Windows starten
 
@@ -24,7 +61,8 @@ Der gesamte Ordner muss zusammenbleiben und sollte beschreibbar sein.
    und als Vorgabe für neue Dateien. Leere Auswahlfelder bedeuten gemischte Werte;
    eine Änderung setzt nur dieses Feld für alle ausgewählten Jobs.
 3. Für die bisherigen Workflows **Full-SBS** als Quelllayout wählen. Automatisch
-   akzeptiert nur eindeutige unterstützte Dateikürzel, keine reine Auflösungsheuristik.
+   akzeptiert eindeutige unterstützte Dateikürzel oder passende Stereo-Metadaten
+   mit Full-/Half-Geometrie, keine reine Auflösungsheuristik.
 4. Ziel und Container wählen. **Testen** zeigt technische Daten, Ausgabe und Warnungen.
    **Start** prüft erneut und verarbeitet alle noch offenen, gültigen Jobs.
    Blockierte Dateien erscheinen mit Fehlergrund; gültige Jobs laufen weiter.
@@ -41,15 +79,19 @@ Durchläufen erstellen. Fertige Jobs laufen erst nach bewusster Einstellungsänd
 
 | Ziel | Verhalten |
 | --- | --- |
+| Full-SBS | Zwei vollständige Halbbilder nebeneinander, rekonstruierte Quellauflösung |
+| Full-OU | Zwei vollständige Halbbilder übereinander, rekonstruierte Quellauflösung |
 | Half-SBS | 1920 × 1080, links/rechts gepackt |
 | Half-OU | 1920 × 1080, links oben/rechts unten |
-| Anaglyph | Volle rekonstruierte Auflösung eines Auges; 17 AnaglyphBatch-Verfahren |
-| Mono | Linkes Auge; mit **L/R tauschen** das andere Auge |
-| BD-3D · 1080p | AVC/MVC, 1920 × 1080 pro Auge, 23,976 fps; ISO oder M2TS |
-| Nur Framerate ändern | Auflösung, gepacktes Layout, Augenreihenfolge und YUV-Farbaufteilung bleiben erhalten |
+| Anaglyph | Volle rekonstruierte Auflösung eines Halbbildes; 17 AnaglyphBatch-Verfahren |
+| Mono | Linkes Halbbild; mit **L/R tauschen** das andere Halbbild |
+| BD-3D · 1080p | AVC/MVC, 1920 × 1080 pro Halbbild, 23,976 fps; ISO oder M2TS |
+| Nur Framerate ändern | Auflösung, gepacktes Layout, Halbbildreihenfolge und YUV-Farbaufteilung bleiben erhalten |
 
-Half-SBS/OU passen jedes Auge unter Erhalt seines Seitenverhältnisses in 1920 × 1080
+Half-SBS/OU passen jedes Halbbild unter Erhalt seines Seitenverhältnisses in 1920 × 1080
 ein, ergänzen bei Bedarf schwarze Ränder und halbieren danach die Packachse.
+Full-Ausgaben erhalten die rekonstruierte Auflösung je Halbbild. Half → Full
+skaliert die gestauchte Achse hoch und gewinnt keine verlorenen Bilddetails zurück.
 Full-/Half-SBS und Full-/Half-OU sind mögliche Quellen. Zusätzlich werden progressive
 H.264-MVC- und SDR-MV-HEVC-Quellen mit zwei vollständigen Ansichten verarbeitet.
 Anaglyphen, Frame-sequential und unabhängige Videospuren sind keine unterstützten Quellen.
@@ -129,7 +171,7 @@ Stereo-Ausgaben enthalten **MKV-StereoMode** bzw. die explizite **MP4-st3d**-Box
 H.264 verwendet zusätzlich Frame-Packing-SEI (3 für SBS, 4 für OU). Ein verlustfreier
 MKV→MP4-Verpackungsschritt überträgt die Container-Kennzeichnung; das Video wird
 nur einmal kodiert. Die fertige Ausgabe wird auf diese Kennzeichnungen geprüft.
-Bei **Nur Framerate ändern** mit umgekehrter Augenreihenfolge ist MKV erforderlich:
+Bei **Nur Framerate ändern** mit umgekehrter Halbbildreihenfolge ist MKV erforderlich:
 st3d kann R/L nicht ausdrücken. Anaglyph-/Mono-Ausgaben erhalten keine SBS/OU-Flags.
 **Testen** zeigt die Layout-Erkennung und die geplanten Kennzeichnungen.
 
@@ -274,14 +316,14 @@ anhand der beiden vom Decoder gemeldeten Ansichten. Manuelle Einträge
 - MVC: Progressive 8-Bit-4:2:0-Stereoquellen in M2TS/TS/SSIF und einer kombinierten
   MKV/MP4-Videospur. Der portable edge264-mvc-Decoder benötigt keinen Frameserver;
   FRIM wird bei unterstützbaren Decoder-Lücken als geprüfter Windows-Fallback verwendet.
-  Bei Blu-ray-ISO bestimmt die Playlist die linke/rechte Basisansicht. Ohne diese
+  Bei Blu-ray-ISO bestimmt die Playlist die linke/rechte Basis-Halbbild. Ohne diese
   Angabe wird links angenommen und ausdrücklich angezeigt; **L/R tauschen**
   bleibt für die Korrektur verfügbar. Ursprüngliche CFR-Paketbildzeiten werden vollständig geprüft.
 - Blu-ray-3D-ISO: Unverschlüsselte UDF-2.50-Discs mit einer vollständigen
   einzelnen SSIF-Filmdatei. Die längste Film-Playlist wird gewählt und genannt.
   Seamless Branching, alternative Blickwinkel und Clip-Ausschnitte bleiben blockiert.
 - MV-HEVC: FFmpeg 7.1.1 dekodiert beide ausdrücklich als links/rechts
-  gekennzeichneten Ansichten. Die Basisansicht kann rechts oder links sein.
+  gekennzeichneten Ansichten. Die Basis-Halbbild kann rechts oder links sein.
   Beide Bildzeitfolgen müssen zusammenpassen. SDR einschließlich 10-Bit-Quellen
   folgt dem bestehenden Farbpfad; HDR und immersive Projektionen bleiben blockiert.
 
@@ -292,3 +334,31 @@ Kompatibilität des tatsächlich gewählten Tonformats geprüft. Nur Framerate �
 
 MV-HEVC-Ausgabe für Apple-Geräte ist ein späteres eigenes Ausgabeziel. Beliebigem
 Stereomaterial werden keine erfundenen Spatial-Video-Kamerametadaten beigefügt.
+
+## Matroska und 3D-Kennzeichnung
+
+MKV-StereoMode kennzeichnet Anordnung und Reihenfolge: 1 = SBS L/R,
+11 = SBS R/L, 3 = OU links oben und 2 = OU links unten. DisplayWidth/DisplayHeight
+beschreiben die rekonstruierte Geometrie eines Halbbildes. Half-SBS-/Half-OU-MKV
+setzt deshalb auch das entsprechende Pixelseitenverhältnis; Full-Ausgaben
+behalten quadratische Pixel. StereoMode allein enthält keine Full-/Half-Angabe.
+Anaglyphen erhalten keine besondere Anaglyph-StereoMode-Kennzeichnung.
+
+Zusätzlich erkannt werden sView-Kürzel `-sbs`, `-hsbs`, `-hou`, `-half-sbs`,
+`-half-ou` und WMV-Stereometadaten. Widersprüche zwischen Name und Metadaten
+werden bei automatischer Erkennung gemeldet. `.mk3d`/`.mkv3d` sind MKV-Quellen.
+
+Referenzen: [Matroska-Elemente](https://www.matroska.org/technical/elements.html)
+und [sView-Stereoformate](https://github.com/gkv311/sview/blob/master/docs/stereoformats.md).
+
+## Stand der MVC-Qualitätsprüfung
+
+Native BT.709-/1080p-Halbbilder bleiben vor der MVC-Kodierung pixelgenau erhalten.
+Der bisherige YUV/RGB/YUV-Umweg entfällt. Die FRIM-Grundeinstellungen bleiben
+vorerst im dokumentierten Qualitätsprofil. Gemeldetes Flackern und Artefakte
+bei Textüberblendungen einer Diaschau sind in Untersuchung; eine vollständige
+Behebung ist noch nicht bestätigt. Technische Abschlussprüfungen bewerten
+Integrität, Halbbilder und Verpackung, nicht die sichtbare Bildqualität.
+
+Build-Anleitung: [BUILD.md](BUILD.md). Der passende Anwendungscode liegt im
+portablen Paket unter `source/`.

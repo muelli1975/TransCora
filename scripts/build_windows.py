@@ -19,7 +19,12 @@ def main():
     for name in ('assets', 'presets', 'tools', 'licenses'):
         shutil.copytree(root/name, output/name, ignore=shutil.ignore_patterns('__pycache__'), dirs_exist_ok=True)
     (output/'docs').mkdir(exist_ok=True)
-    shutil.copy2(root/'docs/RELEASE_NOTES_0.1.6.md', output/'docs/RELEASE_NOTES_0.1.6.md')
+    shutil.copy2(root/'docs/RELEASE_NOTES_1.0.md', output/'docs/RELEASE_NOTES_1.0.md')
+    for name in ('transcora', 'scripts', 'tests', 'reference', 'assets', 'presets', 'licenses', 'docs', '.github'):
+        shutil.copytree(root/name, output/'source'/name,
+                        ignore=shutil.ignore_patterns('__pycache__', '*.pyc'), dirs_exist_ok=True)
+    for name in ('run_transcora.py', 'requirements-build.txt', 'BUILD.md', 'LICENSE', 'README.md', 'THIRD_PARTY.md'):
+        shutil.copy2(root/name, output/'source'/name)
     python_license = next((p for p in (Path(sys.base_prefix)/'LICENSE.txt', Path(sys.base_prefix)/'LICENSE') if p.is_file()), None)
     if python_license is None:
         raise ValueError('Python license missing from the build installation')
@@ -32,6 +37,15 @@ def main():
         path = Path(distribution.locate_file(notice))
         if path.is_file():
             shutil.copy2(path, output/'licenses'/('PYINSTALLER-'+path.name))
+    pillow = importlib.metadata.distribution('Pillow')
+    pillow_notices = [p for p in pillow.files or [] if 'licenses' in p.parts and Path(pillow.locate_file(p)).is_file()]
+    if not pillow_notices:
+        raise ValueError('Pillow dependency license notices missing')
+    for notice in pillow_notices:
+        source = Path(pillow.locate_file(notice))
+        target = output/'licenses/Pillow'/Path(*notice.parts[notice.parts.index('licenses')+1:])
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, target)
     for name in ('README.md', 'LICENSE', 'THIRD_PARTY.md'):
         shutil.copy2(root/name, output/name)
     (output/'output').mkdir(exist_ok=True)

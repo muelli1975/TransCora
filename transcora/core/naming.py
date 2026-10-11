@@ -6,6 +6,8 @@ from .model import Options, frame_rate
 
 
 _HINTS = {"lr": ("full_sbs", False), "lrh": ("half_sbs", False), "lrq": ("half_sbs", False),
+          "sbs": ("full_sbs", False), "hsbs": ("half_sbs", False), "hou": ("half_ou", False),
+          "half-sbs": ("half_sbs", False), "half-ou": ("half_ou", False),
           "rl": ("full_sbs", True), "rlh": ("half_sbs", True), "rlq": ("half_sbs", True),
           "tb": ("full_ou", False), "ab": ("full_ou", False),
           "tbh": ("half_ou", False), "abq": ("half_ou", False),
@@ -14,7 +16,7 @@ _HINTS = {"lr": ("full_sbs", False), "lrh": ("half_sbs", False), "lrq": ("half_s
 
 
 def filename_layout(stem: str) -> tuple[str, bool] | None:
-    match = re.search(r"-(lrh|rlh|lrq|rlq|tbh|bth|abq|baq|lr|rl|tb|bt|ab|ba)$", stem, re.I)
+    match = re.search(r"-(half-sbs|half-ou|hsbs|hou|sbs|lrh|rlh|lrq|rlq|tbh|bth|abq|baq|lr|rl|tb|bt|ab|ba)$", stem, re.I)
     hint = _HINTS[match[1].lower()] if match else None
     own = re.search(r"_(full_sbs|half_sbs|full_ou|half_ou)$", stem, re.I)
     if own:
@@ -33,7 +35,7 @@ def filename_layout(stem: str) -> tuple[str, bool] | None:
 def clean_stem(stem: str) -> str:
     # Remove recognized compound markers only; preserve ordinary words containing '3D'.
     stem = re.sub(r"(?:[-. _])3d[-. _]+h?(?:sbs|tab)(?=$|[-. _])", "", stem, flags=re.I)
-    stem = re.sub(r"-(?:lrh|rlh|lrq|rlq|tbh|bth|abq|baq|lr|rl|tb|bt|ab|ba|2d)$", "", stem, flags=re.I)
+    stem = re.sub(r"-(?:half-sbs|half-ou|hsbs|hou|sbs|lrh|rlh|lrq|rlq|tbh|bth|abq|baq|lr|rl|tb|bt|ab|ba|2d)$", "", stem, flags=re.I)
     stem = re.sub(r"_(?:full_sbs|half_sbs|full_ou|half_ou|mono_l)$", "", stem, flags=re.I)
     stem = re.sub(r"_\d+(?:\.\d+)?(?:_\d+)?fps$", "", stem, flags=re.I)
     stem = re.sub(r"_fps\d+(?:\.\d+)?(?:_\d+)?$", "", stem, flags=re.I)
@@ -93,7 +95,8 @@ def effective_suffix(options: Options, method_suffix: str, source: Path | None =
         return ""
     if options.naming == "layout":
         return "_" + ("mono_l" if options.target == "mono" else options.target)
-    return {"half_sbs": ".3D.HSBS-lrh", "half_ou": ".3D.HTAB-tbh", "mono": "_mono_l-2d"}[options.target]
+    return {"half_sbs": ".3D.HSBS-lrh", "half_ou": ".3D.HTAB-tbh", "full_sbs": ".3D.SBS-lr",
+            "full_ou": ".3D.TAB-tb", "mono": "_mono_l-2d"}[options.target]
 
 
 def output_parts(source: Path, options: Options, method_suffix: str) -> tuple[str, str]:
