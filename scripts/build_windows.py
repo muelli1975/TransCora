@@ -56,6 +56,10 @@ def main():
             shutil.copytree(output/name, app_files/name, dirs_exist_ok=True)
         for name in ('README.md', 'README_DE.md', 'BUILD.md', 'LICENSE', 'THIRD_PARTY.md'):
             shutil.copy2(output/name, app_files/name)
+        # Adding tools and guides changes the bundle's sealed resources.
+        # Re-sign the completed app, retaining existing nested binary signatures.
+        subprocess.run(['codesign', '--force', '--sign', '-', str(output/'TransCora.app')], check=True)
+        subprocess.run(['codesign', '--verify', '--deep', '--strict', str(output/'TransCora.app')], check=True)
     (output/'output').mkdir(exist_ok=True)
     manifest = {}
     for path in sorted(output.rglob('*')):
