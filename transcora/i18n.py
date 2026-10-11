@@ -1009,6 +1009,8 @@ EN.update({
     'Eine positive Pixelzahl bis 20000 und lange/kurze Seite wählen.': 'Choose a positive pixel count up to 20000 and a long/short edge.',
     'MPO-Teilung erhält die komprimierten Bilddaten unverändert.': 'MPO splitting preserves the compressed image data unchanged.',
     'Ausgabe: Original-JPEGs ohne Neukodierung': 'Output: original JPEGs without re-encoding',
+    'Bildstapel abgeschlossen: {0} erfolgreich · {1} Fehler · {2} blockiert.': 'Image batch finished: {0} successful · {1} errors · {2} blocked.',
+    'Bildprüfung abgeschlossen: {0} bereit · {1} blockiert.': 'Image check finished: {0} ready · {1} blocked.',
     'Farbannahme {0}={1} (fehlende SDR-Angabe)': 'Colour assumption {0}={1} (missing SDR tag)',
     'Half-Layout: Gestauchte Achse wird je Halbbild rekonstruiert.': 'Half layout: the compressed axis is reconstructed for each half-image.',
     'Ausgabe: {0} × {1} Pixel je Datei': 'Output: {0} × {1} pixels per file',

@@ -18,6 +18,41 @@ from tkinter import ttk
 
 
 class GuiTests(unittest.TestCase):
+    def test_image_batch_continues_after_bad_source_and_export_failure(self):
+        from PIL import Image
+        from transcora.core.images import ImageOptions, mpo_jpegs
+        from transcora.gui.images_panel import execute_image as actual_execute
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            bad = folder/'bad.jpg'; bad.write_bytes(b'not an image')
+            sources = [folder/'a/stereo.mpo', folder/'b/stereo.mpo']
+            for source in sources:
+                source.parent.mkdir()
+                Image.new('RGB', (32, 24), 'red').save(source, format='MPO', save_all=True,
+                                                     append_images=[Image.new('RGB', (32, 24), 'blue')])
+            panel = self.window.images
+            panel.add_paths([bad, *sources])
+            for job in panel.jobs: job.options = ImageOptions(task='mpo')
+            panel.output.set(str(folder/'out'))
+            def export(tools, plan, *args):
+                if plan.sources[0] == sources[0].resolve():
+                    raise OSError('One export failed')
+                return actual_execute(tools, plan, *args)
+            with patch('transcora.gui.images_panel.threading.Thread') as thread, \
+                 patch('transcora.gui.images_panel.Toolchain.find', side_effect=AssertionError('MPO needs no FFmpeg')), \
+                 patch('transcora.gui.images_panel.execute_image', side_effect=export), \
+                 patch('transcora.gui.images_panel.new_run_log', return_value=folder/'run.log'):
+                thread.return_value.start.side_effect = lambda: thread.call_args.kwargs['target']()
+                panel.run(False); panel.poll()
+                self.assertEqual([job.status for job in panel.jobs], ['blocked', 'ready', 'ready'])
+                panel.run(True); panel.poll()
+            self.assertEqual([job.status for job in panel.jobs], ['blocked', 'failed', 'completed'])
+            expected = mpo_jpegs(sources[1])
+            outputs = (folder/'out/stereo_2_l.jpg', folder/'out/stereo_2_r.jpg')
+            self.assertEqual(tuple(path.read_bytes() for path in outputs), expected)
+            self.assertIn('1 erfolgreich', panel.status.get())
+            self.assertFalse(panel.busy)
+
     def test_bd_remaining_time_is_per_phase_and_resets_between_steps(self):
         window = self.window
         window.add_paths([Path('test_full_sbs.mp4')])

@@ -317,20 +317,44 @@ class ImagePanel:
         self.cancel.clear(); self.set_busy(True); self.progress['value'] = 0; self.status.set('Bildstapel prüfen …')
         def worker():
             try:
-                tools = Toolchain.find(); prepared = plans(snapshot, output, self.cancel)
-                for plan in prepared: self.events.put(('job', (plan.sources, 'ready', plan.summary)))
-                if convert:
+                prepared = []; reserved = set(); blocked = failed = completed = 0
+                for job in snapshot:
+                    if self.cancel.is_set(): raise Cancelled()
+                    try:
+                        plan = plans([job], output, self.cancel, reserved=reserved)[0]
+                    except Cancelled:
+                        raise
+                    except Exception as error:
+                        blocked += 1
+                        self.events.put(('job', ((job.source.resolve(),), 'blocked', str(error))))
+                        self.owner.events.put(('log', job.source.name+': '+str(error)))
+                        continue
+                    prepared.append(plan)
+                    self.events.put(('job', (plan.sources, 'ready', plan.summary)))
+                if convert and prepared:
                     log = new_run_log(app_root()); self.owner.events.put(('log', 'Bildprotokoll: '+str(log)))
-                    started = time.monotonic()
+                    started = time.monotonic(); tools = None
                     for number, plan in enumerate(prepared, 1):
                         if self.cancel.is_set(): raise Cancelled()
                         self.events.put(('job', (plan.sources, 'running', plan.summary)))
-                        execute_image(tools, plan, self.cancel, lambda kind, data: self.events.put((kind, data)), log)
-                        self.events.put(('job', (plan.sources, 'completed', plan.summary)))
+                        try:
+                            if plan.options.task != 'mpo' and tools is None:
+                                tools = Toolchain.find()
+                            execute_image(tools, plan, self.cancel, lambda kind, data: self.events.put((kind, data)), log)
+                        except Cancelled:
+                            raise
+                        except Exception as error:
+                            failed += 1
+                            self.events.put(('job', (plan.sources, 'failed', str(error))))
+                            self.owner.events.put(('log', plan.sources[0].name+': '+str(error)))
+                        else:
+                            completed += 1
+                            self.events.put(('job', (plan.sources, 'completed', plan.summary)))
                         left = (time.monotonic()-started)/number*(len(prepared)-number)
                         self.events.put(('progress', (number/len(prepared)*100, f'{number}/{len(prepared)} · Restzeit etwa {left:.0f} s')))
-                    self.owner.events.put(('sound', None))
-                self.events.put(('status', 'Bildstapel abgeschlossen.' if convert else 'Prüfung bestanden; bereit für Start.'))
+                    if completed: self.owner.events.put(('sound', None))
+                self.events.put(('status', f'Bildstapel abgeschlossen: {completed} erfolgreich · {failed} Fehler · {blocked} blockiert.'
+                                 if convert else f'Bildprüfung abgeschlossen: {len(prepared)} bereit · {blocked} blockiert.'))
             except Cancelled: self.events.put(('error', ('cancelled', 'Bildstapel abgebrochen.')))
             except Exception as error: self.events.put(('error', ('failed' if convert else 'blocked', str(error))))
             finally: self.events.put(('done', None))

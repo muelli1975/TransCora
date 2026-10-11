@@ -59,20 +59,24 @@ class MpoTests(unittest.TestCase):
                         self.assertEqual(image.format, 'JPEG')
                         image.load()
 
-    def test_incomplete_index_range_is_rejected(self):
+    def test_missing_container_padding_does_not_block_complete_jpegs(self):
         self.padded_mpo(b'\0'*45, b'\0'*17)
         self.source.write_bytes(self.source.read_bytes()[:-1])
-        with self.assertRaisesRegex(ValueError, 'MPO-Index'):
-            mpo_jpegs(self.source)
+        self.assertEqual(mpo_jpegs(self.source), self.original)
 
-    def test_missing_eoi_is_rejected_even_when_pixels_can_be_read(self):
+    def test_inaccurate_index_sizes_do_not_block_complete_jpegs(self):
         left_size, entries, endian = self.padded_mpo(b'\0'*45, b'')
         data = bytearray(self.source.read_bytes())
-        # The declared range ends before EOI; Pillow can still read the full
-        # file, but a standalone lossless JPEG must contain its own end marker.
+        # Ignore inaccurate lengths when both actual JPEGs are complete.
         struct.pack_into(endian+'I', data, entries+4, left_size-2)
+        right_size = struct.unpack_from(endian+'I', data, entries+20)[0]
+        struct.pack_into(endian+'I', data, entries+20, right_size+30)
         self.source.write_bytes(data)
         self.assertEqual(inspect(self.source), ((64, 48), True))
+        self.assertEqual(mpo_jpegs(self.source), self.original)
+
+    def test_actually_truncated_jpeg_is_rejected(self):
+        self.source.write_bytes(self.source.read_bytes()[:-2])
         with self.assertRaisesRegex(ValueError, 'JPEG-Halbbild'):
             mpo_jpegs(self.source)
 

@@ -154,22 +154,25 @@ def inspect(path: Path, *, require_equal_size=True):
 
 
 def mpo_jpegs(path: Path) -> tuple[bytes, bytes]:
-    """Extract MP-index byte ranges; remove only the obsolete MPF APP2 index."""
+    """Extract the JPEGs at Pillow's frame offsets; remove the obsolete MPF APP2."""
     with Image.open(path) as image:
         if image.format != 'MPO' or image.n_frames != 2:
             raise ValueError('MPO mit genau zwei Halbbildern erforderlich.')
-        entries = image.mpinfo[0xB002]
         positions = []
         for frame in range(2):
             image.seek(frame)
             positions.append(image.offset)
     result = []
     with path.open('rb') as source:
-        for offset, entry in zip(positions, entries):
-            source.seek(offset)
-            data = source.read(entry['Size'])
-            if len(data) != entry['Size']:
+        source.seek(0, os.SEEK_END)
+        ends = positions[1:]+[source.tell()]
+        for offset, end in zip(positions, ends):
+            if end <= offset:
                 raise ValueError('Beschädigter MPO-Index oder unvollständiges JPEG-Halbbild.')
+            source.seek(offset)
+            # Actual frame boundaries are sufficient; camera-reported Sizes
+            # need not agree about padding or the JPEG end marker.
+            data = source.read(end-offset)
             # Fuji camera indexes include zero padding after EOI in the image
             # size. It belongs to the MPO container, not the standalone JPEG.
             data = data.rstrip(b'\x00')
@@ -213,8 +216,9 @@ def reserve(paths, folder, stem, suffixes, reserved):
         number += 1
 
 
-def plans(jobs: list[ImageJob], output: Path, cancel: threading.Event) -> list[ImagePlan]:
-    reserved = set(); result = []
+def plans(jobs: list[ImageJob], output: Path, cancel: threading.Event, *, reserved=None) -> list[ImagePlan]:
+    reserved = set() if reserved is None else reserved
+    result = []
     for job in jobs:
         if cancel.is_set():
             raise Cancelled()
@@ -386,7 +390,7 @@ def execute_image(tools, plan, cancel, emit, log_path):
                     target = folder/(str(i)+'.jpg'); target.write_bytes(item)
                     # Each original JPEG already carries its own metadata.
                     # Copying frame 0 tags over frame 1 can change orientation
-                    # and camera-specific fields, and needs no external tool.
+                    # and camera-specific fields. Extraction needs no tool.
                     staged.append(target)
             else:
                 emit('phase', 'Bild orientieren und Farbprofil lesen')

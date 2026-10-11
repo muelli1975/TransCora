@@ -2,7 +2,8 @@
 
 ## RC5
 
-- Lossless MPO splitting accepts the zero padding included in Fujifilm camera image sizes. Embedded JPEG pixels and compressed data remain unchanged; missing JPEG end markers or truncated ranges still fail.
+- Image batches now isolate source and export errors per file and continue with valid images. Shared output-name reservations still prevent collisions. MPO-only batches need no FFmpeg lookup.
+- Lossless MPO splitting follows actual Pillow frame boundaries, accepts Fujifilm zero padding and ignores inaccurate image-size fields. Embedded JPEG pixels and compressed data remain unchanged; actually truncated JPEGs still fail.
 - Lossless MPO splitting no longer requires matching dimensions or EXIF orientations. Those checks apply only when composing a stereo image.
 - MPO splitting preserves each JPEG's original metadata without an unnecessary ExifTool rewrite; right-eye orientation and camera fields are no longer overwritten with left-eye values.
 - Missing SDR colour descriptions use explicit existing hints or customary HD/PAL/NTSC defaults, with visible assumptions instead of rejecting usable sources. Full-OU defaults use the height of one eye.
