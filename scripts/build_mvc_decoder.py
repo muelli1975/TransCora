@@ -25,7 +25,8 @@ def main():
     edge, source = build/'edge264-mvc', build/'mvc-source/src'
     cc = os.environ.get('TRANSCORA_MVC_CC', 'gcc')
     subprocess.run(['make', '-C', str(edge), '-j4', 'STATIC=yes', 'BUILDTEST=no',
-                    'VARIANTS=x86-64-v2,x86-64-v3', 'CFLAGS=-march=x86-64', 'CC='+cc, 'V=no'], check=True)
+                    'VARIANTS=x86-64-v2,x86-64-v3', 'CFLAGS=-march=x86-64', 'CC='+cc, 'V=no',
+                    *(['OS=windows'] if os.name == 'nt' else [])], check=True)
     patched = build/'core'
     patched.mkdir(exist_ok=True)
     for name in ('mvcsource.h', 'cache_budget.h', 'h264poc.h'):
