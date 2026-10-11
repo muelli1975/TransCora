@@ -6,6 +6,9 @@ from transcora.core.images import ImageOptions, resized_dimensions
 
 class LocalisationTests(unittest.TestCase):
     def test_message_values_and_paths_remain_user_data(self):
+        self.assertEqual(translate('Dubois LCD (Sanders/McAllister) + rot', 'en'), 'Dubois LCD (Sanders/McAllister) + red')
+        self.assertEqual(translate('Dubois grün/magenta (GM)', 'en'), 'Dubois green/magenta (GM)')
+        self.assertEqual(translate('Dubois amber/blau (YB)', 'en'), 'Dubois amber/blue (YB)')
         self.assertEqual(translate('Voreinstellung geladen: Fertig', 'en'), 'Preset loaded: Fertig')
         self.assertEqual(translate(r'C:\Bilder\Wartet_full_sbs.png', 'en'), r'C:\Bilder\Wartet_full_sbs.png')
         self.assertEqual(translate('Einstellungen für 3 ausgewählte Datei(en). Leere Auswahlfelder bedeuten gemischte Werte.', 'en'),

@@ -9,7 +9,7 @@ from PIL import ImageGrab, Image
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from transcora.gui.window import Window
-from transcora.core.model import Job, Options
+from transcora.core.model import Job, Options, TARGETS, PROFILES
 from transcora.gui.preview_window import PreviewWindow
 
 OUT = ROOT/'output/gui-check'
@@ -40,7 +40,7 @@ window.tree.selection_set(window.jobs[0].id)
 window.selection_changed()
 window.variables['target'].set('Anaglyph')
 window.option_changed('target')
-window.variables['profile'].set('Kompatibel · 8 Bit / 4:2:0')
+window.variables['profile'].set(window.t(PROFILES['compatible']))
 window.option_changed('profile')
 window.elapsed_time.set('Vergangene Zeit: 02:34')
 window.elapsed.set('Restzeit: ca. 05:12')
@@ -94,7 +94,7 @@ for language, name in [('en', 'English'), ('de', 'Deutsch')]:
     snap(dialog, 'image-preview-'+language+'.png')
     dialog.destroy()
     window.notebook.select(window.video_tab)
-    window.variables['target'].set(window.t('Kreuzblick – Full-SBS R/L'))
+    window.variables['target'].set(window.t(TARGETS['cross_sbs']))
     window.option_changed('target')
     snap(root, 'video-'+language+'.png')
 root.destroy()

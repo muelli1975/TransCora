@@ -984,6 +984,9 @@ EN = {'\nFehler: {0}\n{1}\n': '\nError: {0}\n{1}\n',
                                                                                   'contrast'}
 
 EN.update({
+    'Dubois LCD (Sanders/McAllister) + rot': 'Dubois LCD (Sanders/McAllister) + red',
+    'Dubois grün/magenta (GM)': 'Dubois green/magenta (GM)',
+    'Dubois amber/blau (YB)': 'Dubois amber/blue (YB)',
     'Kreuzblick · Full-SBS R/L': 'Cross-view · Full-SBS R/L',
     'Kreuzblick-Ausgabe benötigt MKV für die eindeutige R/L-Kennzeichnung.': 'Cross-view output requires MKV for unambiguous R/L metadata.',
     'Kreuzblick: Full-SBS mit rechtem Halbbild zuerst. MKV erhält die passende R/L-Kennzeichnung.': 'Cross-view: Full-SBS with the right half-image first. MKV receives matching R/L metadata.',
