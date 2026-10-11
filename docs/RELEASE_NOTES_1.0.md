@@ -20,6 +20,8 @@
 - Weitere sView-Dateikürzel und WMV-Stereometadaten erkennen.
 - MVC-Aufbereitung erhält native BT.709-/1080p-Halbbilder pixelgenau, ohne den
   bisherigen YUV/RGB/YUV-Umweg. Die abschließende Dekodierungsprüfung bleibt erhalten.
+- MVC-Encoding: 40/40 Mbit/s, strikte GOP 24/4, CPB 3750 KB und maximal vier
+  gepufferte Bilder; qualitätsorientierte FRIM-Stufe `-u 1`.
 - Portable Ausgabe einschließlich passendem Anwendungscode und ExifTool samt
   Original-Supportdateien; Icon und Bereitschaftston bleiben unverändert.
 

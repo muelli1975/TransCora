@@ -153,8 +153,8 @@ def encoder_args(executable: Path, left: Path, right: Path, base: Path, dependen
     # FRIM rate control is the aggregate of both views, per the author's manual.
     return list(map(str, [executable, '-sw', '-i', left, right, '-viewoutput', '-o:mvc', base, dependent,
                          '-w', '1920', '-h', '1080', '-f', str(BD_RATE), '-I420',
-                         '-vbr', '28000', '40000', '-u', '1', '-profile', 'high', '-level', '4.1',
-                         '-gop', '24', '4', '0', 'O', '-cpbsize', '3570', '-l', '6', '-rf', '4',
+                         '-vbr', '40000', '40000', '-u', '1', '-profile', 'high', '-level', '4.1',
+                         '-gop', '24', '4', '0', 'S', '-cpbsize', '3750', '-l', '6', '-maxdpb', '4',
                          '-colormatrix', 'bt709', '-colorprim', 'bt709', '-colortransfer', 'bt709',
                          '-VuiNalHrd', 'on', '-PicTimingSEI', 'off', '-EndOfSequence', 'off']))
 

@@ -286,8 +286,9 @@ Bildzeiten, Interlacing und Bildlücken bleiben bis zu geprüften Regeln blockie
 
 FRIM 1.31 verwendet das mitgelieferte Software-SDK; Intel-Grafik, Treiberinstallation,
 AVISynth oder Netzwerkzugang werden für diesen FFmpeg-Eingabepfad nicht benötigt.
-Der geprüfte Encoder verwendet hohe Qualität, insgesamt 28/40 Mbit/s Ziel-/Maximalrate,
-AVC/MVC Level 4.1, GOP 24, begrenztes 8-Bit-4:2:0-BT.709. Für Blu-ray-Video ist dieses
+Der geprüfte Encoder verwendet hohe Qualität, insgesamt 40/40 Mbit/s Ziel-/Maximalrate,
+AVC/MVC Level 4.1, strikte GOP 24/4, CPB 3750 KB, maximal vier gepufferte Bilder und
+begrenztes 8-Bit-4:2:0-BT.709. Die qualitätsorientierte FRIM-Stufe `-u 1` bleibt erhalten. Für Blu-ray-Video ist dieses
 Profil fest; das 4:4:4-Anaglyphenprofil ist davon unabhängig.
 
 Die gewählten Audiospuren mit bekannter Mono-, Stereo-, 5.1- oder 7.1-Belegung werden
