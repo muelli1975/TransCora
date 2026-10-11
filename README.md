@@ -2,16 +2,21 @@
 
 Portabler, lokaler Konverter für 3D-Videos und Bilder mit Python-Oberfläche und FFmpeg.
 Videos und Bilder haben eigene Listen und Einstellungen. BD-3D-Ausgabe als ISO/M2TS,
-MPO-Teilung, Bildkonvertierung und L/R-Vorbereitung sind enthalten.
+MPO-Teilung und Bildkonvertierung sind enthalten.
+Deutsch/English lässt sich in beiden Bereichen umschalten; die Sprachwahl wird gespeichert.
 Kein Account, Tracking oder Netzwerkzugriff im Programm.
 
 ## Bilder verarbeiten
 
 Im Bereich **Bilder** Dateien oder Ordner hinzufügen, gewünschte Einträge auswählen
-und die Aufgabe festlegen. Einstellungen gelten für die Auswahl und als Vorgabe
-für neue Dateien. **Testen** prüft den gesamten Stapel vor dem Start; **Details**
+und die Aufgabe festlegen. Einstellungen gelten für die markierten Dateien; ohne
+Auswahl für neu hinzugefügte Dateien. Strg+A markiert alle Dateien, Strg+Klick einzelne
+Dateien und Umschalt+Klick einen Bereich. **Testen** prüft den gesamten Stapel vor dem Start; **Details**
 zeigt Quellinterpretation, Ausgabeziele und Hinweise. **Kontrollbild** hilft bei der
-Prüfung der Halbbildreihenfolge. Listen und eigene Voreinstellungen sind speicherbar.
+Prüfung der Halbbildreihenfolge und ist für genau eine Datei verfügbar. Die Kontrolle
+zeigt das Exportergebnis mit Fensteranpassung oder scrollbarer 1:1-Ansicht. Beide Bereiche
+verwenden standardmäßig `output`. Bei „Layout beibehalten“ bleibt der Dateiname erhalten;
+Namenskonflikte bekommen eine Nummer. Listen und eigene Voreinstellungen sind speicherbar.
 
 - **Bilder konvertieren:** JPEG/JPS, PNG/PNS, TIFF, BMP, WebP und MPO als Quellen;
   JPEG, PNG, TIFF oder verlustfreies WebP als Ausgabe. Layout beibehalten,
@@ -19,13 +24,15 @@ Prüfung der Halbbildreihenfolge. Listen und eigene Voreinstellungen sind speich
 - **MPO verlustfrei teilen:** Genau zwei JPEG-Halbbilder extrahieren, mit `_l`/`_r`
   benennen und den obsoleten MPO-Index entfernen. Keine JPEG-Neukodierung und
   keine Größenänderung; EXIF-Orientierung bleibt für die ungedrehten Pixel passend.
-- **L/R-Paare vorbereiten:** Dateinamen `_l`/`_r` beziehungsweise Ordner `L`/`R`
-  erkennen. Nur vollständige Paare mit gleichen Maßen und Einstellungen starten.
-  Unverändert in `L/0001_l…` und `R/0001_r…` kopieren; vorhandene Ziele schützen.
-- **Lange Kante:** 0 erhält die ursprüngliche/re-konstruierte Größe; eine Zahl
-  setzt die längste Ausgabekante. Beim Teilen gilt die Größe je Halbbild.
-  Eine größere Zahl skaliert hoch, ohne neue Details zu erzeugen.
-- JPEG: Qualität **90** (optional 95), **4:4:4**, optimierte Kodierung.
+- **Größe:** Original, 1080p, 2160p, 2048 lange Seite oder Benutzerdefiniert mit
+  langer/kurzer Seite in Pixeln, wie in AnaChroma. Das Seitenverhältnis bleibt erhalten.
+  Beim Teilen gilt die Größe je Halbbild; bei SBS/OU für das gepackte Ausgabebild.
+  Größere Vorgaben skalieren hoch, ohne neue Details zu erzeugen.
+- **CIELAB Least Squares:** Zusätzliches Anaglyphenverfahren für Bilder, mit demselben
+  nativen Werkzeug und Solver wie AnaChroma. Die Halbbilder werden in sRGB vorbereitet
+  und bei Größenänderung mit Lanczos vor der iterativen Berechnung skaliert. Die
+  iterative Berechnung kann deutlich länger dauern als die Matrixverfahren.
+- JPEG: Qualität **90** (optional 95), **4:4:4**.
   PNG/TIFF/WebP erhalten Transparenz beim Beibehalten des Layouts. JPEG und
   Stereo-Transformationen setzen transparente Bereiche auf Weiß.
 - Bei einer Wandlung EXIF-Orientierung anwenden und eingebettete ICC-Profile
@@ -363,3 +370,11 @@ Integrität, Halbbilder und Verpackung, nicht die sichtbare Bildqualität.
 
 Build-Anleitung: [BUILD.md](BUILD.md). Der passende Anwendungscode liegt im
 portablen Paket unter `source/`.
+
+## Kreuzblick-Video
+
+**Kreuzblick · Full-SBS R/L** setzt das rechte Halbbild links und das linke rechts.
+Die vollständige rekonstruierte Halbbildgröße bleibt erhalten. Ausgabe als MKV mit
+StereoMode R/L; der Standardzusatz ist `-rl` (z. B. `Film-rl.mkv`). Das Ergebnis ist
+auch beim erneuten Import eindeutig erkennbar. Die Halbbildreihenfolge einer R/L-
+Quelle wird zuerst korrekt interpretiert; „L/R tauschen“ ändert die Quellzuordnung.

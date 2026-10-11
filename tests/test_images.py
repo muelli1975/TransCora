@@ -79,24 +79,18 @@ class ImageTests(unittest.TestCase):
             self.assertNotIn('ThumbnailImage', tags); self.assertNotIn('PreviewImage', tags)
             self.assertEqual(plan.outputs[0].stat().st_mtime_ns, source.stat().st_mtime_ns)
 
-    def test_pair_validation_numbering_lists_collision_and_cancel(self):
-        left, right = self.folder/'photo_l.jpg', self.folder/'photo_r.jpg'
-        self.left.save(left); self.right.save(right)
-        os.utime(right, ns=(right.stat().st_atime_ns, left.stat().st_mtime_ns - 10_000_000_000))
-        opts = ImageOptions(task='pairs'); jobs = [ImageJob(left, opts), ImageJob(right, replace(opts))]
-        with self.assertRaises(ValueError): plans(jobs[:1], self.folder/'pairs', self.cancel)
-        prepared = plans(jobs, self.folder/'pairs', self.cancel)
-        execute_image(self.tools, prepared[0], self.cancel, lambda *a: None, self.folder/'pairs.log')
-        self.assertEqual(prepared[0].outputs[0].name, '0001_l.jpg')
-        for source, output in zip(prepared[0].sources, prepared[0].outputs):
-            self.assertEqual(hashlib.sha256(source.read_bytes()).digest(), hashlib.sha256(output.read_bytes()).digest())
-            self.assertEqual(source.stat().st_mtime_ns, output.stat().st_mtime_ns)
-        next_plan = plans(jobs, self.folder/'pairs', self.cancel)[0]
-        self.assertNotEqual(next_plan.outputs, prepared[0].outputs)
+    def test_image_lists_collision_and_cancel(self):
+        options = ImageOptions(target='keep', format='png', metadata=False)
+        jobs = [ImageJob(self.source, options)]
+        prepared = plans(jobs, self.folder/'out', self.cancel)[0]
+        self.assertEqual(prepared.outputs[0].name, self.source.name)
+        execute_image(self.tools, prepared, self.cancel, lambda *a: None, self.folder/'log')
+        next_plan = plans(jobs, self.folder/'out', self.cancel)[0]
+        self.assertNotEqual(next_plan.outputs, prepared.outputs)
+        self.assertNotIn('converted', next_plan.outputs[0].name)
         listing = self.folder/'list.json'; save_images(listing, jobs); restored = load_images(listing)
         self.assertEqual(restored[0].serializable(), jobs[0].serializable())
         self.cancel.set()
         with self.assertRaises(__import__('transcora.core.engine', fromlist=['Cancelled']).Cancelled):
-            execute_image(self.tools, next_plan, self.cancel, lambda *a: None, self.folder/'pairs.log')
+            execute_image(self.tools, next_plan, self.cancel, lambda *a: None, self.folder/'log')
         self.assertFalse(any(p.exists() for p in next_plan.outputs))
-

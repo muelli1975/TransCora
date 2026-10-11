@@ -3,3 +3,4 @@ PyInstaller==6.22.3
 
 # Runtime image support and CI screenshot verification.
 Pillow==11.3.0
+cmake==4.4.4

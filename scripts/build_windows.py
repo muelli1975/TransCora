@@ -23,7 +23,7 @@ def main():
     for name in ('transcora', 'native', 'scripts', 'tests', 'reference', 'assets', 'presets', 'licenses', 'docs', '.github'):
         shutil.copytree(root/name, output/'source'/name,
                         ignore=shutil.ignore_patterns('__pycache__', '*.pyc'), dirs_exist_ok=True)
-    for name in ('run_transcora.py', 'requirements-build.txt', 'BUILD.md', 'LICENSE', 'README.md', 'THIRD_PARTY.md'):
+    for name in ('.gitattributes', 'run_transcora.py', 'requirements-build.txt', 'BUILD.md', 'LICENSE', 'README.md', 'THIRD_PARTY.md'):
         shutil.copy2(root/name, output/'source'/name)
     python_license = next((p for p in (Path(sys.base_prefix)/'LICENSE.txt', Path(sys.base_prefix)/'LICENSE') if p.is_file()), None)
     if python_license is None:

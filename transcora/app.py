@@ -24,11 +24,14 @@ def main():
             from transcora.core.images import exiftool
             from transcora.core.engine import capture
             image_tools = bool(capture(exiftool()+['-ver']).strip())
+            from transcora.core.cielab import verify_tool
+            cielab_tool = verify_tool()
             if not (app_root() / "assets" / "ready.wav").is_file():
                 raise ValueError("Completion sound is missing")
             Path(sys.argv[2]).write_text(json.dumps({"ok": True, "methods": len(window.catalog),
                 "root": str(app_root()), "ffmpeg": capabilities["version"], "mvc": mvc_decoder.is_file(),
-                "bd3d": bd.encoder.is_file() and bd.muxer.is_file(), "images": image_tools}), encoding="utf-8")
+                "bd3d": bd.encoder.is_file() and bd.muxer.is_file(), "images": image_tools,
+                "cielab": cielab_tool.is_file()}), encoding="utf-8")
             root.destroy()
             return
         root.mainloop()

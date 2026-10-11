@@ -21,6 +21,18 @@ def apply_theme(root):
     style.theme_use("clam")
     style.configure(".", background=APP_BG, foreground=TEXT, bordercolor=BORDER,
                     darkcolor=BORDER, lightcolor=BORDER)
+    # Match the Stereo-Tools segmented selector: dark inactive segments,
+    # gold selection and the existing light-gold selected hover state.
+    style.configure("TNotebook", background=APP_BG, borderwidth=0, tabmargins=(10, 4, 10, 0))
+    style.configure("TNotebook.Tab", background=SECONDARY_BG, foreground=TEXT,
+                    bordercolor=BORDER, lightcolor=BORDER, darkcolor=BORDER,
+                    padding=(18, 4), focuscolor=GOLD_LIGHT)
+    tab_colors = [("disabled", SECONDARY_BG), ("selected", "active", GOLD_LIGHT),
+                  ("selected", GOLD), ("active", HOVER_BG)]
+    style.map("TNotebook.Tab", background=tab_colors,
+              foreground=[("disabled", DISABLED), ("selected", APP_BG)],
+              lightcolor=[("selected", GOLD), ("!selected", BORDER)],
+              darkcolor=[("selected", GOLD), ("!selected", BORDER)])
     style.configure("TButton", background=SECONDARY_BG, foreground=TEXT,
                     bordercolor=BORDER, padding=(9, 5), focusthickness=1, focuscolor=GOLD_LIGHT)
     style.map("TButton", background=[("disabled", SECONDARY_BG), ("active", HOVER_BG)],
@@ -47,6 +59,11 @@ def apply_theme(root):
               foreground=[("disabled", DISABLED)],
               indicatorbackground=[("disabled", "selected", DISABLED), ("disabled", SECONDARY_BG),
                                    ("selected", GOLD), ("active", HOVER_BG)])
+    style.configure("TRadiobutton", background=APP_BG, foreground=TEXT,
+                    indicatorbackground=SECONDARY_BG, indicatorforeground=TEXT)
+    style.map("TRadiobutton", background=[("active", APP_BG)],
+              foreground=[("disabled", DISABLED)],
+              indicatorbackground=[("selected", GOLD), ("active", HOVER_BG)])
     style.configure("TCombobox", fieldbackground=PANEL_BG, background=HOVER_BG, arrowcolor=GOLD_LIGHT)
     style.map("TCombobox", fieldbackground=[("disabled", PANEL_BG), ("readonly", PANEL_BG)],
               foreground=[("disabled", DISABLED), ("readonly", TEXT)],

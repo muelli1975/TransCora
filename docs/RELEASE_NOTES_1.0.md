@@ -1,5 +1,22 @@
 # TransCora 1.0
 
+## RC3
+
+- Complete German/English interface with immediate switching and a saved language preference.
+- Video/image tabs now use the shared Nachtgold palette, including selected, hover and disabled states.
+- Images use the same `output` default, filename display, preset menu and selection scope as videos.
+- Ctrl+A, Ctrl+click and Shift+click select all, individual entries and a range. Changes affect every selected entry.
+- Image sizes follow AnaChroma: Original, 1080p, 2160p, 2048 long edge and Custom with long/short edge in pixels.
+- Preview requires exactly one selected file. Video and image previews retain output-resolution pixels and offer fit or scrollable 1:1 display in a dark window.
+- Keeping an image layout retains the source filename. Stereo and anaglyph conversions use descriptive suffixes; collisions never overwrite existing files.
+- Removed L/R pair preparation. Lossless MPO splitting retains the embedded JPEG data, with `_l.jpg` and `_r.jpg` filenames.
+- Temporary PNG compression and a second JPEG Huffman pass were removed to reduce avoidable preview/export work without changing decoded JPEG quality.
+- Added cross-view video: Full-SBS with right half-image first, MKV StereoMode R/L and a `-rl` filename marker.
+- Added image-only CIELAB Least Squares using AnaChroma's native, hash-pinned solver and recorded AnaglyphBatch reference checks. Lanczos resizing precedes the iterative solver; orientation, ICC and ExifTool handling remain shared.
+- Regular image transformations retain the tested FFmpeg engine. A local 24 MP comparison showed different timing by method, rather than a general advantage for replacing it with Python/NumPy.
+
+## Existing 1.0 features
+
 - Eigene Bereiche **Videos** und **Bilder** mit unabhängigen Dateilisten,
   Auswahl-Einstellungen, Voreinstellungen, Kontrollbild, Testen, Start und Abbruch.
 - Bilder: JPEG, PNG, TIFF, BMP, WebP, JPS/PNS und MPO als Quellen; JPEG, PNG,
@@ -8,8 +25,6 @@
   obsolete MPO-Index wird entfernt, die komprimierten JPEG-Bilddaten bleiben erhalten.
 - Stereo-Bilder: Full-/Half-SBS und Full-/Half-OU, Anaglyphen mit allen 17
   Batch-Verfahren sowie linkes/rechtes oder beide getrennte Halbbilder.
-- L/R-Paare anhand von _l/_r beziehungsweise Ordnern L/R prüfen und unverändert
-  in nummerierte L/R-Ausgabeordner kopieren. Fehlende oder doppelte Halbbilder blockieren den Start.
 - Bildorientierung und ICC-Farbprofile werden vor einer Wandlung berücksichtigt.
   ExifTool übernimmt EXIF/XMP/IPTC, darunter Aufnahmezeiten, ohne eingebettete
   Vorschaubilder. Geänderte Bilder erhalten passende Orientierung; Dateizeiten bleiben erhalten.

@@ -18,6 +18,90 @@ from tkinter import ttk
 
 
 class GuiTests(unittest.TestCase):
+    def test_image_extended_selection_and_changes_apply_to_all_selected(self):
+        panel = self.window.images
+        self.window.notebook.select(self.window.image_tab)
+        panel.add_paths([Path('/photos/one_full_sbs.jpg'), Path('/photos/two_full_sbs.jpg'), Path('/photos/three_full_sbs.jpg')])
+        self.root.update()
+        def click(job, modifiers=0):
+            x, y, width, height = panel.tree.bbox(job.id)
+            panel.tree.event_generate('<ButtonPress-1>', x=x+12, y=y+height//2, state=modifiers)
+            panel.tree.event_generate('<ButtonRelease-1>', x=x+12, y=y+height//2, state=modifiers)
+            self.root.update()
+        click(panel.jobs[0]); click(panel.jobs[2], 4)
+        self.assertEqual(set(panel.tree.selection()), {panel.jobs[0].id, panel.jobs[2].id})
+        click(panel.jobs[0]); click(panel.jobs[2], 1)
+        self.assertEqual(len(panel.tree.selection()), 3)
+        panel.tree.focus_force(); self.root.update()
+        panel.tree.event_generate('<Control-a>'); self.root.update()
+        self.assertEqual(len(panel.selected()), 3)
+        panel.variables['target'].set('Full-OU'); panel.changed('target')
+        self.assertTrue(all(job.options.target == 'full_ou' for job in panel.jobs))
+        self.assertEqual(panel.defaults.target, 'keep')
+        self.assertEqual(str(panel.preview_button.cget('state')), 'disabled')
+        with patch('transcora.gui.images_panel.messagebox.showinfo') as info:
+            panel.preview()
+        info.assert_called_once()
+        self.assertFalse(panel.busy)
+        panel.tree.selection_set(panel.jobs[0].id); panel.selection_changed()
+        self.assertEqual(str(panel.preview_button.cget('state')), 'normal')
+        panel.variables['size_mode'].set('Benutzerdefiniert'); panel.changed('size_mode')
+        panel.variables['size_edge'].set('kurze Seite'); panel.changed('size_edge')
+        panel.variables['size_pixels'].set('600'); panel.changed('size_pixels')
+        self.assertEqual(panel.jobs[0].options.size_pixels, 600)
+        self.assertEqual(panel.jobs[1].options.size_mode, 'original')
+
+    def test_language_switch_preserves_jobs_user_names_and_persists_language(self):
+        self.window.add_paths([Path('/films/Wartet_full_sbs.mp4')])
+        job = self.window.jobs[0]; job.status = 'ready'
+        self.window.tree.selection_set(job.id); self.window.selection_changed()
+        self.window.variables['suffix'].set('_Mein_Name'); self.window.option_changed('suffix')
+        options = replace(job.options)
+        with tempfile.TemporaryDirectory() as folder, patch('transcora.gui.window.app_root', return_value=Path(folder)):
+            self.window.language_var.set('English'); self.window.language_changed(); self.root.update()
+            saved = json.loads((Path(folder)/'settings.json').read_text(encoding='utf-8'))
+            self.assertEqual(saved['language'], 'en')
+            self.assertEqual(job.options, options)
+            self.assertEqual(self.window.notebook.tab(self.window.image_tab, 'text'), 'Images')
+            self.assertEqual(self.window.tree.heading('file', 'text'), 'File')
+            self.assertEqual(self.window.tree.item(job.id, 'values')[0], 'Wartet_full_sbs.mp4')
+            self.assertIn('_Mein_Name', self.window.output_name.get())
+            self.window.variables['target'].set('Change frame rate only'); self.window.option_changed('target')
+            self.assertEqual(job.options.target, 'framerate')
+            self.window.images.set_busy(True)
+            self.assertTrue(all(str(widget.cget('state')) == 'disabled' for widget in self.window.language_controls))
+            self.window.language_var.set('Deutsch'); self.window.language_changed()
+            self.assertEqual(self.window.language, 'en')
+            self.window.images.set_busy(False)
+            self.window.language_var.set('Deutsch'); self.window.language_changed(); self.root.update()
+            self.assertEqual(self.window.tree.heading('file', 'text'), 'Datei')
+            self.assertEqual(self.window.notebook.tab(self.window.image_tab, 'text'), 'Bilder')
+            self.assertEqual(job.options.target, 'framerate')
+            self.window.language = 'en'; self.window._load_settings()
+            self.assertEqual(self.window.language, 'de')
+
+    def test_cross_view_gui_selects_mkv_and_image_preview_preserves_original_pixels(self):
+        self.window.variables['target'].set('Kreuzblick · Full-SBS R/L')
+        self.window.option_changed('target')
+        self.assertEqual(self.window.defaults.container, 'mkv')
+        self.assertEqual(self.window.variables['container'].get(), 'MKV')
+        self.assertEqual(str(self.window.combos['container'].cget('state')), 'disabled')
+        self.assertTrue(self.window.output_name.get().endswith('-rl.mkv'))
+        from transcora.gui.image_view import ImageView
+        from PIL import Image
+        dialog = tk.Toplevel(self.root); dialog.geometry('600x400')
+        viewer = ImageView(dialog, self.window.localizer); viewer.pack(fill='both', expand=True)
+        source = Image.new('RGB', (2000, 1200), (20, 40, 60)); viewer.set_images([source])
+        self.root.update()
+        self.assertEqual(viewer.images[0].size, source.size)
+        self.assertLess(viewer.photos[0].width(), source.width)
+        viewer.fit.set(False); viewer.render(); self.root.update()
+        self.assertEqual(viewer.photos[0].width(), source.width)
+        self.assertEqual(viewer.photos[0].height(), source.height)
+        self.assertEqual(viewer.canvas.cget('background'), '#181818')
+        self.assertEqual(int(viewer.canvas.cget('highlightthickness')), 0)
+        dialog.destroy()
+
     def test_images_tab_has_independent_selection_and_operation_guard(self):
         panel = self.window.images
         self.window.notebook.select(self.window.image_tab)

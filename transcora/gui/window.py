@@ -13,6 +13,8 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
 from transcora import __version__
+from transcora.i18n import LANGUAGES
+from transcora.gui.localization import Localizer, TextVar
 from transcora.core.engine import Cancelled, execute, methods, plan_job, preview
 from transcora.core.model import Job, LAYOUTS, PROFILES, TARGETS, Options, VIDEO_EXTENSIONS, app_root, FPS_CHOICES, COMPATIBILITY_NOTE, AUDIO_FORMATS, AUDIO_TRACKS, AUDIO_CHANNELS
 from transcora.core.naming import effective_suffix, suffix_choices, reserve_output, filename_layout, fps_suffix, default_disc_title
@@ -44,6 +46,7 @@ class Window:
         self.log_lines = []
         self.catalog = methods()
         self.defaults = Options()
+        self.language = 'de'
         self.input_folder = str(app_root())
         self.output_folder = str(app_root() / "output")
         self.recursive_value = False
@@ -54,17 +57,62 @@ class Window:
             self.presets = load_presets(app_root()/"user-presets.json")
         except (OSError, ValueError, TypeError) as error:
             self.log_lines.append("Voreinstellungen: " + str(error))
+        self.localizer = Localizer(root, self)
+        root.localizer = self.localizer
+        self.t = self.localizer.t
         self._style()
         self._build()
+        self.apply_language()
         schedule_dark_titlebar(root)
         root.protocol("WM_DELETE_WINDOW", self.close)
         root.after(100, self.poll)
+
+    def add_language_control(self, parent):
+        combo = ttk.Combobox(parent, textvariable=self.language_var,
+                             values=list(LANGUAGES.values()), state='readonly', width=10)
+        combo.pack(side='right')
+        combo.bind('<<ComboboxSelected>>', self.language_changed)
+        self.language_controls.append(combo)
+
+    def language_changed(self, event=None):
+        if self.busy or self.images.busy:
+            self.language_var.set(LANGUAGES[self.language])
+            return
+        self.language = next(key for key, label in LANGUAGES.items() if label == self.language_var.get())
+        self.apply_language()
+        try:
+            self.persist_settings()
+        except OSError:
+            self.status.set('Der Programmordner ist schreibgeschützt; Einstellungen konnten nicht gespeichert werden.')
+
+    def apply_language(self):
+        for panel in (self, self.images):
+            for key, mapping in panel.mappings.items():
+                if key in panel.combos:
+                    panel.combos[key].configure(values=[self.t(value) for value in mapping.values()])
+        for job in self.jobs:
+            self.update_row(job)
+        self.selection_changed()
+        self.images.refresh(); self.images.selection_changed()
+        self.combos['target_fps'].configure(values=[value.replace(',', '.') if self.language == 'en' else value for value in FPS_CHOICES])
+        self.localizer.apply()
+
+    def persist_settings(self):
+        write_json(app_root() / 'settings.json', {'schema_version': 2,
+                   'defaults': asdict(replace(self.defaults, layout='auto', swap=False, disc_title=None)),
+                   'output_folder': str(self.output_path()), 'input_folder': self.input_folder,
+                   'recursive': self.recursive.get(), 'language': self.language})
+
+    def language_sensitivity(self):
+        for widget in self.language_controls:
+            widget.configure(state='disabled' if self.busy or self.images.busy else 'readonly')
 
     def _load_settings(self):
         try:
             data = json.loads((app_root() / "settings.json").read_text(encoding="utf-8"))
             if not isinstance(data, dict) or data.get("schema_version") not in (1, 2):
                 return
+            self.language = data.get('language', 'de') if data.get('language') in LANGUAGES else 'de'
             defaults = Options.from_dict(data.get("defaults", {}))
             if defaults.method not in self.catalog:
                 return
@@ -106,7 +154,10 @@ class Window:
         header = ttk.Frame(outer)
         header.grid(row=0, column=0, sticky="ew", pady=(0, 8))
         ttk.Label(header, text="TransCora", foreground=GOLD_LIGHT, font=("Segoe UI", 15)).pack(side="left")
-        ttk.Label(header, text="Lokale 3D-Video-Konvertierung", foreground=MUTED).pack(side="right")
+        self.language_var = tk.StringVar(value=LANGUAGES[self.language])
+        self.language_controls = []
+        self.add_language_control(header)
+        ttk.Label(header, text="Lokale 3D-Video-Konvertierung", foreground=MUTED).pack(side="right", padx=12)
         toolbar = ttk.Frame(outer)
         toolbar.grid(row=1, column=0, sticky="ew", pady=(0, 8))
         for text, callback in (("Dateien hinzufügen", self.add_files), ("Ordner hinzufügen", self.add_folder),
@@ -122,7 +173,7 @@ class Window:
         holder.grid(row=2, column=0, sticky="nsew")
         holder.columnconfigure(0, weight=1)
         holder.rowconfigure(0, weight=1)
-        self.tree = ttk.Treeview(holder, columns=("file", "layout", "target", "status"), show="headings", height=6)
+        self.tree = ttk.Treeview(holder, columns=("file", "layout", "target", "status"), show="headings", height=6, selectmode="extended")
         for key, label, width in (("file", "Datei", 340), ("layout", "Quelle", 100),
                                   ("target", "Ziel", 165), ("status", "Status", 100)):
             self.tree.heading(key, text=label)
@@ -132,7 +183,9 @@ class Window:
         scrollbar.grid(row=0, column=1, sticky="ns")
         self.tree.configure(yscrollcommand=scrollbar.set)
         self.tree.bind("<<TreeviewSelect>>", self.selection_changed)
-        self.selection_text = tk.StringVar(value="Einstellungen gelten für neu hinzugefügte Dateien.")
+        self.tree.bind('<Control-a>', self.select_all)
+        self.tree.bind('<Control-A>', self.select_all)
+        self.selection_text = TextVar(self.localizer, value="Einstellungen gelten für neu hinzugefügte Dateien.")
         ttk.Label(outer, textvariable=self.selection_text, foreground=MUTED).grid(row=3, column=0, sticky="w", pady=(5, 3))
         fields = ttk.Frame(outer)
         fields.grid(row=4, column=0, sticky="ew")
@@ -152,9 +205,9 @@ class Window:
             self.option_frames[key] = frame
             frame.grid(row=row, column=col, sticky="ew", padx=(0, 8), pady=3)
             ttk.Label(frame, text=label).pack(anchor="w")
-            var = tk.StringVar(value=self.mappings[key][getattr(self.defaults, key)])
+            var = tk.StringVar(value=self.t(self.mappings[key][getattr(self.defaults, key)]))
             self.variables[key] = var
-            widget = ttk.Combobox(frame, textvariable=var, values=list(self.mappings[key].values()), state="readonly", width=22)
+            widget = ttk.Combobox(frame, textvariable=var, values=[self.t(v) for v in self.mappings[key].values()], state="readonly", width=22)
             widget.pack(fill="x")
             widget.bind("<<ComboboxSelected>>", lambda event, k=key: self.option_changed(k))
             self.controls.append((widget, "readonly"))
@@ -204,7 +257,7 @@ class Window:
         check = ttk.Checkbutton(folder_checks, text="Unterordner mitverarbeiten", variable=self.recursive)
         check.pack(side="left", padx=(0, 10))
         self.controls.append((check, "normal"))
-        self.output_name = tk.StringVar()
+        self.output_name = TextVar(self.localizer, )
         ttk.Label(fields, textvariable=self.output_name, foreground=GOLD_LIGHT, wraplength=790).grid(
             row=3, column=0, columnspan=3, sticky="ew", pady=(3, 0))
         output = ttk.Frame(outer)
@@ -217,9 +270,9 @@ class Window:
         entry.bind("<FocusOut>", lambda event: self.invalidate_all())
         self.controls.append((entry, "normal"))
         self.button(output, "Wählen", self.choose_output).grid(row=0, column=2, padx=(8, 0))
-        self.warning = tk.StringVar()
+        self.warning = TextVar(self.localizer, )
         ttk.Label(outer, textvariable=self.warning, foreground=GOLD_LIGHT, wraplength=800).grid(row=6, column=0, sticky="ew", pady=5)
-        self.details = tk.StringVar(value="Dateien hinzufügen oder eine gespeicherte Liste laden.")
+        self.details = TextVar(self.localizer, value="Dateien hinzufügen oder eine gespeicherte Liste laden.")
         detail_frame = ttk.Frame(outer)
         detail_frame.grid(row=7, column=0, sticky="ew")
         detail_frame.columnconfigure(0, weight=1)
@@ -296,21 +349,21 @@ class Window:
             audio_selection.bind(event, lambda e: self.option_changed('audio_selection'))
         self.controls.append((audio_selection, 'normal'))
         self.combos['audio_selection'] = audio_selection
-        self.audio_note = tk.StringVar()
+        self.audio_note = TextVar(self.localizer, )
         ttk.Label(audio_fields, textvariable=self.audio_note, foreground=MUTED, wraplength=360).grid(
             row=1, column=1, columnspan=2, sticky='w', pady=3)
         ttk.Label(audio_fields, text='Einstellungen werden sofort übernommen.', foreground=MUTED).grid(
             row=2, column=0, columnspan=2, sticky='w', pady=(12, 0))
         ttk.Button(audio_fields, text='Schließen', command=self.close_audio_options).grid(
             row=2, column=2, sticky='e', pady=(12, 0))
-        self.status = tk.StringVar(value="Bereit")
+        self.status = TextVar(self.localizer, value="Bereit")
         progress_info = ttk.Frame(outer)
         progress_info.grid(row=10, column=0, sticky="ew", pady=(6, 3))
         progress_info.columnconfigure(0, weight=1)
         self.status_label = ttk.Label(progress_info, textvariable=self.status, wraplength=800)
         self.status_label.grid(row=0, column=0, sticky="w")
-        self.elapsed = tk.StringVar(value="")
-        self.elapsed_time = tk.StringVar(value="")
+        self.elapsed = TextVar(self.localizer, value="")
+        self.elapsed_time = TextVar(self.localizer, value="")
         self.progress = ttk.Progressbar(outer, mode="determinate", maximum=100)
         self.progress.grid(row=11, column=0, sticky="ew")
         timing = ttk.Frame(outer)
@@ -319,7 +372,7 @@ class Window:
         ttk.Label(timing, textvariable=self.elapsed, foreground=MUTED).pack(side='left', padx=(24, 0))
         footer = ttk.Frame(outer)
         footer.grid(row=13, column=0, sticky="ew", pady=(8, 0))
-        self.speed = tk.StringVar(value="")
+        self.speed = TextVar(self.localizer, value="")
         ttk.Label(footer, textvariable=self.speed, foreground=MUTED).pack(side="left")
         self.abort_button = ttk.Button(footer, text="Abbrechen", command=self.abort, state="disabled", style="Danger.TButton")
         self.abort_button.pack(side="right")
@@ -351,11 +404,11 @@ class Window:
             load.add_command(label=name, command=lambda n=name: self.apply_preset(n))
             delete.add_command(label=name, command=lambda n=name: self.delete_preset(n))
         if not self.presets:
-            load.add_command(label='Keine gespeicherten Voreinstellungen', state='disabled')
-            delete.add_command(label='Keine gespeicherten Voreinstellungen', state='disabled')
-        menu.add_cascade(label='Laden', menu=load)
-        menu.add_command(label='Speichern unter …', command=self.preset_dialog)
-        menu.add_cascade(label='Löschen', menu=delete)
+            load.add_command(label=self.t('Keine gespeicherten Voreinstellungen'), state='disabled')
+            delete.add_command(label=self.t('Keine gespeicherten Voreinstellungen'), state='disabled')
+        menu.add_cascade(label=self.t('Laden'), menu=load)
+        menu.add_command(label=self.t('Speichern unter …'), command=self.preset_dialog)
+        menu.add_cascade(label=self.t('Löschen'), menu=delete)
 
     def store_preset(self, name):
         if self.busy:
@@ -370,11 +423,12 @@ class Window:
         self.presets = updated
         self.status.set('Voreinstellung gespeichert: ' + name)
 
-    def preset_dialog(self):
-        if self.busy:
+    def preset_dialog(self, store=None, title='Voreinstellung speichern'):
+        if self.busy or self.images.busy:
             return
+        store = store or self.store_preset
         dialog = tk.Toplevel(self.root, background=APP_BG)
-        dialog.title('Voreinstellung speichern')
+        dialog.title(title)
         dialog.transient(self.root)
         schedule_dark_titlebar(dialog)
         frame = ttk.Frame(dialog, padding=12)
@@ -387,7 +441,7 @@ class Window:
         note.pack(anchor='w')
         def save(event=None):
             try:
-                self.store_preset(name.get())
+                store(name.get())
                 dialog.destroy()
             except (OSError, ValueError) as error:
                 note.configure(text=str(error))
@@ -397,6 +451,7 @@ class Window:
         ttk.Button(buttons, text='Speichern', command=save, style='Primary.TButton').pack(side='right', padx=5)
         entry.bind('<Return>', save)
         dialog.bind('<Escape>', lambda e: dialog.destroy())
+        self.localizer.apply()
         dialog.grab_set()
         entry.focus_set()
 
@@ -434,6 +489,12 @@ class Window:
         ids = set(self.tree.selection())
         return [job for job in self.jobs if job.id in ids]
 
+    def select_all(self, event=None):
+        if not self.busy and not self.images.busy:
+            self.tree.selection_set(self.tree.get_children())
+            self.selection_changed()
+        return 'break'
+
     def reset_defaults(self):
         if self.busy:
             return
@@ -444,7 +505,7 @@ class Window:
 
     def update_row(self, job):
         layout = job.plan.layout if job.plan else job.options.layout
-        values = (job.source.name, LAYOUTS.get(layout, "?"), TARGETS[job.options.target], STATUS[job.status])
+        values = (job.source.name, self.t(LAYOUTS.get(layout, "?")), self.t(TARGETS[job.options.target]), self.t(STATUS[job.status]))
         if self.tree.exists(job.id):
             self.tree.item(job.id, values=values)
         else:
@@ -462,7 +523,7 @@ class Window:
                 if key == "suffix":
                     value = effective_suffix(self.defaults, self.catalog[self.defaults.method]["suffix"])
                     value = value or "Keiner"
-                var.set(self.mappings[key][value] if key in self.mappings else value)
+                var.set(self.t(self.mappings[key][value]) if key in self.mappings else self.t(value) if key == "suffix" and value == "Keiner" else value)
             self.updating = False
             self.last_suffix_display = self.variables['suffix'].get()
             self.last_title_display = self.variables['disc_title'].get()
@@ -477,9 +538,9 @@ class Window:
                 values = [self.display_suffix(job) for job in selected]
             value = values[0]
             if key in self.mappings:
-                var.set(self.mappings[key][value] if all(v == value for v in values) else "")
+                var.set(self.t(self.mappings[key][value]) if all(v == value for v in values) else "")
             else:
-                var.set(value if all(v == value for v in values) else "")
+                var.set(self.t(value) if key == "suffix" and value == "Keiner" else value if all(v == value for v in values) else "")
         self.updating = False
         self.last_suffix_display = self.variables['suffix'].get()
         self.last_title_display = self.variables['disc_title'].get()
@@ -505,9 +566,9 @@ class Window:
             if key == 'disc_title':
                 value = value.strip() or None
             if key == "suffix":
-                value = "" if value == "Keiner" else value
+                value = "" if value == self.t("Keiner") else value
             if key in self.mappings:
-                value = next(k for k, label in self.mappings[key].items() if label == value)
+                value = next(k for k, label in self.mappings[key].items() if self.t(label) == value)
             elif key in {"crf", "bitrate_mbps"}:
                 value = float(value.replace(",", "."))
             def changed(options, source=None):
@@ -518,6 +579,7 @@ class Window:
                         result.container, result.codec = 'iso', 'h264'
                     elif options.target == 'bd3d':
                         result.container = 'mp4'
+                    if value == 'cross_sbs': result.container = 'mkv'
                     if value == "framerate":
                         result.swap = False
                 if key == "suffix" and value == effective_suffix(replace(options, suffix=None), self.catalog[options.method]["suffix"], source):
@@ -562,23 +624,23 @@ class Window:
         self.title_frame.grid() if bd3d and selected else self.title_frame.grid_remove()
         self.option_frames['method'].grid()
         self.option_frames['profile'].grid()
-        self.combos['container'].configure(values=[self.mappings['container'][k] for k in
-            (('iso', 'm2ts') if bd3d else ('mp4', 'mkv'))])
+        self.combos['container'].configure(values=[self.t(self.mappings['container'][k]) for k in
+            (('iso', 'm2ts') if bd3d else ('mkv',) if options.target == 'cross_sbs' else ('mp4', 'mkv'))])
         self.advanced_button.configure(state='normal')
         self.swap_control.configure(state="disabled" if framerate else "normal")
         self.fps_frame.grid() if framerate else self.fps_frame.grid_remove()
         self.combos["method"].configure(state="readonly" if anaglyph else "disabled")
         self.combos["profile"].configure(state="readonly" if anaglyph else "disabled")
-        self.combos["suffix"].configure(values=self.available_suffixes(options, selected[0] if selected else None))
-        self.combos["container"].configure(state="disabled" if options.codec == "h265" else "readonly")
+        self.combos["suffix"].configure(values=[self.t(v) for v in self.available_suffixes(options, selected[0] if selected else None)])
+        self.combos["container"].configure(state="disabled" if options.codec == "h265" or options.target == "cross_sbs" else "readonly")
         self.combos['codec'].configure(state='disabled' if bd3d else 'readonly')
         self.combos['rate_mode'].configure(state='disabled' if bd3d else 'readonly')
         self.combos["crf"].configure(state="normal" if options.rate_mode == "crf" and not bd3d else "disabled")
         self.combos["bitrate_mbps"].configure(state="normal" if options.rate_mode == "abr" and not bd3d else "disabled")
         no_audio = options.audio_tracks == 'none'
         self.combos['audio_format'].configure(state='disabled' if bd3d or no_audio or options.audio_channels == 'stereo' else 'readonly')
-        self.variables['audio_format'].set('LPCM · 24 Bit' if bd3d else AUDIO_FORMATS[
-            'aac' if options.audio_channels == 'stereo' else options.audio_format])
+        self.variables['audio_format'].set(self.t('LPCM · 24 Bit' if bd3d else AUDIO_FORMATS[
+            'aac' if options.audio_channels == 'stereo' else options.audio_format]))
         self.combos['audio_channels'].configure(state='disabled' if no_audio else 'readonly')
         self.combos['audio_selection'].configure(state='normal' if options.audio_tracks == 'selected' else 'disabled')
         self.audio_note.set('BD-3D: LPCM mit 48 kHz und 24 Bit.' if bd3d else (
@@ -601,6 +663,8 @@ class Window:
             text = "1080p · 23,976 fps · AVC/MVC · Hohe Qualität. Andere konstante Quellbildraten werden direkt angepasst."
             if options.container == 'm2ts':
                 text += " M2TS enthält beide Halbbilder, jedoch keine Blu-ray-Disc-Struktur."
+        if options.target == "cross_sbs":
+            text = "Kreuzblick: Full-SBS mit rechtem Halbbild zuerst. MKV erhält die passende R/L-Kennzeichnung."
         if options.codec == "h265":
             text += " H.265: MKV, längere Rechenzeit und Zielplayer prüfen; CRF ist codecabhängig."
         if options.rate_mode == "abr" and not bd3d:
@@ -613,7 +677,7 @@ class Window:
         if job.plan and options.target == "framerate":
             options = replace(options, layout=job.plan.layout, swap=job.plan.swap)
         try:
-            return effective_suffix(options, self.catalog[options.method]["suffix"], job.source) or "Keiner"
+            return effective_suffix(options, self.catalog[options.method]["suffix"], job.source) or self.t("Keiner")
         except ValueError:
             return options.suffix or fps_suffix(options.target_fps)
 
@@ -698,8 +762,8 @@ class Window:
     def add_files(self):
         if self.busy:
             return
-        paths = filedialog.askopenfilenames(title="Videos hinzufügen", initialdir=self.input_folder,
-                 filetypes=[("Videos", " ".join("*" + e for e in sorted(VIDEO_EXTENSIONS))), ("Alle Dateien", "*.*")])
+        paths = filedialog.askopenfilenames(title=self.t("Videos hinzufügen"), initialdir=self.input_folder,
+                 filetypes=[(self.t("Videos"), " ".join("*" + e for e in sorted(VIDEO_EXTENSIONS))), (self.t("Alle Dateien"), "*.*")])
         if paths:
             self.input_folder = str(Path(paths[0]).parent)
             self.add_paths(paths)
@@ -707,7 +771,7 @@ class Window:
     def add_folder(self):
         if self.busy:
             return
-        value = filedialog.askdirectory(title="Videoordner hinzufügen", initialdir=self.input_folder)
+        value = filedialog.askdirectory(title=self.t("Videoordner hinzufügen"), initialdir=self.input_folder)
         if not value:
             return
         folder = Path(value).resolve()
@@ -741,7 +805,7 @@ class Window:
     def load(self):
         if self.busy:
             return
-        value = filedialog.askopenfilename(title="Jobliste laden", initialdir=self.input_folder, filetypes=[("TransCora-Jobliste", "*.json")])
+        value = filedialog.askopenfilename(title=self.t("Jobliste laden"), initialdir=self.input_folder, filetypes=[(self.t("TransCora-Jobliste"), "*.json")])
         if not value:
             return
         try:
@@ -760,22 +824,22 @@ class Window:
                 self.invalidate_all()
             self.status.set("Jobliste ergänzt. Alle Quellen werden vor dem Start neu geprüft.")
         except (OSError, ValueError, TypeError) as error:
-            messagebox.showerror("Jobliste", str(error), parent=self.root)
+            messagebox.showerror(self.t("Jobliste"), self.t(str(error)), parent=self.root)
 
     def save(self):
         if self.busy:
             return
-        value = filedialog.asksaveasfilename(title="Jobliste speichern", initialdir=self.input_folder, defaultextension=".json",
-                                            filetypes=[("TransCora-Jobliste", "*.json")])
+        value = filedialog.asksaveasfilename(title=self.t("Jobliste speichern"), initialdir=self.input_folder, defaultextension=".json",
+                                            filetypes=[(self.t("TransCora-Jobliste"), "*.json")])
         if value:
             try:
                 save_list(Path(value), self.jobs, self.output_path())
                 self.status.set("Jobliste gespeichert; enthalten sind Pfade und Einstellungen, keine Videos.")
             except OSError as error:
-                messagebox.showerror("Speichern", str(error), parent=self.root)
+                messagebox.showerror(self.t("Speichern"), self.t(str(error)), parent=self.root)
 
     def choose_output(self):
-        value = filedialog.askdirectory(title="Ausgabeordner wählen", initialdir=self.output_var.get())
+        value = filedialog.askdirectory(title=self.t("Ausgabeordner wählen"), initialdir=self.output_var.get())
         if value:
             self.output_var.set(value)
             self.invalidate_all()
@@ -812,6 +876,7 @@ class Window:
 
     def set_busy(self, value):
         self.busy = value
+        self.language_sensitivity()
         self.notebook.tab(self.image_tab, state='disabled' if value else 'normal')
         for widget, normal in self.controls:
             widget.configure(state="disabled" if value else normal)
@@ -1002,8 +1067,7 @@ class Window:
         scroll = ttk.Scrollbar(holder, orient='vertical', command=text.yview)
         scroll.grid(row=0, column=1, sticky='ns')
         text.configure(yscrollcommand=scroll.set)
-        text.insert("1.0", "\n\n".join(self.log_lines[-150:]) or "Noch keine technischen Meldungen.")
-        text.configure(state="disabled")
+        self.localizer.text(text, "\n\n".join(self.log_lines[-150:]) or "Noch keine technischen Meldungen.")
         button = self.button(dialog, 'Logs löschen', lambda: self.clear_logs(text))
         button.pack(anchor='e', padx=8, pady=8)
         button.configure(state='disabled' if self.busy else 'normal')
@@ -1011,6 +1075,7 @@ class Window:
             if event.widget == dialog:
                 self.controls = [(w, state) for w, state in self.controls if w is not button]
         dialog.bind('<Destroy>', forget)
+        self.localizer.apply()
 
     def clear_logs(self, text=None):
         if self.busy:
@@ -1020,10 +1085,7 @@ class Window:
             self.log_lines.clear()
             self.status.set(f'{count} Laufprotokolle gelöscht.')
             if text is not None:
-                text.configure(state='normal')
-                text.delete('1.0', 'end')
-                text.insert('1.0', 'Keine technischen Meldungen.')
-                text.configure(state='disabled')
+                self.localizer.text(text, 'Keine technischen Meldungen.')
         except OSError as error:
             self.status.set(f'Logs löschen: {error}')
 
@@ -1077,9 +1139,10 @@ class Window:
                     value = payload[3]
                     parts = []
                     if value["speed"] != "N/A":
-                        parts.append("Geschwindigkeit " + value["speed"].replace("x", "×").replace(".", ","))
+                        numeric = value["speed"].replace("x", "×")
+                        parts.append("Geschwindigkeit " + (numeric.replace(".", ",") if self.language == 'de' else numeric))
                     if value["fps"] not in (None, "N/A"):
-                        parts.append(value["fps"].replace(".", ",") + " fps")
+                        parts.append((value["fps"].replace(".", ",") if self.language == 'de' else value["fps"]) + " fps")
                     self.speed.set(" · ".join(parts))
                 elif kind == "phase":
                     self.status.set(payload[3])
@@ -1098,7 +1161,9 @@ class Window:
                         self.controls = [(widget, state) for widget, state in self.controls if widget not in widgets]
                         self.controls.extend(viewer.controls())
                         image = tk.PhotoImage(master=viewer.dialog, data=base64.b64encode(png))
-                        viewer.image_label.configure(image=image, text="")
+                        from PIL import Image
+                        import io
+                        viewer.image_view.set_images([Image.open(io.BytesIO(png))])
                         viewer.image_label.image = image
                 elif kind == "sound":
                     if os.name == "nt":
@@ -1111,11 +1176,12 @@ class Window:
                         return
         except queue.Empty:
             pass
+        self.localizer.apply()
         self.root.after(100, self.poll)
 
     def close(self):
         if self.busy or self.images.busy:
-            if messagebox.askyesno("TransCora", "Laufende Arbeit abbrechen und TransCora schließen?", parent=self.root):
+            if messagebox.askyesno(self.t("TransCora"), self.t("Laufende Arbeit abbrechen und TransCora schließen?"), parent=self.root):
                 self.closing = True
                 self.abort()
                 self.images.abort()
@@ -1128,8 +1194,8 @@ class Window:
             write_json(app_root() / "settings.json", {"schema_version": 2,
                        "defaults": asdict(replace(self.defaults, layout="auto", swap=False, disc_title=None)),
                        "output_folder": str(self.output_path()), "input_folder": self.input_folder,
-                       "recursive": self.recursive.get()})
+                       "recursive": self.recursive.get(), "language": self.language})
         except OSError:
             # Read-only application folders must not prevent exit or conversion to a writable destination.
-            messagebox.showwarning("Einstellungen", "Der Programmordner ist schreibgeschützt; Einstellungen konnten nicht gespeichert werden.", parent=self.root)
+            messagebox.showwarning(self.t("Einstellungen"), self.t("Der Programmordner ist schreibgeschützt; Einstellungen konnten nicht gespeichert werden."), parent=self.root)
         self.root.destroy()

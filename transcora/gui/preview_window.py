@@ -6,19 +6,25 @@ from tkinter import ttk
 
 from transcora.gui.native import schedule_dark_titlebar
 from transcora.gui.slider import Timeline
+from transcora.gui.image_view import ImageView
 
 
 class PreviewWindow:
     def __init__(self, parent, load_frame):
         self.load_frame = load_frame
         self.duration = 0.0
+        self.localizer = parent.localizer
+        self.t = self.localizer.t
         self.dialog = tk.Toplevel(parent)
         self.dialog.title("Kontrollbild · vor der Kodierung")
         self.dialog.configure(background="#181818")
+        self.dialog.geometry("820x600")
+        self.dialog.minsize(500, 400)
         schedule_dark_titlebar(self.dialog)
         frame = ttk.Frame(self.dialog, padding=12)
         frame.pack(fill="both", expand=True)
         frame.columnconfigure(0, weight=1)
+        frame.rowconfigure(3, weight=1)
         self.time_var = tk.StringVar(value="00:00")
         self.position_seconds = 0.0
         self.displayed_time = "00:00"
@@ -32,8 +38,9 @@ class PreviewWindow:
         self.scale.bind("<KeyRelease>", self.slider_released)
         self.position_label = ttk.Label(frame, text="Videodauer wird ermittelt …")
         self.position_label.grid(row=0, column=2, sticky="w")
-        self.image_label = ttk.Label(frame, text="Kontrollbild wird berechnet …", background="#000000")
-        self.image_label.grid(row=3, column=0, columnspan=3, pady=10)
+        self.image_view = ImageView(frame, self.localizer)
+        self.image_view.grid(row=3, column=0, columnspan=3, pady=10, sticky="nsew")
+        self.image_label = self.image_view.canvas
         self.note = ttk.Label(frame, text="Gleiche Filterkette wie im Export · 8-Bit-Anzeige, ohne Videokompression",
                               wraplength=640)
         self.note.grid(row=4, column=0, columnspan=3, sticky="w")
@@ -66,7 +73,7 @@ class PreviewWindow:
         return seconds + int(parts[-2])*60 + (int(parts[0])*3600 if len(parts) == 3 else 0)
 
     def update_position_label(self, seconds):
-        self.position_label.configure(text="/ " + (self.time_text(self.duration) if self.duration else "Dauer unbekannt"))
+        self.position_label.configure(text="/ " + (self.time_text(self.duration) if self.duration else self.t("Dauer unbekannt")))
 
     def position_changed(self, value):
         self.position_seconds = float(value)

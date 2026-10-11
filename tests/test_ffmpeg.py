@@ -18,6 +18,31 @@ from transcora.core.toolchain import Toolchain
 
 
 class FFmpegTests(unittest.TestCase):
+    def test_cross_view_outputs_right_first_with_metadata_and_reimports(self):
+        from transcora.core.engine import metadata_layout
+        plan, _ = self.export(Options(target='cross_sbs', container='mkv', crf=18))
+        self.assertEqual(plan.stereo, ('sbs', True))
+        self.assertTrue(plan.output.name.endswith('-rl.mkv'))
+        info = probe(self.tools, plan.output)
+        self.assertEqual(metadata_layout(info['video']), ('sbs', True))
+        normal = self.plan(Options(target='full_sbs', container='mkv'))
+        # Compare packing in RGB, before position-dependent error-diffusion
+        # dithering and 4:2:0 chroma subsampling in the encoded output.
+        normal.graph = normal.graph.split(';[composite]zscale=')[0] + ';[composite]null[v]'
+        plan.graph = plan.graph.split(';[composite]zscale=')[0] + ';[composite]null[v]'
+        normal_png = preview(self.tools, normal, threading.Event())
+        cross_png = preview(self.tools, plan, threading.Event())
+        from PIL import Image, ImageChops
+        import io
+        with Image.open(io.BytesIO(normal_png)) as a, Image.open(io.BytesIO(cross_png)) as b:
+            width, height = a.size
+            self.assertEqual(b.size, a.size)
+            for first, second in [(0, width//2), (width//2, 0)]:
+                difference = ImageChops.difference(a.crop((first, 0, first+width//2, height)), b.crop((second, 0, second+width//2, height)))
+                self.assertIsNone(difference.getbbox())
+        restored = plan_job(self.tools, Job(plan.output, Options(target='full_sbs', container='mkv')), self.folder/'restored', set(), capabilities=self.capabilities)
+        self.assertEqual((restored.layout, restored.swap), ('full_sbs', True))
+
     @classmethod
     def setUpClass(cls):
         try:

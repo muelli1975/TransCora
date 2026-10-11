@@ -4,7 +4,7 @@ import ctypes
 import sys
 import tkinter as tk
 import time
-from PIL import ImageGrab
+from PIL import ImageGrab, Image
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -81,5 +81,21 @@ root.geometry('780x680+20+0')
 snap(root, 'images-minimum.png')
 window.notebook.select(window.video_tab)
 snap(root, 'video-minimum.png')
+for language, name in [('en', 'English'), ('de', 'Deutsch')]:
+    window.language = language; window.language_var.set(name); window.apply_language()
+    window.notebook.select(window.image_tab)
+    window.images.variables['task'].set(window.t('Bilder konvertieren')); window.images.changed('task')
+    window.images.variables['size_mode'].set(window.t('Benutzerdefiniert')); window.images.changed('size_mode')
+    window.images.variables['size_edge'].set(window.t('kurze Seite')); window.images.changed('size_edge')
+    snap(root, 'images-custom-'+language+'.png')
+    window.images.events.put(('preview', [Image.new('RGB', (2000, 1200), (38, 48, 58))]))
+    window.images.poll()
+    dialog = window.images.preview_dialog
+    snap(dialog, 'image-preview-'+language+'.png')
+    dialog.destroy()
+    window.notebook.select(window.video_tab)
+    window.variables['target'].set(window.t('Kreuzblick – Full-SBS R/L'))
+    window.option_changed('target')
+    snap(root, 'video-'+language+'.png')
 root.destroy()
 ctypes.windll.user32.ShowWindow(taskbar, 5)

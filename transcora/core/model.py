@@ -13,7 +13,7 @@ LAYOUTS = {"auto": "Automatisch", "full_sbs": "Full-SBS", "half_sbs": "Half-SBS"
            "full_ou": "Full-OU", "half_ou": "Half-OU", "mono": "Mono / 2D",
            "mvc": "MVC / Blu-ray 3D", "mvhevc": "MV-HEVC"}
 TARGETS = {"half_sbs": "Half-SBS · 1080p", "half_ou": "Half-OU · 1080p",
-           "full_sbs": "Full-SBS · Quellauflösung", "full_ou": "Full-OU · Quellauflösung",
+           "cross_sbs": "Kreuzblick · Full-SBS R/L", "full_sbs": "Full-SBS · Quellauflösung", "full_ou": "Full-OU · Quellauflösung",
            "anaglyph": "Anaglyph", "mono": "Mono · linkes Halbbild", "framerate": "Nur Framerate ändern", "bd3d": "BD-3D · 1080p"}
 NAMING = {"original": "Kein Layout-Zusatz", "layout": "Layout-Zusatz",
           "players": "Player-Kürzel (Kodi/Bino)"}
@@ -120,6 +120,8 @@ class Options:
                 raise ValueError("BD-3D benötigt ISO oder M2TS mit AVC/MVC.")
         elif self.container not in {"mp4", "mkv"}:
             raise ValueError("ISO/M2TS ist nur für BD-3D verfügbar.")
+        if self.target == "cross_sbs" and self.container != "mkv":
+            raise ValueError("Kreuzblick-Ausgabe benötigt MKV für die eindeutige R/L-Kennzeichnung.")
         if self.codec == "h265" and self.container != "mkv":
             raise ValueError("H.265 ist in dieser Version nur mit MKV freigegeben.")
 

@@ -61,6 +61,7 @@ def fps_suffix(value: str) -> str:
 
 def suffix_choices(options: Options, method_suffix: str, layout: str | None = None, swap: bool = False) -> list[str]:
     target = layout if options.target == "framerate" else options.target
+    if target == "cross_sbs": return ["-rl", ".3D.SBS-rl", "Keiner"]
     choices = {"half_sbs": ["_half_sbs", "-lrh", "-lrq", ".3D.HSBS", ".3D.HSBS-lrh"],
                "half_ou": ["_half_ou", "-tbh", "-abq", ".3D.HTAB", ".3D.HTAB-tbh"],
                "full_sbs": ["_full_sbs", "-lr"], "full_ou": ["_full_ou", "-tb", "-ab"],
@@ -87,6 +88,7 @@ def effective_suffix(options: Options, method_suffix: str, source: Path | None =
                   ("full_sbs", True): "-rl", ("half_sbs", True): "-rlh",
                   ("full_ou", True): "-bt", ("half_ou", True): "-bth"}.get((layout, swap), "")
         return fps_suffix(options.target_fps) + marker
+    if options.target == "cross_sbs": return ".3D.SBS-rl" if options.naming == "players" else "-rl"
     if options.target == "bd3d":
         return ""
     if options.target == "anaglyph":

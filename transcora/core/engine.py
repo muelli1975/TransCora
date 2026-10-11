@@ -188,6 +188,7 @@ class Plan:
     @property
     def stereo(self) -> tuple[str, bool] | None:
         layout = self.layout if self.options.target == "framerate" else self.options.target
+        if layout == "cross_sbs": return ("sbs", True)
         if layout not in {"half_sbs", "full_sbs", "half_ou", "full_ou"}:
             return None
         return ("sbs" if layout.endswith("sbs") else "ou", self.swap if self.options.target == "framerate" else False)
@@ -295,10 +296,11 @@ def build_graph(video: dict, options: Options, layout: str, swap: bool, colors: 
         stack = "hstack" if options.target == "half_sbs" else "vstack"
         graph.append(f"[lp][rp]{stack}=inputs=2[composite]")
         size = (1920, 1080)
-    elif options.target in {"full_sbs", "full_ou"}:
-        stack = "hstack" if options.target == "full_sbs" else "vstack"
-        graph.append(f"[l][r]{stack}=inputs=2[composite]")
-        size = (display_w * (2 if options.target == 'full_sbs' else 1),
+    elif options.target in {"full_sbs", "full_ou", "cross_sbs"}:
+        stack = "hstack" if options.target in {"full_sbs", "cross_sbs"} else "vstack"
+        order = "[r][l]" if options.target == "cross_sbs" else "[l][r]"
+        graph.append(f"{order}{stack}=inputs=2[composite]")
+        size = (display_w * (2 if options.target in {'full_sbs', 'cross_sbs'} else 1),
                 display_h * (2 if options.target == 'full_ou' else 1))
     elif options.target == "mono":
         graph.append("[r]nullsink")
@@ -440,7 +442,7 @@ def plan_job(tools: Toolchain, job: Job, output_root: Path, reserved: set[str],
         raise ValueError("Das gepackte Raster lässt sich nicht in zwei gleich große Halbbilder teilen.")
     colors, color_warnings = color_spec(video)
     warnings.extend(color_warnings)
-    if layout.startswith('half_') and options.target in {'full_sbs', 'full_ou'}:
+    if layout.startswith('half_') and options.target in {'full_sbs', 'full_ou', 'cross_sbs'}:
         warnings.append('Half → Full: Die gestauchte Achse wird hochskaliert. Verlorene Bilddetails werden nicht wiederhergestellt.')
     if any(s.get("codec_type") == "subtitle" for s in info["streams"]):
         warnings.append("Untertitel werden nicht übernommen.")
@@ -718,7 +720,7 @@ def preview(tools: Toolchain, plan: Plan, cancel: threading.Event, seconds: floa
         raise ValueError("Zeitstelle liegt außerhalb des Videos.")
     from .multiview import runtime, input_args
     with runtime(tools, plan, cancel, seconds) as (working, decoder):
-        graph = working.graph + (";[right]nullsink;[left]null[v]" if plan.options.target == "bd3d" else "") + ";[v]scale=640:360:force_original_aspect_ratio=decrease:flags=lanczos,format=rgb24[preview]"
+        graph = working.graph + (";[right]nullsink;[left]null[v]" if plan.options.target == "bd3d" else "") + ";[v]format=rgb24[preview]"
         if working.info.get('preview_trim'):
             index = working.info['video']['index']
             graph = graph.replace(f'[0:{index}]', f"[0:{index}]trim=start_frame={working.info['preview_trim']},", 1)

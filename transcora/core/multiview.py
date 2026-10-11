@@ -287,7 +287,7 @@ def inspect_source(tools, source, cancel=None, explicit='auto', phase=None):
         positions = str(video.get('view_pos_available', '')).split(',')
         if video.get('codec_name') == 'hevc' and len(ids) > 1:
             if len(ids) != 2 or len(positions) != 2 or set(positions) != {'1', '2'}:
-                raise ValueError('MV-HEVC: Zwei eindeutig als links/rechts gekennzeichnete Ansichten sind erforderlich.')
+                raise ValueError('MV-HEVC: Zwei eindeutig als links/rechts gekennzeichnete Halbbilder sind erforderlich.')
             desc = {'kind': 'mvhevc', 'source_index': video['index']}
         elif video.get('codec_name') == 'h264':
             if phase:
@@ -311,7 +311,7 @@ def inspect_source(tools, source, cancel=None, explicit='auto', phase=None):
                             kinds.add(nal[0]&31)
             if not {15, 20} <= kinds:
                 if len(videos) > 1 or disc or explicit == 'mvc' or kinds & {15, 20}:
-                    raise ValueError('MVC: Vollständige Basis- und Zusatzansicht fehlen.')
+                    raise ValueError('MVC: Vollständiges Basis- und Zusatzhalbbild fehlen.')
                 desc = None
                 info.pop('multiview', None)
             else:
@@ -387,14 +387,14 @@ class PairClock:
         if re.search(r'\bn:\s*\d+', line):
             match = re.search(r'\bpts:\s*(-?\d+)\s+pts_time:', line)
             if not match:
-                raise ValueError('MV-HEVC: Fehlende Bildzeit einer Ansicht.')
+                raise ValueError('MV-HEVC: Fehlende Bildzeit eines Halbbildes.')
             self.queues[side].append(int(match[1]))
             while all(self.queues.values()):
                 if self.queues['left'].popleft() != self.queues['right'].popleft():
                     raise ValueError('MV-HEVC: Halbbilder sind zeitlich nicht synchron.')
                 self.count += 1
             if len(self.queues[side]) > 512:
-                raise ValueError('MV-HEVC: Eine Ansicht fehlt oder bleibt zurück.')
+                raise ValueError('MV-HEVC: Ein Halbbild fehlt oder bleibt zurück.')
         return True
 
     def finish(self, expected=None):

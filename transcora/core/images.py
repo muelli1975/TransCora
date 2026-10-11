@@ -19,15 +19,22 @@ from .naming import clean_stem, filename_layout
 from .storage import write_json
 
 EXTENSIONS = {'.jpg', '.jpeg', '.jps', '.png', '.pns', '.tif', '.tiff', '.bmp', '.webp', '.mpo'}
-TASKS = {'convert': 'Bilder konvertieren', 'mpo': 'MPO verlustfrei teilen', 'pairs': 'L/R-Paare vorbereiten'}
+TASKS = {'convert': 'Bilder konvertieren', 'mpo': 'MPO verlustfrei teilen'}
 LAYOUTS = {'auto': 'Automatisch', 'mono': 'Mono / 2D', 'full_sbs': 'Full-SBS', 'half_sbs': 'Half-SBS',
            'full_ou': 'Full-OU', 'half_ou': 'Half-OU'}
 TARGETS = {'keep': 'Layout beibehalten', 'full_sbs': 'Full-SBS', 'full_ou': 'Full-OU',
            'half_sbs': 'Half-SBS', 'half_ou': 'Half-OU', 'anaglyph': 'Anaglyph',
            'left': 'Linkes Halbbild', 'right': 'Rechtes Halbbild', 'split': 'Beide Halbbilder teilen'}
 FORMATS = {'jpeg': 'JPEG', 'png': 'PNG', 'tiff': 'TIFF', 'webp': 'WebP (verlustfrei)'}
+SIZES = {'original': 'Original', '1080p': '1080p', '2160p': '2160p',
+         '2048': '2048 lange Seite', 'custom': 'Benutzerdefiniert'}
+SIZE_EDGES = {'long': 'lange Seite', 'short': 'kurze Seite'}
 SUFFIX = {'jpeg': '.jpg', 'png': '.png', 'tiff': '.tif', 'webp': '.webp'}
 SRGB = ImageCms.ImageCmsProfile(ImageCms.createProfile('sRGB')).tobytes()
+
+
+def image_methods():
+    return dict(methods(), cielab={'label': 'CIELAB Least Squares (David McAllister)', 'suffix': 'cielab'})
 
 
 @dataclass
@@ -38,6 +45,9 @@ class ImageOptions:
     format: str = 'jpeg'
     quality: int = 90
     long_edge: int = 0
+    size_mode: str = 'original'
+    size_edge: str = 'long'
+    size_pixels: int = 2048
     swap: bool = False
     metadata: bool = True
     method: str = 'dubois_lcd'
@@ -46,6 +56,9 @@ class ImageOptions:
     def from_dict(cls, data):
         if not isinstance(data, dict) or set(data)-set(cls.__dataclass_fields__):
             raise ValueError('Ungültige Bildeinstellungen.')
+        data = dict(data)
+        if 'size_mode' not in data and data.get('long_edge', 0):
+            data.update(size_mode='custom', size_pixels=data['long_edge'], long_edge=0)
         result = cls(**data)
         result.validate()
         return result
@@ -56,8 +69,10 @@ class ImageOptions:
                 raise ValueError('Ungültige Bildeinstellung: '+key)
         if self.quality not in (90, 95) or type(self.long_edge) is not int or not 0 <= self.long_edge <= 20000:
             raise ValueError('JPEG-Qualität: 90/95. Lange Kante: 0 (Original) bis 20000 Pixel.')
-        if type(self.swap) is not bool or type(self.metadata) is not bool or self.method not in methods():
+        if type(self.swap) is not bool or type(self.metadata) is not bool or self.method not in image_methods():
             raise ValueError('Ungültige Bild-, Metadaten- oder Anaglypheneinstellung.')
+        if self.size_mode not in SIZES or self.size_edge not in SIZE_EDGES or type(self.size_pixels) is not int or not 1 <= self.size_pixels <= 20000:
+            raise ValueError('Eine positive Pixelzahl bis 20000 und lange/kurze Seite wählen.')
 
 
 @dataclass
@@ -87,8 +102,13 @@ class ImagePlan:
 
     @property
     def summary(self):
+        if self.options.task == 'convert':
+            _, size = image_graph(self)
+            if self.options.target == 'split': size = (size[0]//2, size[1])
+        else:
+            size = (self.size[0]//2, self.size[1]) if self.options.task == 'mpo' else self.size
         return (f'{TASKS[self.options.task]} · {self.size[0]} × {self.size[1]} · '
-                f'{LAYOUTS.get(self.layout, self.layout)}\n' + '\n'.join(map(str, self.outputs)) +
+                f'{LAYOUTS.get(self.layout, self.layout)}\nAusgabe: {size[0]} × {size[1]} Pixel je Datei\n' + '\n'.join(map(str, self.outputs)) +
                 ('\n'+'\n'.join(self.warnings) if self.warnings else ''))
 
 
@@ -185,7 +205,7 @@ def reserve(paths, folder, stem, suffixes, reserved):
 
 
 def plans(jobs: list[ImageJob], output: Path, cancel: threading.Event) -> list[ImagePlan]:
-    reserved = set(); result = []; pairs = {}
+    reserved = set(); result = []
     for job in jobs:
         if cancel.is_set():
             raise Cancelled()
@@ -195,21 +215,9 @@ def plans(jobs: list[ImageJob], output: Path, cancel: threading.Event) -> list[I
         size, mpo = inspect(source)
         if opts.metadata and opts.task in {'convert', 'mpo'}:
             exiftool()
-        if opts.task == 'pairs':
-            if mpo:
-                raise ValueError('L/R-Vorbereitung benötigt einzelne Halbbilder; MPO zuerst teilen.')
-            match = re.fullmatch(r'(.+)[_-]([lr])', source.stem, re.I)
-            side = match[2].lower() if match else source.parent.name.lower()
-            if side not in {'l', 'r'}:
-                raise ValueError('L/R-Paar: Namen mit _l/_r oder Ordner L/R erforderlich: '+source.name)
-            name = match[1] if match else source.stem
-            parent = source.parent.parent if source.parent.name.lower() in {'l', 'r'} else source.parent
-            key = (str(parent).casefold(), name.casefold())
-            group = pairs.setdefault(key, {})
-            if side in group:
-                raise ValueError('Doppeltes '+side.upper()+'-Halbbild: '+source.name)
-            group[side] = (source, opts, size)
-            continue
+        if opts.task == 'convert' and opts.target == 'anaglyph' and opts.method == 'cielab':
+            from .cielab import verify_tool
+            verify_tool()
         warnings = []
         hint = filename_layout(source.stem)
         if mpo:
@@ -240,28 +248,14 @@ def plans(jobs: list[ImageJob], output: Path, cancel: threading.Event) -> list[I
             folder /= source.parent.relative_to(job.source_root.resolve())
         ext = '.jpg' if opts.task == 'mpo' else SUFFIX[opts.format]
         suffixes = ('_l'+ext, '_r'+ext) if opts.task == 'mpo' or opts.target == 'split' else (
-            ('_'+methods()[opts.method]['suffix'] if opts.target == 'anaglyph' else
-             '_'+opts.target if opts.target != 'keep' else '_converted')+ext,)
-        outputs = reserve({source}, folder, clean_stem(source.stem), suffixes, reserved)
+            ('_'+image_methods()[opts.method]['suffix'] if opts.target == 'anaglyph' else
+             {'left': '_l', 'right': '_r'}.get(opts.target, '_'+opts.target) if opts.target != 'keep' else '')+ext,)
+        # Retaining the layout also retains its existing filename marker.
+        stem = source.stem if opts.target == 'keep' and opts.task == 'convert' else clean_stem(source.stem)
+        outputs = reserve({source}, folder, stem, suffixes, reserved)
         stat = source.stat()
         result.append(ImagePlan((source,), outputs, opts, layout, swap, packed,
                                 ((stat.st_size, stat.st_mtime_ns),), tuple(warnings)))
-    for number, group in enumerate(sorted(pairs.items()), 1):
-        _, pair = group
-        if set(pair) != {'l', 'r'}:
-            raise ValueError('Unvollständiges L/R-Paar: '+next(iter(pair.values()))[0].name)
-        left, right = pair['l'], pair['r']
-        if left[2] != right[2] or asdict(left[1]) != asdict(right[1]):
-            raise ValueError('L/R-Paar: Maße und Einstellungen müssen übereinstimmen.')
-        if left[1].swap:
-            left, right = right, left
-        outputs = []
-        for side, item in [('l', left), ('r', right)]:
-            folder = output.resolve()/side.upper()
-            outputs.extend(reserve({left[0], right[0]}, folder, f'{number:04d}', ('_'+side+item[0].suffix.lower(),), reserved))
-        sources = (left[0], right[0]); stamps = tuple((p.stat().st_size, p.stat().st_mtime_ns) for p in sources)
-        result.append(ImagePlan(sources, tuple(outputs), left[1], 'mono', False, left[2], stamps,
-                               ('L/R-Ordner und Nummerierung; Bilddateien werden unverändert kopiert.',)))
     return result
 
 
@@ -281,11 +275,31 @@ def normalized(source: Path, frame=0):
     return image
 
 
+def resized_dimensions(size, options):
+    """Match AnaChroma SizeSpec: fit presets, long/short edge and nearest pixel."""
+    w, h = size
+    mode = options.size_mode
+    if options.long_edge and mode == 'original':
+        factor = options.long_edge/max(w, h)
+    elif mode == 'original': return size
+    elif mode == '1080p': factor = min(1920/w, 1080/h)
+    elif mode == '2160p': factor = min(3840/w, 2160/h)
+    elif mode == '2048': factor = 2048/max(w, h)
+    else: factor = options.size_pixels/(max(w, h) if options.size_edge == 'long' else min(w, h))
+    return max(1, round(w*factor)), max(1, round(h*factor))
+
+
 def image_graph(plan):
     opts = plan.options; target = opts.target
     if target == 'keep':
         graph = '[0:v]null[composite]'; size = plan.size
     elif target == 'anaglyph':
+        if opts.method == 'cielab':
+            w, h = plan.size
+            size = (w//2, h) if plan.layout.endswith('sbs') else (w, h//2)
+            if plan.layout == 'half_sbs': size = (size[0]*2, size[1])
+            if plan.layout == 'half_ou': size = (size[0], size[1]*2)
+            return None, resized_dimensions(size, opts)
         video = dict(index=0, width=plan.size[0], height=plan.size[1], pix_fmt='rgb24')
         graph, size, _ = build_graph(video, Options(target='anaglyph'), plan.layout, plan.swap,
             dict(matrix='gbr', primaries='bt709', transfer='iec61966-2-1', range='pc'), methods()[opts.method])
@@ -313,13 +327,11 @@ def image_graph(plan):
     elif target.startswith('half_'):
         size = (size[0]//2, size[1]) if target == 'half_sbs' else (size[0], size[1]//2)
         filters.append(f'scale={size[0]}:{size[1]}:flags=lanczos')
-    if opts.long_edge:
+    if opts.long_edge or opts.size_mode != 'original':
         # In split mode resize the two reconstructed halves equally.
-        edge = max(size[0]//2, size[1]) if target == 'split' else max(size)
-        ratio = opts.long_edge/edge
-        size = max(1, round(size[0]*ratio)), max(1, round(size[1]*ratio))
-        if target == 'split':
-            size = max(2, round(size[0]/2)*2), size[1]
+        half_size = (size[0]//2, size[1]) if target == 'split' else size
+        output_size = resized_dimensions(half_size, opts)
+        size = (output_size[0]*2, output_size[1]) if target == 'split' else output_size
         filters.append(f'scale={size[0]}:{size[1]}:flags=lanczos')
     filters.extend(['setsar=1', 'format=rgba' if target == 'keep' else 'format=rgb24'])
     return graph+';[composite]'+','.join(filters)+'[v]', size
@@ -350,11 +362,7 @@ def execute_image(tools, plan, cancel, emit, log_path):
         try:
             if cancel.is_set():
                 raise Cancelled()
-            if opts.task == 'pairs':
-                for i, source in enumerate(plan.sources):
-                    target = folder/(str(i)+plan.outputs[i].suffix)
-                    shutil.copy2(source, target); staged.append(target)
-            elif opts.task == 'mpo':
+            if opts.task == 'mpo':
                 data = mpo_jpegs(plan.sources[0])
                 if plan.swap:
                     data = data[::-1]
@@ -376,13 +384,18 @@ def execute_image(tools, plan, cancel, emit, log_path):
                     image = packed
                 elif image.mode == 'RGBA' and opts.target != 'keep':
                     flattened = Image.new('RGB', image.size, 'white'); flattened.paste(image, mask=image.getchannel('A')); image = flattened
-                input_file = folder/'normalized.png'; image.save(input_file)
-                graph, _ = image_graph(plan)
-                rendered = folder/'pixels.png'
-                emit('phase', 'Bild mit FFmpeg verarbeiten')
-                capture([str(tools.ffmpeg), '-v', 'error', '-nostdin', '-n', '-filter_complex_threads', '1',
-                    '-i', str(input_file), '-filter_complex', graph, '-map', '[v]', '-frames:v', '1',
-                    '-c:v', 'png', '-threads', '1', str(rendered)], cancel, timeout=180)
+                # Temporary PNGs need lossless pixels, not costly compression.
+                if opts.target == 'anaglyph' and opts.method == 'cielab':
+                    from .cielab import render
+                    rendered = render(image, plan, folder, cancel, emit)
+                else:
+                    input_file = folder/'normalized.png'; image.save(input_file, compress_level=0)
+                    graph, _ = image_graph(plan)
+                    rendered = folder/'pixels.png'
+                    emit('phase', 'Bild mit FFmpeg verarbeiten')
+                    capture([str(tools.ffmpeg), '-v', 'error', '-nostdin', '-n', '-filter_complex_threads', '1',
+                        '-i', str(input_file), '-filter_complex', graph, '-map', '[v]', '-frames:v', '1',
+                        '-c:v', 'png', '-compression_level', '0', '-threads', '1', str(rendered)], cancel, timeout=180)
                 with Image.open(rendered) as pixels:
                     pictures = ([pixels.crop((0, 0, pixels.width//2, pixels.height)),
                                  pixels.crop((pixels.width//2, 0, pixels.width, pixels.height))]
@@ -393,7 +406,9 @@ def execute_image(tools, plan, cancel, emit, log_path):
                     if opts.format == 'jpeg':
                         if pixels.mode == 'RGBA':
                             plain = Image.new('RGB', pixels.size, 'white'); plain.paste(pixels, mask=pixels.getchannel('A')); pixels = plain
-                        pixels.convert('RGB').save(target, quality=opts.quality, subsampling=0, optimize=True, icc_profile=SRGB)
+                        # One JPEG pass; Huffman optimisation changes file size,
+                        # not decoded pixels, and needlessly delays the preview.
+                        pixels.convert('RGB').save(target, quality=opts.quality, subsampling=0, icc_profile=SRGB)
                     elif opts.format == 'webp':
                         pixels.save(target, lossless=True, method=6, icc_profile=SRGB)
                     elif opts.format == 'tiff':
@@ -408,7 +423,7 @@ def execute_image(tools, plan, cancel, emit, log_path):
                             raise ValueError('Ausgabemaße stimmen nicht mit dem Bildplan überein.')
                     staged.append(target)
             for i, target in enumerate(staged):
-                source = plan.sources[i] if opts.task == 'pairs' else plan.sources[0]
+                source = plan.sources[0]
                 stat = source.stat(); os.utime(target, ns=(stat.st_atime_ns, stat.st_mtime_ns))
             for source, stamp in zip(plan.sources, plan.stamps):
                 stat = source.stat()

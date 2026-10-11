@@ -86,3 +86,15 @@ Original license notices and a source/binary manifest are bundled in `tools/mvc`
 
 Integration tests download one SHA256-pinned MV-HEVC conformance sample from
 FFmpeg's FATE suite. It is test material, not a bundled application dependency.
+
+## CIELAB Least Squares
+
+The image-only CIELAB method executes the same native PNG port as AnaChroma,
+from AnaChroma commit `1f5284dce7958be1165d7167b6631da760fd84c6`. The mathematical
+sources and solver are retained unchanged from `mbrown1413/anaglyph` commit
+`4db425343687f796b85f04ae204e05a43e5742f0`; SHA256 hashes are verified before building.
+The GPL-3.0-or-later tool communicates through PNG files as a separate process.
+It statically links pinned libpng 1.6.59 and zlib 1.3.2. The executable, matching
+offline source archive, provenance and complete CIELAB/levmar/libpng/zlib license
+texts are bundled under `tools/cielab`. See `native/cielab/README.md` and
+`SOURCES.json`. The original numerical method and iteration limits are unchanged.

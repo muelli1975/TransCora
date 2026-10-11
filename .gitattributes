@@ -1,0 +1,3 @@
+* text=auto
+# Hash-verified original CIELab solver sources must retain original line endings.
+native/cielab/upstream/** -text
