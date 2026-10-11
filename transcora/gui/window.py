@@ -152,14 +152,14 @@ class Window:
         outer.columnconfigure(0, weight=1)
         outer.rowconfigure(2, weight=1)
         header = ttk.Frame(outer)
-        header.grid(row=0, column=0, sticky="ew", pady=(0, 8))
+        header.grid(row=0, column=0, sticky="ew", pady=(0, 4))
         ttk.Label(header, text="TransCora", foreground=GOLD_LIGHT, font=("Segoe UI", 15)).pack(side="left")
         self.language_var = tk.StringVar(value=LANGUAGES[self.language])
         self.language_controls = []
         self.add_language_control(header)
         ttk.Label(header, text="Lokale 3D-Video-Konvertierung", foreground=MUTED).pack(side="right", padx=12)
         toolbar = ttk.Frame(outer)
-        toolbar.grid(row=1, column=0, sticky="ew", pady=(0, 8))
+        toolbar.grid(row=1, column=0, sticky="ew", pady=(0, 4))
         for text, callback in (("Dateien hinzufügen", self.add_files), ("Ordner hinzufügen", self.add_folder),
                                ("Entfernen", self.remove), ("Liste laden", self.load), ("Liste speichern", self.save)):
             self.button(toolbar, text, callback).pack(side="left", padx=(0, 5))

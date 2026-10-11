@@ -44,11 +44,11 @@ class ImagePanel:
             pass
         box = ttk.Frame(parent, padding=10); box.pack(fill='both', expand=True)
         box.columnconfigure(0, weight=1); box.rowconfigure(2, weight=1)
-        header = ttk.Frame(box); header.grid(row=0, column=0, sticky='ew', pady=(0, 8))
+        header = ttk.Frame(box); header.grid(row=0, column=0, sticky='ew', pady=(0, 4))
         ttk.Label(header, text='TransCora', foreground=GOLD_LIGHT, font=('Segoe UI', 15)).pack(side='left')
         owner.add_language_control(header)
         ttk.Label(header, text='Bilder und Halbbilder im Stapel verarbeiten', foreground=MUTED).pack(side='right', padx=12)
-        toolbar = ttk.Frame(box); toolbar.grid(row=1, column=0, sticky='ew', pady=(0, 8))
+        toolbar = ttk.Frame(box); toolbar.grid(row=1, column=0, sticky='ew', pady=(0, 4))
         for title, callback in [('Dateien hinzufügen', self.add_files), ('Ordner hinzufügen', self.add_folder),
                                 ('Entfernen', self.remove), ('Liste laden', self.load), ('Liste speichern', self.save)]:
             self.button(toolbar, title, callback).pack(side='left', padx=(0, 5))
