@@ -18,8 +18,7 @@ def main():
     output = root/'dist/TransCora'
     for name in ('assets', 'presets', 'tools', 'licenses'):
         shutil.copytree(root/name, output/name, ignore=shutil.ignore_patterns('__pycache__'), dirs_exist_ok=True)
-    (output/'docs').mkdir(exist_ok=True)
-    shutil.copy2(root/'docs/RELEASE_NOTES_1.0.md', output/'docs/RELEASE_NOTES_1.0.md')
+    shutil.copytree(root/'docs', output/'docs', dirs_exist_ok=True)
     for name in ('transcora', 'native', 'scripts', 'tests', 'reference', 'assets', 'presets', 'licenses', 'docs', '.github'):
         shutil.copytree(root/name, output/'source'/name,
                         ignore=shutil.ignore_patterns('__pycache__', '*.pyc'), dirs_exist_ok=True)
@@ -46,14 +45,14 @@ def main():
         target = output/'licenses/Pillow'/Path(*notice.parts[notice.parts.index('licenses')+1:])
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, target)
-    for name in ('README.md', 'README_DE.md', 'LICENSE', 'THIRD_PARTY.md'):
+    for name in ('README.md', 'README_DE.md', 'BUILD.md', 'LICENSE', 'THIRD_PARTY.md'):
         shutil.copy2(root/name, output/name)
     if sys.platform == 'darwin':
         subprocess.run(['ditto', str(root/'dist/TransCora.app'), str(output/'TransCora.app')], check=True)
         app_files = output/'TransCora.app/Contents/MacOS'
         for name in ('assets', 'presets', 'tools', 'licenses', 'docs'):
             shutil.copytree(output/name, app_files/name, dirs_exist_ok=True)
-        for name in ('README.md', 'README_DE.md', 'LICENSE', 'THIRD_PARTY.md'):
+        for name in ('README.md', 'README_DE.md', 'BUILD.md', 'LICENSE', 'THIRD_PARTY.md'):
             shutil.copy2(output/name, app_files/name)
     (output/'output').mkdir(exist_ok=True)
     manifest = {}

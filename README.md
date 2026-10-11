@@ -18,7 +18,7 @@ Download a package from [Releases](https://github.com/muelli1975/TransCora/relea
 | Linux x64 | `TransCora_1.0_Linux_x64.tar.gz` | `./TransCora` |
 | macOS Apple Silicon | `TransCora_1.0_macOS_AppleSilicon.tar.gz` | `TransCora.app` |
 
-Windows includes Python, FFmpeg and the BD-3D tools. Linux and macOS include the application runtime and image tools; **FFmpeg with ffprobe and system Perl must be installed separately**. On Ubuntu/Debian: `sudo apt install ffmpeg perl`. On macOS with Homebrew: `brew install ffmpeg`. macOS packages are not notarised.
+Windows includes Python, FFmpeg and the BD-3D tools. Linux and macOS include the application runtime and image tools; **FFmpeg with ffprobe and system Perl must be installed separately**. On Ubuntu/Debian: `sudo apt install ffmpeg perl`. On macOS with Homebrew: `brew install ffmpeg-full`. macOS packages are not notarised.
 
 Keep the supplied application files and tools together. No separate Python installation is needed for these packages. Blu-ray 3D encoding is available in the Windows package. The Linux package also includes the MVC reader; the Apple Silicon package currently supports packed stereo and ordinary video input, without an MVC reader.
 
@@ -92,7 +92,7 @@ Windows can also read unencrypted MVC/Blu-ray 3D and SDR MV-HEVC sources. Readin
 
 Save lists to resume a batch with its per-file settings. Lists contain paths and settings, not the media itself. Save **Presets** to reuse conversion settings. Language and chosen folders are remembered locally.
 
-Shortcuts: **Ctrl+O** adds files; **Ctrl+A** selects the list; **Ctrl+click** selects individual entries; **Shift+click** selects a range; **Delete** removes selected entries; **Esc** cancels the active operation.
+Shortcuts: **Ctrl+O** adds files; **Ctrl+A** selects the list; **Ctrl+click** selects individual entries; **Shift+click** selects a range; **Delete** removes selected entries; **Esc** cancels the active operation. On macOS use **Command** for opening files, selecting all and selecting individual entries.
 
 ## Source and license
 

@@ -102,8 +102,8 @@ Full-Ausgaben erhalten die rekonstruierte Auflösung je Halbbild. Half → Full
 skaliert die gestauchte Achse hoch und gewinnt keine verlorenen Bilddetails zurück.
 Die Videogröße ist als **Standard / Original / 1080p / 2160p / Benutzerdefiniert** wählbar.
 Standard behält die bisherigen Größen bei. Original verwendet die rekonstruierte
-Quellgröße je Auge. Benutzerdefinierte Maße gelten bei Full-Ausgaben je Auge,
-bei Half-/Mono-/Anaglyph-Ausgaben für das Gesamtbild. Half-SBS in UHD bedeutet
+Quellgröße je Auge. Benutzerdefinierte Maße gelten bei allen Videoausgaben für
+das Gesamtbild. Kreuzblick mit 1920 × 540 enthält zwei unverzerrte 960 × 540-Augenbilder. Half-SBS in UHD bedeutet
 3840 × 2160 gesamt, Full-SBS mit UHD je Auge 7680 × 2160 gesamt.
 Eine größere Ausgabe stellt keine verlorenen Quelldetails wieder her.
 

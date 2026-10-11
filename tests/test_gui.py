@@ -115,15 +115,19 @@ class GuiTests(unittest.TestCase):
         self.root.update()
         def click(job, modifiers=0):
             x, y, width, height = panel.tree.bbox(job.id)
-            panel.tree.event_generate('<ButtonPress-1>', x=x+12, y=y+height//2, state=modifiers)
-            panel.tree.event_generate('<ButtonRelease-1>', x=x+12, y=y+height//2, state=modifiers)
+            if self.root.tk.call('tk', 'windowingsystem') == 'aqua' and modifiers == 4:
+                panel.tree.event_generate('<Command-ButtonPress-1>', x=x+12, y=y+height//2)
+                panel.tree.event_generate('<Command-ButtonRelease-1>', x=x+12, y=y+height//2)
+            else:
+                panel.tree.event_generate('<ButtonPress-1>', x=x+12, y=y+height//2, state=modifiers)
+                panel.tree.event_generate('<ButtonRelease-1>', x=x+12, y=y+height//2, state=modifiers)
             self.root.update()
         click(panel.jobs[0]); click(panel.jobs[2], 4)
         self.assertEqual(set(panel.tree.selection()), {panel.jobs[0].id, panel.jobs[2].id})
         click(panel.jobs[0]); click(panel.jobs[2], 1)
         self.assertEqual(len(panel.tree.selection()), 3)
         panel.tree.focus_force(); self.root.update()
-        panel.tree.event_generate('<Control-a>'); self.root.update()
+        panel.tree.event_generate('<Command-a>' if self.root.tk.call('tk', 'windowingsystem') == 'aqua' else '<Control-a>'); self.root.update()
         self.assertEqual(len(panel.selected()), 3)
         panel.variables['target'].set('Full-OU'); panel.changed('target')
         self.assertTrue(all(job.options.target == 'full_ou' for job in panel.jobs))

@@ -187,6 +187,9 @@ class Window:
         self.tree.bind("<<TreeviewSelect>>", self.selection_changed)
         self.tree.bind('<Control-a>', self.select_all)
         self.tree.bind('<Control-A>', self.select_all)
+        if self.root.tk.call('tk', 'windowingsystem') == 'aqua':
+            self.tree.bind('<Command-a>', self.select_all)
+            self.tree.bind('<Command-A>', self.select_all)
         self.selection_text = TextVar(self.localizer, value="Einstellungen gelten für neu hinzugefügte Dateien.")
         ttk.Label(outer, textvariable=self.selection_text, foreground=MUTED).grid(row=3, column=0, sticky="w", pady=(5, 3))
         fields = ttk.Frame(outer)
@@ -440,6 +443,8 @@ class Window:
         self.root.bind("<Control-o>", lambda event: (self.images.add_files() if self.notebook.select() == str(self.image_tab)
             else self.add_files()) if not self.busy and not self.images.busy else None)
         self.root.bind("<Delete>", lambda event: self.remove() if not self.busy and self.root.focus_get() == self.tree else None)
+        if self.root.tk.call('tk', 'windowingsystem') == 'aqua':
+            self.root.tk.call('bind', str(self.root), '<Command-o>', self.root.bind('<Control-o>'))
         self.root.bind("<Escape>", lambda event: self.images.abort() if self.images.busy else self.abort() if self.busy else None)
         self.selection_changed()
 

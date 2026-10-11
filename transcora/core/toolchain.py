@@ -35,7 +35,8 @@ class Toolchain:
         ext = ".exe" if os.name == "nt" else ""
         roots = [app_root() / "tools" / "ffmpeg"]
         if os.name != 'nt':
-            roots += [Path('/opt/homebrew'), Path('/usr/local'), Path('/usr')]
+            roots += [Path('/opt/homebrew/opt/ffmpeg-full'), Path('/usr/local/opt/ffmpeg-full'),
+                      Path('/opt/homebrew'), Path('/usr/local'), Path('/usr')]
         for root in roots:
             for folder in (root, root / "bin"):
                 if all((folder / (name + ext)).is_file() for name in ("ffmpeg", "ffprobe")):

@@ -64,6 +64,9 @@ class ImagePanel:
         self.tree.bind('<<TreeviewSelect>>', self.selection_changed)
         self.tree.bind('<Control-a>', self.select_all)
         self.tree.bind('<Control-A>', self.select_all)
+        if self.tree.tk.call('tk', 'windowingsystem') == 'aqua':
+            self.tree.bind('<Command-a>', self.select_all)
+            self.tree.bind('<Command-A>', self.select_all)
         self.tree.bind('<Delete>', lambda event: self.remove() if not self.busy else None)
         self.scope = TextVar(owner.localizer, value='Einstellungen gelten für neu hinzugefügte Bilder.')
         ttk.Label(box, textvariable=self.scope, foreground=MUTED).grid(row=3, column=0, sticky='w', pady=(5, 3))
