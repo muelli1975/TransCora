@@ -17,7 +17,9 @@ DANGER_HOVER = "#944545"
 
 def checkbox_indicator(root, style):
     """Draw the same 24-pixel rounded gold checkbox as the other Stereo tools."""
-    from PIL import Image, ImageDraw, ImageTk
+    from io import BytesIO
+    import tkinter as tk
+    from PIL import Image, ImageDraw
     scale = 4
     images = []
     for selected, active, disabled in ((False, False, False), (True, False, False),
@@ -33,7 +35,10 @@ def checkbox_indicator(root, style):
         if selected:
             draw.line([(6*scale, 12*scale), (10*scale, 16*scale), (18*scale, 8*scale)],
                       fill=TEXT, width=3*scale, joint='curve')
-        images.append(ImageTk.PhotoImage(bitmap.resize((24, 24), Image.Resampling.LANCZOS), master=root))
+        # Tk reads PNG directly, avoiding a second native Tcl/Tk bridge at startup.
+        png = BytesIO()
+        bitmap.resize((24, 24), Image.Resampling.LANCZOS).save(png, format='PNG')
+        images.append(tk.PhotoImage(master=root, data=png.getvalue()))
     root.checkbox_images = images
     if 'Stereo.checkbox' not in style.element_names():
         style.element_create('Stereo.checkbox', 'image', images[0],

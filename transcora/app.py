@@ -37,6 +37,8 @@ def main():
         root.mainloop()
     except Exception as error:
         if self_test:
+            import traceback
+            traceback.print_exc()
             Path(sys.argv[2]).write_text(json.dumps({"ok": False, "error": str(error)}), encoding="utf-8")
             root.destroy()
             raise SystemExit(1)
