@@ -20,7 +20,7 @@ def main():
         shutil.copytree(root/name, output/name, ignore=shutil.ignore_patterns('__pycache__'), dirs_exist_ok=True)
     (output/'docs').mkdir(exist_ok=True)
     shutil.copy2(root/'docs/RELEASE_NOTES_1.0.md', output/'docs/RELEASE_NOTES_1.0.md')
-    for name in ('transcora', 'scripts', 'tests', 'reference', 'assets', 'presets', 'licenses', 'docs', '.github'):
+    for name in ('transcora', 'native', 'scripts', 'tests', 'reference', 'assets', 'presets', 'licenses', 'docs', '.github'):
         shutil.copytree(root/name, output/'source'/name,
                         ignore=shutil.ignore_patterns('__pycache__', '*.pyc'), dirs_exist_ok=True)
     for name in ('run_transcora.py', 'requirements-build.txt', 'BUILD.md', 'LICENSE', 'README.md', 'THIRD_PARTY.md'):
