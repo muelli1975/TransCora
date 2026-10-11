@@ -1,0 +1,47 @@
+name: Diagnose camera MPO extraction
+on:
+  push:
+    branches: [diagnose-fuji-mpo]
+permissions:
+  contents: read
+jobs:
+  camera-mpo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install Pillow==11.3.0
+      - name: Compare decoded frames and lossless extraction
+        run: |
+          python - <<'PY'
+          import urllib.request
+          from pathlib import Path
+          from PIL import Image
+          from transcora.core.images import inspect, mpo_jpegs
+          samples = {
+              "pillow-fujifilm": "https://raw.githubusercontent.com/python-pillow/Pillow/11.3.0/Tests/images/fujifilm.mpo",
+              "gimp-sample1": "https://raw.githubusercontent.com/ksashikumar/file-mpo/master/sample1.mpo",
+              "gimp-sample2": "https://raw.githubusercontent.com/ksashikumar/file-mpo/master/sample2.mpo",
+          }
+          for name, url in samples.items():
+              p = Path(name + ".mpo")
+              urllib.request.urlretrieve(url, p)
+              data = p.read_bytes()
+              with Image.open(p) as im:
+                  print(name, "camera", im.getexif().get(272), "frames", im.n_frames, flush=True)
+                  for i, entry in enumerate(im.mpinfo[0xB002]):
+                      im.seek(i)
+                      start = im.offset
+                      block = data[start:start + entry["Size"]]
+                      print("frame", i, "offset", start, "entry size", entry["Size"], "length", len(block),
+                            "EOI last", block.endswith(b"\xff\xd9"),
+                            "last EOI", block.rfind(b"\xff\xd9"), "tail", block[-32:].hex(), flush=True)
+              print("inspect", inspect(p), flush=True)
+              try:
+                  frames = mpo_jpegs(p)
+                  print("extraction OK", [len(x) for x in frames], flush=True)
+              except Exception as exc:
+                  print("extraction FAILED", repr(exc), flush=True)
+          PY
