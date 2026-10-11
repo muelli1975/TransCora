@@ -138,10 +138,26 @@ class UdfLabelTests(unittest.TestCase):
 
 
 class MvcMetadataTests(unittest.TestCase):
+    def test_mux_hrd_duplication_is_normalized_but_other_parameter_changes_are_kept(self):
+        from transcora.core.mvc import comparable_parameter
+        fixtures = [(
+            '27640029ac2d140780227e5c05a808080a000007d200017701c0c0000a67540001db575ef7c140',
+            '27640029ac2d140780227e5c05a808080a000007d200017701c0c0000a67540001db575ef7c6060000533aa0000edabaf7be14'), (
+            '2f8000294b0b4501e0089f97016a020202800001f480005dc0703000022ade8000630f57bdf0554b5ca61522',
+            '2f8000294b0b4501e0089f97016a020202800001f480005dc0703000022ade8000630f57bdf18180001156f40003187abdef8554b5ca615220')]
+        for before, after in fixtures:
+            original, muxed = bytes.fromhex(before), bytes.fromhex(after)
+            self.assertEqual(comparable_parameter(original), comparable_parameter(muxed))
+            changed = muxed[:3]+bytes([muxed[3]^1])+muxed[4:]  # level
+            self.assertNotEqual(comparable_parameter(original), comparable_parameter(changed))
+        with self.assertRaises(ValueError):
+            comparable_parameter(bytes.fromhex(fixtures[0][1].replace('0000533aa', '0000533ab')))
+
     def test_coded_comparison_accepts_mux_headers_but_catches_picture_and_parameter_changes(self):
         from transcora.core.mvc import coded_fingerprint
         prefix = b'\x00\x00\x01'
-        sps, pps, picture = b'\x67\xab\xcd\x80', b'\x68\xab\x80', b'\x65picture\x80'
+        sps = bytes.fromhex('27640029ac2d140780227e5c05a808080a000007d200017701c0c0000a67540001db575ef7c140')
+        pps, picture = bytes.fromhex('28ee3cb0'), b'\x65picture\x80'
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp)/'video.avc'
             def fingerprint(nals, start=prefix):
@@ -151,10 +167,13 @@ class MvcMetadataTests(unittest.TestCase):
             self.assertEqual(expected, fingerprint([b'\x09\xf0', sps, pps, sps, b'\x06SEI\x80', picture], b'\x00'+prefix))
             self.assertEqual(expected, fingerprint([b'\x18\x30', sps, pps, picture]))
             self.assertNotEqual(expected, fingerprint([sps, pps, picture.replace(b'picture', b'changed')]))
-            self.assertNotEqual(expected, fingerprint([sps.replace(b'\xab', b'\xac'), pps, picture]))
+            self.assertNotEqual(expected, fingerprint([sps.replace(b'\x29', b'\x28', 1), pps, picture]))
             self.assertNotEqual(expected, fingerprint([sps, pps, picture, picture]))
             a, b = b'\x41A\x80', b'\x41B\x80'
             self.assertNotEqual(fingerprint([sps, pps, a, b]), fingerprint([sps, pps, b, a]))
+            other = sps.replace(b'\x29', b'\x28', 1)
+            self.assertNotEqual(fingerprint([sps, pps, a, other, b]),
+                                fingerprint([other, pps, a, sps, b]))
             with self.assertRaises(ValueError):
                 fingerprint([sps, pps])
 

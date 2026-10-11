@@ -2,10 +2,21 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from transcora.core.multiview import PairClock, demux_ts
+from transcora.core.multiview import PairClock, demux_ts, playlist_base_right
 
 
 class MultiviewSafetyTests(unittest.TestCase):
+    def test_playlist_base_eye_flag_is_read_without_assuming_order(self):
+        data = bytearray(58)
+        data[:8] = b'MPLS0200'
+        data[40:44] = (14).to_bytes(4, 'big')
+        data[56] = 0x40
+        self.assertFalse(playlist_base_right(data))
+        data[56] |= 0x10
+        self.assertTrue(playlist_base_right(data))
+        with self.assertRaises(ValueError):
+            playlist_base_right(data[:56])
+
     def test_mismatched_or_missing_view_cannot_pass_pair_validation(self):
         clock = PairClock()
         clock.line('[showinfo@mv_right] n: 0 pts: 20 pts_time: 0.02')

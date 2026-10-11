@@ -7,6 +7,9 @@
 - Name every initial/export/check phase in the main status. Use an indeterminate
   bar for unmeasurable phases, show progress during the full final decode, and
   display Restzeit: — until an estimate can be made. Record phase durations in logs.
+- Prevent FFmpeg's terminal statistics from overwriting its machine-readable
+  frame-progress lines on the MVC stderr pipe. This restores frame progress and
+  ETA calculation while speed/fps reports are already visible.
 - Add advanced original/AAC audio, all/selected/no-track and explicit stereo-downmix
   options; default to all original channels and avoid another lossy encode.
   Blu-ray output remains 48 kHz, 24-bit LPCM. Use Wave64 for long surround tracks.

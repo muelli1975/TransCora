@@ -169,14 +169,50 @@ def tag_generated_stream(path: Path, check=None) -> int:
         temporary.unlink(missing_ok=True)
 
 
+def comparable_parameter(nal):
+    """Normalize only tsMuxeR's exact duplicate of NAL HRD into VCL HRD.
+
+    Blu-ray muxing adds this buffering description. It must be identical to the
+    already present NAL HRD; every other SPS/MVC bit stays part of the comparison.
+    """
+    if nal[0]&31 not in (7, 15):
+        return nal
+    b, _, _ = signal_bounds(nal[1:])
+    if b.read():  # chroma_loc_info_present_flag
+        b.ue(); b.ue()
+    if b.read():  # timing_info_present_flag
+        b.read(65)
+    def hrd():
+        start = b.pos
+        count = b.ue()+1
+        if count > 32:
+            raise ValueError('BD-3D: Ungültige HRD-Pufferbeschreibung.')
+        b.read(8)
+        for _ in range(count):
+            b.ue(); b.ue(); b.read()
+        b.read(20)
+        return b.bits[start:b.pos]
+    nal_hrd = hrd() if b.read() else None
+    at = b.pos
+    if not b.read():
+        return nal
+    vcl_hrd = hrd()
+    if not nal_hrd or vcl_hrd != nal_hrd:
+        raise ValueError('BD-3D: Unerwartet unterschiedliche NAL-/VCL-HRD-Parameter.')
+    bits = (b.bits[:at]+'0'+b.bits[b.pos:]).rstrip('0')
+    bits += '0'*((-len(bits))%8)
+    return nal[:1]+escape(int(bits, 2).to_bytes(len(bits)//8, 'big'))
+
+
 def coded_fingerprint(path: Path, check=None):
     """Compare coded pictures and parameter sets despite muxer-added AUD/SEI.
 
     tsMuxeR repeats parameter sets and may change Annex-B start code length.
-    The ordered slice/prefix payloads and the distinct SPS/PPS payloads must
-    remain identical. This is not a substitute for decoding the final movie.
+    Ordered slice/prefix payloads and active parameters must remain identical,
+    allowing only an exact HRD duplicate. Final full decoding remains mandatory.
     """
     digest, parameters, count = hashlib.sha256(), set(), 0
+    active, context = {}, b''
     with path.open('rb') as source:
         for _, nal in annex_nals(source, check):
             nal = nal.rstrip(b'\x00')  # Annex-B trailing_zero_8bits, outside RBSP.
@@ -184,8 +220,17 @@ def coded_fingerprint(path: Path, check=None):
                 raise ValueError('BD-3D: Leere NAL-Einheit in der Bildspur.')
             kind = nal[0]&31
             if kind in (7, 8, 15):
+                nal = comparable_parameter(nal)
                 parameters.add(nal)
+                if active.get(kind) != nal:
+                    active[kind] = nal
+                    state = hashlib.sha256()
+                    for key, value in sorted(active.items()):
+                        state.update(struct.pack('>BQ', key, len(value)))
+                        state.update(value)
+                    context = state.digest()
             elif kind in (1, 5, 14, 20):
+                digest.update(context)
                 digest.update(struct.pack('>Q', len(nal)))
                 digest.update(nal)
                 count += kind != 14

@@ -31,7 +31,7 @@ def main():
             folder = Path(tmp)
             seed = folder/'seed.w64'
             capture([str(tools.ffmpeg), '-v', 'error', '-f', 'lavfi', '-i',
-                     'anullsrc=r=48000:cl=7.1', '-t', '.005', '-c:a', 'pcm_s24le', '-f', 'w64', str(seed)])
+                     'anullsrc=r=48000:cl=7.1', '-t', '0.005', '-c:a', 'pcm_s24le', '-f', 'w64', str(seed)])
             header = seed.read_bytes()
             position = header.index(b'data')
             start = position+24

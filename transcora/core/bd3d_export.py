@@ -120,7 +120,7 @@ def encode(tools, bd, plan, base, dependent, cancel, emit, log, estimated_frames
     errors = []
     pairs = PairClock() if plan.info.get('multiview', {}).get('kind') == 'mvhevc' else None
     graph = plan.graph.replace(']sidedata=', ']showinfo@bd_clock=checksum=0,sidedata=', 1)+';[left][right]hstack=inputs=2,showinfo@bd_output=checksum=0[packed]'
-    args = [str(tools.ffmpeg), '-hide_banner', '-nostdin', '-loglevel', 'info', '-copyts',
+    args = [str(tools.ffmpeg), '-hide_banner', '-nostdin', '-nostats', '-loglevel', 'info', '-copyts',
             '-progress', 'pipe:2', '-stats_period', '0.5', '-filter_complex_threads', '1',
             '-protocol_whitelist', 'file,pipe', '-noautorotate', *input_args(plan, copyts=True),
             '-filter_complex', graph, '-map', '[packed]', '-an', '-c:v', 'rawvideo',

@@ -60,6 +60,8 @@ def main():
             execute(tools, plan, threading.Event(), lambda k, v: events.append((k, v)), OUT/f'{case}.log')
             if not plan.output.is_file() or not events or events[-1][1].get('percent') != 100:
                 raise ValueError('Export/progress failed')
+            if not any(k == 'progress' and 5 < v['percent'] < 70 for k, v in events):
+                raise ValueError('MVC encoding did not report intermediate frame progress for the ETA')
             log_text = (OUT/f'{case}.log').read_text(encoding='utf-8')
             if log_text.count('-i:mvc') != 1:
                 raise ValueError('Production export must perform exactly one full MVC decode')
