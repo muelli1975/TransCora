@@ -102,6 +102,10 @@ class ImagePlan:
 
     @property
     def summary(self):
+        if self.options.task == 'mpo':
+            return (f'{TASKS[self.options.task]}\nAusgabe: Original-JPEGs ohne Neukodierung\n' +
+                    '\n'.join(map(str, self.outputs)) +
+                    ('\n'+'\n'.join(self.warnings) if self.warnings else ''))
         if self.options.task == 'convert':
             _, size = image_graph(self)
             if self.options.target == 'split': size = (size[0]//2, size[1])
@@ -127,7 +131,7 @@ def exiftool() -> list[str]:
     raise ValueError('ExifTool fehlt. TransCora.zip vollständig entpacken.')
 
 
-def inspect(path: Path):
+def inspect(path: Path, *, require_equal_size=True):
     with Image.open(path) as image:
         count = getattr(image, 'n_frames', 1)
         mpo = image.format == 'MPO'
@@ -144,7 +148,7 @@ def inspect(path: Path):
             image.seek(1)
             other = image.size[::-1] if image.getexif().get(274, 1) in (5, 6, 7, 8) else image.size
             image.load()
-            if other != size:
+            if require_equal_size and other != size:
                 raise ValueError('MPO-Halbbilder haben unterschiedliche Maße oder Orientierung.')
         return size, mpo
 
@@ -164,7 +168,12 @@ def mpo_jpegs(path: Path) -> tuple[bytes, bytes]:
         for offset, entry in zip(positions, entries):
             source.seek(offset)
             data = source.read(entry['Size'])
-            if len(data) != entry['Size'] or not data.startswith(b'\xff\xd8') or not data.endswith(b'\xff\xd9'):
+            if len(data) != entry['Size']:
+                raise ValueError('Beschädigter MPO-Index oder unvollständiges JPEG-Halbbild.')
+            # Fuji camera indexes include zero padding after EOI in the image
+            # size. It belongs to the MPO container, not the standalone JPEG.
+            data = data.rstrip(b'\x00')
+            if not data.startswith(b'\xff\xd8') or not data.endswith(b'\xff\xd9'):
                 raise ValueError('Beschädigter MPO-Index oder unvollständiges JPEG-Halbbild.')
             out = bytearray(data[:2]); pos = 2
             while pos < len(data):
@@ -212,8 +221,8 @@ def plans(jobs: list[ImageJob], output: Path, cancel: threading.Event) -> list[I
         opts = ImageOptions.from_dict(asdict(job.options)); source = job.source.resolve()
         if source.suffix.lower() not in EXTENSIONS:
             raise ValueError('Nicht unterstütztes Bildformat: '+source.name)
-        size, mpo = inspect(source)
-        if opts.metadata and opts.task in {'convert', 'mpo'}:
+        size, mpo = inspect(source, require_equal_size=opts.task != 'mpo')
+        if opts.metadata and opts.task == 'convert':
             exiftool()
         if opts.task == 'convert' and opts.target == 'anaglyph' and opts.method == 'cielab':
             from .cielab import verify_tool
@@ -375,8 +384,9 @@ def execute_image(tools, plan, cancel, emit, log_path):
                     data = data[::-1]
                 for i, item in enumerate(data):
                     target = folder/(str(i)+'.jpg'); target.write_bytes(item)
-                    if opts.metadata:
-                        copy_metadata(plan.sources[0], target, cancel, oriented=False)
+                    # Each original JPEG already carries its own metadata.
+                    # Copying frame 0 tags over frame 1 can change orientation
+                    # and camera-specific fields, and needs no external tool.
                     staged.append(target)
             else:
                 emit('phase', 'Bild orientieren und Farbprofil lesen')

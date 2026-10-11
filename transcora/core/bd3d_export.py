@@ -148,9 +148,9 @@ def encode(tools, bd, plan, base, dependent, cancel, emit, log, estimated_frames
             key, _, value = text.partition('=')
             if progress and key == 'frame':
                 try:
-                    emit('progress', {'percent': min(70, 5+65*int(value)/max(1, estimated_frames)),
+                    emit('progress', {'percent': min(70, 5+65*int(value)/estimated_frames) if estimated_frames else None,
                                       'seconds': int(value)/float(BD_RATE),
-                                      'phase_percent': min(100, 100*int(value)/max(1, estimated_frames)),
+                                      'phase_percent': min(100, 100*int(value)/estimated_frames) if estimated_frames else None,
                                       'remaining_scope': 'phase'})
                 except ValueError:
                     pass
@@ -186,8 +186,7 @@ def encode(tools, bd, plan, base, dependent, cancel, emit, log, estimated_frames
             raise ValueError('BD-3D: Kodierung fehlgeschlagen · '+'\n'.join(tail)[-3500:])
         check_decoder(decoder, cancel)
         if pairs:
-            expected = plan.info['multiview']['original_video'].get('nb_frames')
-            pairs.finish(int(expected) if expected and expected.isdigit() else None)
+            pairs.finish()
         source_frames, first = clock.finish()
         frames, _ = output_clock.finish()
         # The timestamp-based fps filter may legitimately repeat/drop pairs,
@@ -304,15 +303,15 @@ def export(tools, plan, cancel, emit, log_path, decoder=None):
                 raise ValueError('Quelle seit der Prüfung geändert. Erneut prüfen.')
         unchanged()
         duration = plan.duration/float(config.speed)
-        if not duration:
-            raise ValueError('BD-3D: Laufzeit für die Platzprüfung fehlt.')
-        estimated_frames = max(2, round(duration*float(BD_RATE)))
+        estimated_frames = max(2, round(duration*float(BD_RATE))) if duration > 0 else 0
         # Compressed views, audio, mux, extracted SSIF and demux; no raw video files.
         audio_copies = 3 if plan.options.container == 'iso' else 2
         required = duration*(40000*1000/8*4 + audio_copies*sum(
             channels(s, plan.options)*48000*3 for s in audios)) + 256*1024*1024
-        if shutil.disk_usage(folder).free < required:
-            raise ValueError(f'BD-3D: Für Ausgabe und Prüfdaten werden ungefähr {required/1024**3:.1f} GB freier Platz benötigt.')
+        if duration > 0 and shutil.disk_usage(folder).free < required:
+            # This is a conservative VBR estimate, not the actual final size.
+            log.write(f'WARNING BD-3D: Geschätzter Platzbedarf {required/1024**3:.1f} GB; '
+                      'verfügbarer Platz liegt darunter. Kodierung wird versucht.\n')
         emit('progress', {'percent': 5, 'seconds': 0})
         phase('BD-3D: Beide Halbbilder in hoher Qualität kodieren')
         base, dependent = folder/'base.avc', folder/'dependent.mvc'

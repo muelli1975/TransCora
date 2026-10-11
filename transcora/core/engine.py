@@ -119,7 +119,7 @@ def metadata_full_half(video: dict) -> tuple[str, bool] | None:
     return None
 
 
-def color_spec(video: dict) -> tuple[dict, list[str]]:
+def color_spec(video: dict, layout=None) -> tuple[dict, list[str]]:
     fields = {"matrix": video.get("color_space"), "primaries": video.get("color_primaries"),
               "transfer": video.get("color_transfer"), "range": video.get("color_range")}
     hdr_side_data = ("mastering display", "content light", "dovi", "dolby vision", "hdr")
@@ -133,8 +133,7 @@ def color_spec(video: dict) -> tuple[dict, list[str]]:
                  "transfer": {"bt709", "smpte170m", "iec61966-2-1", "gamma22", "gamma28"},
                  "range": {"tv", "pc"}}
     missing_values = (None, "unknown", "unspecified")
-    # Reject HDR/wide-gamut and other explicit unsupported tags before guessing
-    # any missing field. Existing values are always authoritative.
+    # Existing values are authoritative; fill only missing SDR descriptions.
     for key, value in fields.items():
         if value not in missing_values and value not in supported[key]:
             raise ValueError(f"Noch nicht freigegebene Farbinterpretation: {key}={value}.")
@@ -142,20 +141,20 @@ def color_spec(video: dict) -> tuple[dict, list[str]]:
     rgb = pixel_format.startswith(("gbr", "rgb", "bgr"))
     unknown_color = [key for key in ("matrix", "primaries", "transfer") if fields[key] in missing_values]
     if unknown_color:
-        # Resolution supports a fallback; it cannot prove a colour space. Keep
-        # PAL/NTSC and partially tagged legacy sources out of the HD fallback.
-        legacy = any(fields[key] in {"bt470bg", "smpte170m", "gamma22", "gamma28"}
-                     for key in ("matrix", "primaries", "transfer"))
-        hd = video.get("width", 0) >= 1280 and video.get("height", 0) >= 720
-        hd_hint = fields["matrix"] == "bt709" or fields["primaries"] == "bt709"
-        if legacy or not (hd or hd_hint):
-            raise ValueError("Farbangaben unvollständig; keine eindeutige HD-SDR-Annahme möglich. "
-                             "Quelle prüfen und fehlende Farbangaben vor dem Import ergänzen.")
-        defaults = {"matrix": "gbr" if rgb else "bt709", "primaries": "bt709",
-                    "transfer": "iec61966-2-1" if rgb else "bt709"}
+        # Untagged ordinary SDR is usable. Follow existing colour hints first,
+        # then the usual RGB/HD, PAL or NTSC interpretation, with a warning.
+        family = next((fields[key] for key in ('matrix', 'primaries')
+                       if fields[key] in {'bt709', 'bt470bg', 'smpte170m'}), None)
+        if family is None:
+            height = video.get('height', 0)//(2 if layout == 'full_ou' else 1)
+            family = ('bt709' if rgb or height >= 720 else
+                      'bt470bg' if height > 480 else 'smpte170m')
+        defaults = {"matrix": "gbr" if rgb else family, "primaries": family,
+                    "transfer": "iec61966-2-1" if rgb else
+                    'smpte170m' if family in {'smpte170m', 'bt470bg'} else 'bt709'}
         for key in unknown_color:
             fields[key] = defaults[key]
-            warnings.append(f"Farbannahme {key}={fields[key]} (fehlende HD-SDR-Angabe)")
+            warnings.append(f"Farbannahme {key}={fields[key]} (fehlende SDR-Angabe)")
     if fields["range"] in missing_values:
         if rgb or pixel_format.startswith("yuvj"):
             fields["range"] = "pc"
@@ -384,9 +383,15 @@ def plan_job(tools: Toolchain, job: Job, output_root: Path, reserved: set[str],
         hint = None
         hint_warning = str(error) + " Manuelle Quellinterpretation verwendet."
     multiview = info.get('multiview')
-    metadata = None if multiview else metadata_layout(video)
-    geometry_hint = None if multiview else metadata_full_half(video)
     warnings = [hint_warning] if hint_warning else []
+    try:
+        metadata = None if multiview else metadata_layout(video)
+        geometry_hint = None if multiview else metadata_full_half(video)
+    except ValueError:
+        if options.layout == 'auto':
+            raise
+        metadata = geometry_hint = None
+        warnings.append('Manuelle Quellinterpretation ersetzt abweichende Stereo-Metadaten.')
     if multiview:
         if options.layout not in {'auto', 'mvc', 'mvhevc'}:
             raise ValueError('Diese Quelle enthält echte Multiview-Halbbilder. Automatisch oder das passende Multiview-Format wählen.')
@@ -418,9 +423,9 @@ def plan_job(tools: Toolchain, job: Job, output_root: Path, reserved: set[str],
         if metadata and metadata != ("sbs" if layout.endswith("sbs") else "ou", swap):
             warnings.append("Manuelle Quellinterpretation ersetzt abweichende Stereo-Metadaten.")
     if options.target != 'framerate' and sar not in {'1:1', '0:1', 'N/A', None}:
-        if metadata and (layout, sar) in {('half_sbs', '2:1'), ('half_ou', '1:2')}:
+        if (layout, sar) in {('half_sbs', '2:1'), ('half_ou', '1:2')}:
             video['sample_aspect_ratio'] = '1:1'
-            warnings.append('Stereo-Metadaten: Gestauchte Achse wird je Halbbild rekonstruiert.')
+            warnings.append('Half-Layout: Gestauchte Achse wird je Halbbild rekonstruiert.')
         else:
             raise ValueError(f'Nichtquadratische Pixel (SAR {sar}): Quelllayout und Stereo-Metadaten prüfen.')
     if layout == "mono" and options.target != "framerate":
@@ -440,7 +445,7 @@ def plan_job(tools: Toolchain, job: Job, output_root: Path, reserved: set[str],
                         "Video wird neu kodiert; Ton und Wiedergabegeschwindigkeit bleiben erhalten.")
     if layout != "mono" and (width if layout.endswith("sbs") else height) % 2:
         raise ValueError("Das gepackte Raster lässt sich nicht in zwei gleich große Halbbilder teilen.")
-    colors, color_warnings = color_spec(video)
+    colors, color_warnings = color_spec(video, layout)
     warnings.extend(color_warnings)
     if layout.startswith('half_') and options.target in {'full_sbs', 'full_ou', 'cross_sbs'}:
         warnings.append('Half → Full: Die gestauchte Achse wird hochskaliert. Verlorene Bilddetails werden nicht wiederhergestellt.')
@@ -679,8 +684,7 @@ def execute_prepared(tools: Toolchain, plan: Plan, cancel: threading.Event, emit
                 raise errors[0]
             check_decoder(decoder, cancel)
             if pair_clock:
-                expected = plan.info['multiview']['original_video'].get('nb_frames')
-                pair_clock.finish(int(expected) if expected and expected.isdigit() else None)
+                pair_clock.finish()
             if encoded != temporary:
                 emit("phase", "MP4-3D-Kennzeichnung schreiben" if plan.stereo else "MP4-Bildzeiten schreiben")
                 remux = [str(tools.ffmpeg), "-v", "error", "-nostdin", "-n", "-i", str(encoded),

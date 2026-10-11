@@ -27,7 +27,7 @@ def prepare(video: dict, layout: str, swap: bool = False) -> Preparation:
     def valid_rate(key):
         try:
             value = Fraction(video.get(key, '0/1'))
-            return value if 1 <= value <= 240 else None
+            return value if value > 0 else None
         except (ValueError, ZeroDivisionError, TypeError):
             return None
     rate, average = valid_rate('r_frame_rate'), valid_rate('avg_frame_rate')
@@ -47,7 +47,7 @@ def prepare(video: dict, layout: str, swap: bool = False) -> Preparation:
     variable = abs(average-rate) > rate/1000
     if variable:
         rate = average
-    colors, warnings = color_spec(video)
+    colors, warnings = color_spec(video, layout)
     w, h = video['width'], video['height']
     horizontal = layout.endswith('sbs')
     if w <= 0 or h <= 0 or (w if horizontal else h) % 2:

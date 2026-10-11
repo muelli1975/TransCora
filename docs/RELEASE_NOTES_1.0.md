@@ -1,5 +1,15 @@
 # TransCora 1.0
 
+## RC5
+
+- Lossless MPO splitting accepts the zero padding included in Fujifilm camera image sizes. Embedded JPEG pixels and compressed data remain unchanged; missing JPEG end markers or truncated ranges still fail.
+- Lossless MPO splitting no longer requires matching dimensions or EXIF orientations. Those checks apply only when composing a stereo image.
+- MPO splitting preserves each JPEG's original metadata without an unnecessary ExifTool rewrite; right-eye orientation and camera fields are no longer overwritten with left-eye values.
+- Missing SDR colour descriptions use explicit existing hints or customary HD/PAL/NTSC defaults, with visible assumptions instead of rejecting usable sources. Full-OU defaults use the height of one eye.
+- Explicit source layout selections override unsupported stereo metadata. Half-SBS/OU with matching stretched pixel ratios no longer requires redundant metadata.
+- MV-HEVC checks the actual decoded eye pairs without rejecting them solely because of a container frame-count field. MVC no longer has an arbitrary two-million-frame input limit.
+- BD-3D accepts any positive source frame rate that FFmpeg can convert. Conservative free-space estimates and missing duration metadata no longer block encoding; actual output validity checks remain.
+
 ## RC4
 
 - BD-3D accepts valid variable frame timing and timestamp jitter. Complete stereo pairs are adjusted to the fixed output clock during the single encoding pass; long frame holds retain their presentation duration.

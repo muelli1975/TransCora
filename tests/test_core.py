@@ -138,8 +138,14 @@ class CoreTests(unittest.TestCase):
                 load_list(path)
 
     def test_color_assumptions_and_hdr_are_explicit(self):
-        with self.assertRaisesRegex(ValueError, 'unvollständig'):
-            color_spec({'pix_fmt': 'yuv420p', 'width': 720, 'height': 576})
+        for height, family in ((576, 'bt470bg'), (480, 'smpte170m')):
+            colors, warnings = color_spec({'pix_fmt': 'yuv420p', 'width': 720, 'height': height})
+            self.assertEqual(colors['matrix'], family)
+            self.assertEqual(colors['primaries'], family)
+            self.assertEqual(colors['transfer'], 'smpte170m')
+            self.assertTrue(warnings)
+        colors, warnings = color_spec({'pix_fmt': 'yuv420p', 'width': 720, 'height': 1152}, 'full_ou')
+        self.assertEqual(colors['matrix'], 'bt470bg')
         colors, warnings = color_spec({'pix_fmt': 'yuv420p', 'width': 1920, 'height': 1080})
         self.assertEqual(colors['transfer'], 'bt709')
         self.assertEqual(len(warnings), 4)
@@ -150,8 +156,12 @@ class CoreTests(unittest.TestCase):
                 {'side_data_type': 'Mastering display metadata'}]})
         with self.assertRaisesRegex(ValueError, 'Farbinterpretation'):
             color_spec({'width': 3840, 'height': 2160, 'color_primaries': 'bt2020'})
-        with self.assertRaisesRegex(ValueError, 'unvollständig'):
-            color_spec({'width': 1920, 'height': 1080, 'color_space': 'smpte170m'})
+        colors, warnings = color_spec({'width': 1920, 'height': 1080, 'pix_fmt': 'yuv420p',
+                                      'color_space': 'smpte170m'})
+        self.assertEqual(colors['matrix'], 'smpte170m')
+        self.assertEqual(colors['primaries'], 'smpte170m')
+        self.assertEqual(colors['transfer'], 'smpte170m')
+        self.assertTrue(warnings)
 
     def test_color_range_is_independent_and_existing_tags_win(self):
         tags = {'color_space': 'bt709', 'color_primaries': 'bt709', 'color_transfer': 'bt709'}

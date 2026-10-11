@@ -249,8 +249,6 @@ def packet_clock(tools, source, desc, rate, cancel):
                 stamps.append(int(value))
             except ValueError:
                 raise ValueError('MVC: Fehlende Paketbildzeit. CFR-Quelle mit vollständigen Zeitstempeln verwenden.') from None
-            if len(stamps) > 2_000_000:
-                raise ValueError('MVC: Mehr als zwei Millionen Bilder sind noch nicht freigegeben.')
     run([tools.ffprobe, '-v', 'error', '-protocol_whitelist', 'file,pipe', '-select_streams',
          str(desc['source_index']), '-show_packets', '-show_entries', 'packet=pts', '-of', 'csv=p=0', source],
         cancel, io.StringIO(), None, packets)
@@ -317,7 +315,7 @@ def inspect_source(tools, source, cancel=None, explicit='auto', phase=None):
             else:
                 try:
                     rate = Fraction(video['avg_frame_rate'])
-                    if not 1 <= rate <= 240:
+                    if rate <= 0:
                         raise ValueError
                 except (KeyError, ValueError, ZeroDivisionError):
                     raise ValueError('MVC: Verlässliche Quellframerate fehlt.') from None

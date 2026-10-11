@@ -18,6 +18,18 @@ from transcora.core.toolchain import Toolchain
 
 
 class FFmpegTests(unittest.TestCase):
+    def test_untagged_pal_stereo_and_manual_half_layout_export(self):
+        source = self.folder/'untagged-half.mkv'
+        self.run_ffmpeg('-f', 'lavfi', '-i', 'testsrc2=s=720x576:r=25',
+                       '-vf', 'setsar=2', '-frames:v', '3', '-c:v', 'ffv1', str(source))
+        options = Options(target='full_sbs', layout='half_sbs', container='mkv')
+        plan = self.plan(options, source)
+        self.assertTrue(any('fehlende SDR-Angabe' in warning for warning in plan.warnings))
+        execute(self.tools, plan, threading.Event(), lambda *args: None, self.folder/'pal.log')
+        info = probe(self.tools, plan.output)
+        self.assertEqual((info['video']['width'], info['video']['height']), (1440, 576))
+        self.assertEqual(info['video']['color_space'], 'bt709')
+
     def test_cross_view_outputs_right_first_with_metadata_and_reimports(self):
         from transcora.core.engine import metadata_layout
         plan, _ = self.export(Options(target='cross_sbs', container='mkv', crf=18))
