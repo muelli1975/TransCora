@@ -217,7 +217,7 @@ class Window:
                 self.video_size_caption = TextVar(self.localizer, value=label)
                 ttk.Label(frame, textvariable=self.video_size_caption).pack(anchor='w')
             elif key == 'profile':
-                self.profile_caption = TextVar(self.localizer, value='Farbformat / Farbtiefe')
+                self.profile_caption = TextVar(self.localizer, value=label)
                 ttk.Label(frame, textvariable=self.profile_caption).pack(anchor='w')
             else:
                 ttk.Label(frame, text=label).pack(anchor="w")
@@ -292,7 +292,8 @@ class Window:
         folder_checks = ttk.Frame(output)
         folder_checks.grid(row=0, column=3, sticky="w", padx=(10, 0))
         self.recursive = tk.BooleanVar(value=self.recursive_value)
-        check = ttk.Checkbutton(folder_checks, text="Unterordner", variable=self.recursive)
+        check = ttk.Checkbutton(folder_checks, text="Unterordner mitverarbeiten", variable=self.recursive)
+        self.recursive_control = check
         check.pack(side="left", padx=(0, 10))
         self.controls.append((check, "normal"))
         self.warning = TextVar(self.localizer, )
@@ -757,8 +758,8 @@ class Window:
         self.refresh_dimensions()
         self.combos["bd_bitrate_mbps"].configure(state="readonly" if bd3d else "disabled")
         self.combos["method"].configure(state="readonly" if anaglyph else "disabled")
-        self.combos["profile"].configure(state="readonly" if anaglyph or rows else "disabled",
-            values=[self.t(PROFILES[k]) for k in (('quality', 'quality10') if rows else PROFILES)])
+        self.combos["profile"].configure(state="readonly" if anaglyph else "disabled",
+            values=[self.t(value) for value in PROFILES.values()])
         self.combos["suffix"].configure(values=[self.t(v) for v in self.available_suffixes(options, selected[0] if selected else None)])
         self.combos["container"].configure(state="disabled" if options.codec == "h265" else "readonly")
         self.combos['codec'].configure(state='disabled' if bd3d else 'readonly')
@@ -961,6 +962,8 @@ class Window:
     def save(self):
         if self.busy:
             return
+        if not self.commit_entries():
+            return
         value = filedialog.asksaveasfilename(title=self.t("Jobliste speichern"), initialdir=self.input_folder, defaultextension=".json",
                                             filetypes=[(self.t("TransCora-Jobliste"), "*.json")])
         if value:
@@ -1025,6 +1028,10 @@ class Window:
     def refresh_dimensions(self):
         from transcora.core.video import output_dimensions
         selected = self.selected_jobs()
+        # Selection changes already populate custom values. Do not overwrite
+        # a second dimension still being edited when the first loses focus.
+        if all(o.video_size == 'custom' for o in ([j.options for j in selected] or [self.defaults])):
+            return
         values = []
         for job in selected or [None]:
             opts = job.options if job else self.defaults
@@ -1039,7 +1046,7 @@ class Window:
             else:
                 size = None
             source = self.source_geometry.get(job.id) if job else None
-            if source:
+            if source and opts.video_size != 'custom':
                 w, h, layout = source
                 layout = opts.layout if opts.layout in {'full_sbs', 'half_sbs', 'full_ou', 'half_ou'} else layout
                 ew, eh = (w//2, h) if layout.endswith('sbs') else (w, h//2)
@@ -1243,6 +1250,8 @@ class Window:
         selected = self.selected_jobs()
         if self.busy or len(selected) != 1:
             self.status.set("Für das Kontrollbild genau eine Datei auswählen.")
+            return
+        if not self.commit_entries():
             return
         job = selected[0]
         def request(seconds):

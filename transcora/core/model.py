@@ -103,6 +103,7 @@ class Options:
         if set(data) - set(allowed):
             raise ValueError("Unbekannte Einstellungen in der Jobliste.")
         if data.get('target') == 'row_interleaved':
+            data = dict(data)
             data['profile'] = 'quality'
         result = cls(**data)
         result.validate()

@@ -279,6 +279,31 @@ class GuiTests(unittest.TestCase):
         self.assertFalse(self.window.option_frames['method'].winfo_ismapped())
         self.assertTrue(self.window.screen_fields.winfo_ismapped())
 
+    def test_dimension_focus_change_preserves_pending_height_and_invalid_edits_block_save(self):
+        self.window.variables['video_size'].set('Benutzerdefiniert')
+        self.window.option_changed('video_size')
+        self.window.variables['video_width'].set('2560')
+        self.window.variables['video_height'].set('1440')
+        self.window.option_changed('video_width')
+        self.assertEqual(self.window.variables['video_height'].get(), '1440')
+        self.assertTrue(self.window.commit_entries())
+        self.assertEqual(self.window.defaults.video_height, 1440)
+        self.window.variables['video_width'].set('2559')
+        with patch('transcora.gui.window.filedialog.asksaveasfilename') as dialog:
+            self.window.save()
+            dialog.assert_not_called()
+
+    def test_shared_checkbox_keeps_full_label_and_keyboard_toggle(self):
+        check = self.window.recursive_control
+        self.assertEqual(check.cget('text'), 'Unterordner mitverarbeiten')
+        self.assertEqual(self.window.profile_caption.get(), 'Anaglyph-Ausgabeprofil')
+        before = self.window.recursive.get()
+        check.invoke()
+        self.assertNotEqual(self.window.recursive.get(), before)
+        check.state(['disabled'])
+        check.invoke()
+        self.assertNotEqual(self.window.recursive.get(), before)
+
     def test_displayed_original_dimensions_follow_checked_source_and_mixed_values(self):
         from types import SimpleNamespace
         self.window.add_paths([Path('A_full_sbs.mp4'), Path('B_full_sbs.mp4')])

@@ -15,6 +15,37 @@ DANGER = "#7f3939"
 DANGER_HOVER = "#944545"
 
 
+def checkbox_indicator(root, style):
+    """Draw the same 24-pixel rounded gold checkbox as the other Stereo tools."""
+    from PIL import Image, ImageDraw, ImageTk
+    scale = 4
+    images = []
+    for selected, active, disabled in ((False, False, False), (True, False, False),
+                                       (False, True, False), (True, True, False),
+                                       (False, False, True), (True, False, True)):
+        bitmap = Image.new('RGBA', (24*scale, 24*scale))
+        draw = ImageDraw.Draw(bitmap)
+        colour = DISABLED if disabled else GOLD_LIGHT if active else GOLD
+        fill = colour if selected else APP_BG
+        outline = colour if selected or active else BORDER
+        draw.rounded_rectangle((scale, scale, 23*scale, 23*scale), radius=4*scale,
+                               fill=fill, outline=outline, width=3*scale)
+        if selected:
+            draw.line([(6*scale, 12*scale), (10*scale, 16*scale), (18*scale, 8*scale)],
+                      fill=TEXT, width=3*scale, joint='curve')
+        images.append(ImageTk.PhotoImage(bitmap.resize((24, 24), Image.Resampling.LANCZOS), master=root))
+    root.checkbox_images = images
+    if 'Stereo.checkbox' not in style.element_names():
+        style.element_create('Stereo.checkbox', 'image', images[0],
+            ('disabled', 'selected', images[5]), ('disabled', images[4]),
+            ('selected', 'active', images[3]), ('active', images[2]),
+            ('selected', images[1]), width=30, sticky='w')
+    style.layout('TCheckbutton', [('Checkbutton.padding', {'sticky': 'nswe', 'children': [
+        ('Stereo.checkbox', {'side': 'left', 'sticky': 'w'}),
+        ('Checkbutton.focus', {'side': 'left', 'sticky': 'w', 'children': [
+            ('Checkbutton.label', {'sticky': 'nswe'})]})]})])
+
+
 def apply_theme(root):
     root.configure(background=APP_BG)
     style = ttk.Style(root)
@@ -56,6 +87,7 @@ def apply_theme(root):
     style.map("TMenubutton", background=[("active", HOVER_BG)], foreground=[("disabled", DISABLED)])
     style.configure("TCheckbutton", background=APP_BG, foreground=TEXT,
                     indicatorbackground=SECONDARY_BG, indicatorforeground=TEXT)
+    checkbox_indicator(root, style)
     style.map("TCheckbutton", background=[("disabled", APP_BG), ("active", APP_BG)],
               foreground=[("disabled", DISABLED)],
               indicatorbackground=[("disabled", "selected", DISABLED), ("disabled", SECONDARY_BG),
