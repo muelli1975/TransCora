@@ -14,7 +14,7 @@ from transcora.core.toolchain import Toolchain
 
 class ImageTests(unittest.TestCase):
     def setUp(self):
-        self.temp = tempfile.TemporaryDirectory(); self.folder = Path(self.temp.name)
+        self.temp = tempfile.TemporaryDirectory(); self.folder = Path(self.temp.name).resolve()
         self.tools = Toolchain.find(); self.cancel = threading.Event()
         left = Image.new('RGB', (128, 72), (210, 30, 10)); right = Image.new('RGB', left.size, (10, 50, 210))
         left.paste((255, 255, 255), (20, 20, 60, 24)); right.paste((255, 255, 255), (15, 20, 55, 24))
