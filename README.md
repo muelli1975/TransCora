@@ -1,4 +1,4 @@
-# TransCora 0.1.4
+# TransCora 0.1.6
 
 Portabler, lokaler 3D-Video-Konverter mit kompakter Python-Oberfläche und FFmpeg.
 **Erste Testversion:** Video-Konvertierung ist umgesetzt; BD-3D-Ausgabe als ISO oder M2TS ist enthalten. Bild-/MPO-Werkzeuge folgen später. Kein Account, Tracking oder Netzwerkzugriff im Programm.
@@ -117,7 +117,10 @@ nummeriert, z. B. `Film_2_dubois_lcd.mkv`; auch nachträglich angelegte Ziele si
   anhand der Auflösung beweisen; die Kontrollbild-/Player-Prüfung bleibt sinnvoll.
   Erkannte HDR-Quellen werden nicht automatisch umgewandelt. Interlacing, nichtquadratische Pixel,
   Rotation und VR-Projektion werden in dieser Version mit Hinweis blockiert.
-- Audio wird kopiert. Nicht zum MP4-Profil passende Audiospuren verlangen MKV.
+- Unter **Erweitert** kann Ton im Original übernommen oder als AAC ausgegeben werden.
+  Alle Tonspuren, ausgewählte Spurnummern oder kein Ton sind wählbar. Die Kanalzahl
+  bleibt standardmäßig erhalten; Stereo-Downmix muss ausdrücklich gewählt werden.
+  Für MP4 inkompatiblen Originalton unter Erweitert als AAC ausgeben oder MKV verwenden.
   Untertitel, Kapitel, Daten und Anhänge werden in 0.1 nicht übernommen. Dateisystem-
   Zeitstempel werden noch nicht übertragen; ausgewählte globale Metadaten wie
   `creation_time` und Titel werden übernommen.
@@ -135,15 +138,17 @@ Loslassen des Reglers oder mit Enter im Zeitfeld wird das Bild an der gewählten
 optional einen Ausgabe-Frame derselben Filterkette: 8-Bit-Anzeige
 vor Videokompression, kein Ersatz für den Test im Zielplayer. Der Fortschrittsbalken
 kombiniert Dateifortschritt und Jobanzahl; unterschiedlich lange Videos haben gleiches
-Gewicht. Meldungen und vollständige FFmpeg-Aufrufe stehen unter dem Ausgabeordner
-in `logs`. Logs können lokale Pfade und Metadaten enthalten. Das vorhandene Icon und
+Gewicht. Vergangene Zeit und geschätzte Restzeit stehen nebeneinander. Bei Prüfungen
+ohne belastbare Schätzung steht **Restzeit: —**; der Status nennt den laufenden
+Arbeitsschritt. Meldungen, Phasendauern und vollständige FFmpeg-Aufrufe stehen im
+Programmordner unter `logs`. Logs können lokale Pfade und Metadaten enthalten. Das vorhandene Icon und
 der Windows-Abschlusssound bleiben unverändert.
 
 ## Einstellungen
 
 TransCora merkt Ziel, Anaglyphenverfahren, Ausgabeprofil, Container, Codec,
 Qualitätsmodus, CRF-/Bitratenwerte, Zielbildrate, Dateinamenszusatz, Eingabe-/Ausgabeordner und
-Unterordneroption. Quelllayout beginnt beim nächsten Programmstart mit **Automatisch**,
+Unterordneroption sowie Tonformat, Tonspurauswahl und Kanaleinstellung. Quelllayout beginnt beim nächsten Programmstart mit **Automatisch**,
 **L/R tauschen** ist dann ausgeschaltet. Joblisten behalten ihre individuellen Angaben.
 Dateiliste, Kontrollbildposition und Fenstergröße/-position werden nicht automatisch
 wiederhergestellt. Einstellungen liegen lokal in `settings.json` im Programmordner.
@@ -243,14 +248,17 @@ Der geprüfte Encoder verwendet hohe Qualität, insgesamt 28/40 Mbit/s Ziel-/Max
 AVC/MVC Level 4.1, GOP 24, begrenztes 8-Bit-4:2:0-BT.709. Für Blu-ray-Video ist dieses
 Profil fest; das 4:4:4-Anaglyphenprofil ist davon unabhängig.
 
-Alle Audiospuren mit bekannter Mono-, Stereo-, 5.1- oder 7.1-Belegung werden als
-24-Bit-LPCM mit 48 kHz gespeichert. Es erfolgt keine stille Kanalreduktion.
-Das WAV-Zwischenformat hat derzeit ein geprüftes Limit von 4 GB pro Audiospur;
-zu lange Spuren werden vor der Kodierung blockiert. Untertitel werden noch nicht übernommen.
+Die gewählten Audiospuren mit bekannter Mono-, Stereo-, 5.1- oder 7.1-Belegung werden
+als 24-Bit-LPCM mit 48 kHz gespeichert. Alle Spuren und Originalkanäle sind Standard.
+Stereo-Downmix und kein Ton sind ausdrückliche Optionen unter **Erweitert**.
+Wave64 ersetzt das auf 4 GB begrenzte WAV-Zwischenformat, ohne zusätzliche
+verlustbehaftete Tonkodierung. Untertitel werden noch nicht übernommen.
 
 Bildzeiten werden vollständig geprüft. Rohbilder gehen direkt durch Pipes, nicht in
-riesige Zwischenvideodateien. Beide Ansichten werden vor und nach dem Multiplexen
-dekodiert und bitgenau miteinander verglichen. Bei ISO wird der tatsächliche SSIF
+riesige Zwischenvideodateien. Kodierte Bilddaten und Parameter werden vor und nach dem Multiplexen
+bitgenau verglichen. Die tatsächliche fertige Ausgabe wird einmal vollständig in
+beide Halbbilder dekodiert und auf die erwartete Bildanzahl geprüft. Ein zweiter
+vollständiger Dekodierdurchlauf ist dafür nicht erforderlich. Bei ISO wird der tatsächliche SSIF
 über einen begrenzten UDF-Leser geprüft; bei M2TS die tatsächliche Datei. Komprimierte
 Prüfdaten werden im Ausgabeordner temporär angelegt und bei Erfolg/Abbruch entfernt.
 Es wird ausreichend freier Platz geprüft; es gibt keine automatische Disc-Aufteilung.
@@ -266,8 +274,9 @@ anhand der beiden vom Decoder gemeldeten Ansichten. Manuelle Einträge
 - MVC: Progressive 8-Bit-4:2:0-Stereoquellen in M2TS/TS/SSIF und einer kombinierten
   MKV/MP4-Videospur. Der portable edge264-mvc-Decoder benötigt keinen Frameserver;
   FRIM wird bei unterstützbaren Decoder-Lücken als geprüfter Windows-Fallback verwendet.
-  Die Basisansicht wird als links interpretiert; bei rechts kodierter Basisansicht
-  muss L/R tauschen gewählt werden. Ursprüngliche CFR-Paketbildzeiten werden vollständig geprüft.
+  Bei Blu-ray-ISO bestimmt die Playlist die linke/rechte Basisansicht. Ohne diese
+  Angabe wird links angenommen und ausdrücklich angezeigt; **L/R tauschen**
+  bleibt für die Korrektur verfügbar. Ursprüngliche CFR-Paketbildzeiten werden vollständig geprüft.
 - Blu-ray-3D-ISO: Unverschlüsselte UDF-2.50-Discs mit einer vollständigen
   einzelnen SSIF-Filmdatei. Die längste Film-Playlist wird gewählt und genannt.
   Seamless Branching, alternative Blickwinkel und Clip-Ausschnitte bleiben blockiert.
@@ -278,8 +287,8 @@ anhand der beiden vom Decoder gemeldeten Ansichten. Manuelle Einträge
 
 Die Ausgabe verwendet die vorhandenen SBS/OU-, Mono-, Anaglyphen- und BD-3D-Ziele.
 Blu-ray-LPCM wird für MKV verlustfrei in FLAC gewandelt; andere freigegebene
-Audiospuren werden kopiert. Für MP4 bleibt die vorhandene Audio-Kompatibilitätsprüfung
-aktiv. Nur Framerate ändern erhält weiterhin gepackte Quellen.
+Audiospuren werden gemäß den Tonoptionen übernommen. Für MP4 wird die
+Kompatibilität des tatsächlich gewählten Tonformats geprüft. Nur Framerate ändern erhält weiterhin gepackte Quellen.
 
 MV-HEVC-Ausgabe für Apple-Geräte ist ein späteres eigenes Ausgabeziel. Beliebigem
 Stereomaterial werden keine erfundenen Spatial-Video-Kamerametadaten beigefügt.

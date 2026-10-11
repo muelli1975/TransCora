@@ -189,6 +189,8 @@ def coded_fingerprint(path: Path, check=None):
                 digest.update(struct.pack('>Q', len(nal)))
                 digest.update(nal)
                 count += kind != 14
+            elif kind == 24 and len(nal) == 2 and nal[0] == 24 and nal[1]&31 == 16:
+                pass  # Blu-ray MVC dependency-representation delimiter (tsMuxeR nuDRD).
             elif kind not in (6, 9, 10, 11, 12):
                 raise ValueError(f'BD-3D: Unerwartete NAL-Einheit {kind} in der Bildspur.')
     if not count or not parameters:

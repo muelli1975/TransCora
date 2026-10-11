@@ -149,6 +149,7 @@ class MvcMetadataTests(unittest.TestCase):
                 return coded_fingerprint(path)
             expected = fingerprint([sps, pps, picture])
             self.assertEqual(expected, fingerprint([b'\x09\xf0', sps, pps, sps, b'\x06SEI\x80', picture], b'\x00'+prefix))
+            self.assertEqual(expected, fingerprint([b'\x18\x30', sps, pps, picture]))
             self.assertNotEqual(expected, fingerprint([sps, pps, picture.replace(b'picture', b'changed')]))
             self.assertNotEqual(expected, fingerprint([sps.replace(b'\xab', b'\xac'), pps, picture]))
             self.assertNotEqual(expected, fingerprint([sps, pps, picture, picture]))
