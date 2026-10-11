@@ -261,8 +261,8 @@ class Window:
             number.bind("<Return>", lambda event, k=key: self.option_changed(k))
             self.controls.append((number, "normal"))
             self.combos[key] = number
-        self.button(self.advanced, 'Tonoptionen …', self.show_audio_options).grid(row=1, column=0, sticky='w', pady=5)
-        self.button(self.advanced, "Standardeinstellungen", self.reset_defaults).grid(row=1, column=2, sticky="e", pady=5)
+        self.advanced_audio_button = self.button(actions, 'Tonoptionen …', self.show_audio_options)
+        self.reset_button = self.button(actions, 'Standardeinstellungen', self.reset_defaults)
         # Keep the main window usable at its minimum height. Audio controls live
         # in a reusable dialog so their values and state follow the same selection.
         self.audio_dialog = tk.Toplevel(self.root, background=APP_BG)
@@ -776,9 +776,13 @@ class Window:
     def toggle_advanced(self):
         if self.advanced.winfo_ismapped():
             self.advanced.grid_remove()
+            self.advanced_audio_button.pack_forget()
+            self.reset_button.pack_forget()
             self.detail_text.configure(height=4)
         else:
-            self.detail_text.configure(height=1)
+            self.detail_text.configure(height=2)
+            self.advanced_audio_button.pack(side='left', padx=5)
+            self.reset_button.pack(side='right')
             self.advanced.grid(row=9, column=0, sticky="ew", pady=5)
 
     def show_audio_options(self):
