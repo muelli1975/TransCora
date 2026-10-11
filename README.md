@@ -117,7 +117,7 @@ nummeriert, z. B. `Film_2_dubois_lcd.mkv`; auch nachträglich angelegte Ziele si
   anhand der Auflösung beweisen; die Kontrollbild-/Player-Prüfung bleibt sinnvoll.
   Erkannte HDR-Quellen werden nicht automatisch umgewandelt. Interlacing, nichtquadratische Pixel,
   Rotation und VR-Projektion werden in dieser Version mit Hinweis blockiert.
-- Unter **Erweitert** kann Ton im Original übernommen oder als AAC ausgegeben werden.
+- Unter **Erweitert → Tonoptionen** kann Ton im Original übernommen oder als AAC ausgegeben werden.
   Alle Tonspuren, ausgewählte Spurnummern oder kein Ton sind wählbar. Die Kanalzahl
   bleibt standardmäßig erhalten; Stereo-Downmix muss ausdrücklich gewählt werden.
   Für MP4 inkompatiblen Originalton unter Erweitert als AAC ausgeben oder MKV verwenden.

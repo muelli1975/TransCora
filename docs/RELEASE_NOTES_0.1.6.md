@@ -13,6 +13,8 @@
 - Add advanced original/AAC audio, all/selected/no-track and explicit stereo-downmix
   options; default to all original channels and avoid another lossy encode.
   Blu-ray output remains 48 kHz, 24-bit LPCM. Use Wave64 for long surround tracks.
+- Keep audio options in a compact dialog under Advanced so the file list,
+  progress display and action buttons remain visible at the minimum window size.
 - Read the MVC base-eye flag from ISO playlists. Explain the left-eye assumption
   for sources without that flag and retain the manual L/R swap.
 - Keep FRIM 1.31 software quality settings and the compatible anaglyph profile

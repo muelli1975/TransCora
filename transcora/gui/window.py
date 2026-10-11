@@ -261,11 +261,26 @@ class Window:
             number.bind("<Return>", lambda event, k=key: self.option_changed(k))
             self.controls.append((number, "normal"))
             self.combos[key] = number
-        combo(self.advanced, 1, 0, 'audio_format', 'Tonformat')
-        combo(self.advanced, 1, 1, 'audio_tracks', 'Tonspuren')
-        combo(self.advanced, 1, 2, 'audio_channels', 'Tonkanäle')
-        selection = ttk.Frame(self.advanced)
-        selection.grid(row=2, column=0, sticky='ew', padx=(0, 8), pady=3)
+        self.button(self.advanced, 'Tonoptionen …', self.show_audio_options).grid(row=1, column=0, sticky='w', pady=5)
+        self.button(self.advanced, "Standardeinstellungen", self.reset_defaults).grid(row=1, column=2, sticky="e", pady=5)
+        # Keep the main window usable at its minimum height. Audio controls live
+        # in a reusable dialog so their values and state follow the same selection.
+        self.audio_dialog = tk.Toplevel(self.root, background=APP_BG)
+        self.audio_dialog.withdraw()
+        self.audio_dialog.title('Tonoptionen')
+        self.audio_dialog.transient(self.root)
+        self.audio_dialog.resizable(False, False)
+        self.audio_dialog.protocol('WM_DELETE_WINDOW', self.close_audio_options)
+        self.audio_dialog.bind('<Escape>', lambda e: self.close_audio_options())
+        audio_fields = ttk.Frame(self.audio_dialog, padding=12)
+        audio_fields.pack(fill='both', expand=True)
+        for col in (0, 1, 2):
+            audio_fields.columnconfigure(col, weight=1, uniform='audio')
+        combo(audio_fields, 0, 0, 'audio_format', 'Tonformat')
+        combo(audio_fields, 0, 1, 'audio_tracks', 'Tonspuren')
+        combo(audio_fields, 0, 2, 'audio_channels', 'Tonkanäle')
+        selection = ttk.Frame(audio_fields)
+        selection.grid(row=1, column=0, sticky='ew', padx=(0, 8), pady=3)
         ttk.Label(selection, text='Spurnummern · z. B. 1, 3 oder 2-4').pack(anchor='w')
         self.variables['audio_selection'] = tk.StringVar(value=self.defaults.audio_selection)
         audio_selection = ttk.Entry(selection, textvariable=self.variables['audio_selection'])
@@ -275,9 +290,12 @@ class Window:
         self.controls.append((audio_selection, 'normal'))
         self.combos['audio_selection'] = audio_selection
         self.audio_note = tk.StringVar()
-        ttk.Label(self.advanced, textvariable=self.audio_note, foreground=MUTED, wraplength=480).grid(
-            row=2, column=1, columnspan=2, sticky='w', pady=3)
-        self.button(self.advanced, "Standardeinstellungen", self.reset_defaults).grid(row=3, column=2, sticky="e", pady=5)
+        ttk.Label(audio_fields, textvariable=self.audio_note, foreground=MUTED, wraplength=360).grid(
+            row=1, column=1, columnspan=2, sticky='w', pady=3)
+        ttk.Label(audio_fields, text='Einstellungen werden sofort übernommen.', foreground=MUTED).grid(
+            row=2, column=0, columnspan=2, sticky='w', pady=(12, 0))
+        ttk.Button(audio_fields, text='Schließen', command=self.close_audio_options).grid(
+            row=2, column=2, sticky='e', pady=(12, 0))
         self.status = tk.StringVar(value="Bereit")
         progress_info = ttk.Frame(outer)
         progress_info.grid(row=10, column=0, sticky="ew", pady=(6, 3))
@@ -758,8 +776,26 @@ class Window:
     def toggle_advanced(self):
         if self.advanced.winfo_ismapped():
             self.advanced.grid_remove()
+            self.detail_text.configure(height=4)
         else:
+            self.detail_text.configure(height=1)
             self.advanced.grid(row=9, column=0, sticky="ew", pady=5)
+
+    def show_audio_options(self):
+        if self.busy:
+            return
+        self.refresh_controls()
+        self.audio_dialog.geometry(f'+{self.root.winfo_rootx()+30}+{self.root.winfo_rooty()+100}')
+        self.audio_dialog.deiconify()
+        schedule_dark_titlebar(self.audio_dialog)
+        self.audio_dialog.lift()
+        self.audio_dialog.grab_set()
+        self.combos['audio_tracks'].focus_set()
+
+    def close_audio_options(self):
+        self.option_changed('audio_selection')
+        self.audio_dialog.grab_release()
+        self.audio_dialog.withdraw()
 
     def set_busy(self, value):
         self.busy = value

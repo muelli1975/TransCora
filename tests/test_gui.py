@@ -260,11 +260,18 @@ class GuiTests(unittest.TestCase):
         self.assertEqual(PreviewWindow.time_text(3661), '01:01:01')
 
     def test_bd_audio_options_remain_available_and_phase_replaces_stale_estimate(self):
+        self.root.geometry('860x680')
         self.window.variables['target'].set('BD-3D · 1080p')
         self.window.option_changed('target')
         self.window.toggle_advanced()
         self.root.update()
         self.assertTrue(self.window.advanced.winfo_ismapped())
+        self.assertGreaterEqual(self.window.tree.winfo_height(), 45)
+        self.assertLessEqual(self.window.start_button.winfo_rooty()+self.window.start_button.winfo_height(),
+                             self.root.winfo_rooty()+self.root.winfo_height())
+        self.window.show_audio_options()
+        self.root.update()
+        self.assertTrue(self.window.audio_dialog.winfo_ismapped())
         self.assertEqual(str(self.window.combos['codec'].cget('state')), 'disabled')
         self.assertEqual(str(self.window.combos['audio_format'].cget('state')), 'disabled')
         self.assertEqual(self.window.variables['audio_format'].get(), 'LPCM · 24 Bit')
@@ -272,6 +279,8 @@ class GuiTests(unittest.TestCase):
         self.window.variables['audio_tracks'].set('Ausgewählte Spuren')
         self.window.option_changed('audio_tracks')
         self.assertEqual(str(self.window.combos['audio_selection'].cget('state')), 'normal')
+        self.window.close_audio_options()
+        self.assertFalse(self.window.audio_dialog.winfo_ismapped())
         self.window.run_started = time.monotonic()-30
         self.window.estimated_finish = time.monotonic()+100
         self.window.speed.set('Alte Geschwindigkeit')
@@ -293,7 +302,7 @@ class GuiTests(unittest.TestCase):
     def test_log_has_dark_surfaces_and_scrollbar(self):
         self.window.show_log()
         self.root.update()
-        dialog = next(w for w in self.root.winfo_children() if isinstance(w, tk.Toplevel))
+        dialog = next(w for w in self.root.winfo_children() if isinstance(w, tk.Toplevel) and w.winfo_ismapped())
         self.assertEqual(dialog.cget('background'), APP_BG)
         frame = next(w for w in dialog.winfo_children() if isinstance(w, ttk.Frame))
         text = next(w for w in frame.winfo_children() if isinstance(w, tk.Text))
