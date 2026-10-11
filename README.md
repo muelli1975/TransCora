@@ -2,25 +2,11 @@
 
 [Deutsch](README_DE.md)
 
-**Convert stereoscopic videos and images for your display.**
-
-TransCora converts 3D videos and stereo images into SBS, over/under, cross-view, anaglyphs and row-interleaved output for polarised monitors. It can also create Blu-ray 3D ISO files and extract the two JPEG images from an MPO without recompression. Video and image batches have separate lists, settings and previews.
+TransCora is a local desktop program for converting stereoscopic videos and images. It supports SBS, over/under, cross-view, anaglyphs and row-interleaved output for polarised monitors. On Windows, it also creates Blu-ray 3D ISO and AVC/MVC M2TS files. MPO files can be split into their two eye images without JPEG recompression. Videos and images have separate batch lists, settings and previews.
 
 Everything runs locally, without an account, cloud or tracking. The interface can be switched between German and English.
 
-## Download and start
-
-Download a package from [Releases](https://github.com/muelli1975/TransCora/releases/latest) and extract the complete archive into a writable folder.
-
-| System | Package | Start |
-| --- | --- | --- |
-| Windows x64 | `TransCora_1.0_Windows_x64.zip` | `TransCora.exe` |
-| Linux x64 | `TransCora_1.0_Linux_x64.tar.gz` | `./TransCora` |
-| macOS Apple Silicon | `TransCora_1.0_macOS_AppleSilicon.tar.gz` | `TransCora.app` |
-
-Windows includes Python, FFmpeg and the BD-3D tools. Linux and macOS include the application runtime and image tools; **FFmpeg with ffprobe and system Perl must be installed separately**. On Ubuntu/Debian: `sudo apt install ffmpeg perl`. On macOS with Homebrew: `brew install ffmpeg@7`. macOS packages are not notarised.
-
-Keep the supplied application files and tools together. No separate Python installation is needed for these packages. Blu-ray 3D encoding is available in the Windows package. The Linux package also includes the MVC reader; the Apple Silicon package currently supports packed stereo and ordinary video input, without an MVC reader.
+![TransCora 1.0 video list and output settings](docs/Screenshots/TransCora.png)
 
 ## Quick start
 
@@ -94,8 +80,22 @@ Save lists to resume a batch with its per-file settings. Lists contain paths and
 
 Shortcuts: **Ctrl+O** adds files; **Ctrl+A** selects the list; **Ctrl+click** selects individual entries; **Shift+click** selects a range; **Delete** removes selected entries; **Esc** cancels the active operation. On macOS use **Command** for opening files, selecting all and selecting individual entries.
 
-## Source and license
+## Portable builds and source
+
+Download a package from [Releases](https://github.com/muelli1975/TransCora/releases/latest) and extract the complete archive into a writable folder.
+
+| System | Package | Start |
+| --- | --- | --- |
+| Windows x64 | `TransCora_1.0_Windows_x64.zip` | `TransCora.exe` |
+| Linux x64 | `TransCora_1.0_Linux_x64.tar.gz` | `./TransCora` |
+| macOS Apple Silicon | `TransCora_1.0_macOS_AppleSilicon.tar.gz` | `TransCora.app` |
+
+Windows includes Python, FFmpeg and the BD-3D tools. Linux and macOS include the application runtime and image tools; **FFmpeg with ffprobe and system Perl must be installed separately**. On Ubuntu/Debian: `sudo apt install ffmpeg perl`. On macOS with Homebrew: `brew install ffmpeg@7`. macOS packages are ad-hoc signed and not notarised.
+
+Keep the supplied application files and tools together. No separate Python installation is needed for these packages. Blu-ray 3D encoding is available in the Windows package. The Linux package also includes the MVC reader; the Apple Silicon package currently supports packed stereo and ordinary video input, without an MVC reader.
 
 Release packages include the matching application source. Build instructions: [BUILD.md](BUILD.md). Detailed format notes: [technical reference](docs/TECHNICAL_REFERENCE.md).
+
+## License
 
 Copyright Christoph Müller. TransCora uses the MIT License; supplied third-party tools retain their own licences. See [LICENSE](LICENSE) and [THIRD_PARTY.md](THIRD_PARTY.md).

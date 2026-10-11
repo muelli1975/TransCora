@@ -51,13 +51,8 @@ def main():
         shutil.copy2(root/name, output/name)
     if sys.platform == 'darwin':
         subprocess.run(['ditto', str(root/'dist/TransCora.app'), str(output/'TransCora.app')], check=True)
-        app_files = output/'TransCora.app/Contents/MacOS'
-        for name in ('assets', 'presets', 'tools', 'licenses', 'docs'):
-            shutil.copytree(output/name, app_files/name, dirs_exist_ok=True)
-        for name in ('README.md', 'README_DE.md', 'BUILD.md', 'LICENSE', 'THIRD_PARTY.md'):
-            shutil.copy2(output/name, app_files/name)
-        # Adding tools and guides changes the bundle's sealed resources.
-        # Re-sign the completed app, retaining existing nested binary signatures.
+        # Keep portable tools, settings and exports outside the signed app.
+        # Verify the complete bundle after copying it into the distribution.
         subprocess.run(['codesign', '--force', '--sign', '-', str(output/'TransCora.app')], check=True)
         subprocess.run(['codesign', '--verify', '--deep', '--strict', str(output/'TransCora.app')], check=True)
     (output/'output').mkdir(exist_ok=True)

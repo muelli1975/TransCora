@@ -2,25 +2,11 @@
 
 [English](README.md)
 
-**3D-Videos und Stereobilder für deinen Bildschirm umwandeln.**
-
-TransCora wandelt 3D-Videos und Stereobilder in SBS, Over/Under, Kreuzblick, Anaglyphen und zeilenverschachtelte Ausgaben für Polfilter-Monitore um. Es erstellt außerdem Blu-ray-3D-ISOs und teilt MPO-Dateien ohne JPEG-Neukodierung. Videos und Bilder haben eigene Stapellisten, Einstellungen und Kontrollbilder.
+TransCora ist ein lokales Desktopprogramm zum Umwandeln stereoskopischer Videos und Bilder. Es unterstützt SBS, Over/Under, Kreuzblick, Anaglyphen und zeilenverschachtelte Ausgaben für Polfilter-Monitore. Unter Windows erstellt es außerdem Blu-ray-3D-ISOs und AVC/MVC-M2TS. MPO-Dateien lassen sich ohne JPEG-Neukodierung in ihre beiden Augenbilder aufteilen. Videos und Bilder haben eigene Stapellisten, Einstellungen und Kontrollbilder.
 
 Alles läuft lokal, ohne Account, Cloud oder Tracking. Die Oberfläche lässt sich zwischen Deutsch und Englisch umschalten.
 
-## Herunterladen und starten
-
-Lade ein Paket unter [Releases](https://github.com/muelli1975/TransCora/releases/latest) herunter und entpacke das komplette Archiv in einen beschreibbaren Ordner.
-
-| System | Paket | Start |
-| --- | --- | --- |
-| Windows x64 | `TransCora_1.0_Windows_x64.zip` | `TransCora.exe` |
-| Linux x64 | `TransCora_1.0_Linux_x64.tar.gz` | `./TransCora` |
-| macOS Apple Silicon | `TransCora_1.0_macOS_AppleSilicon.tar.gz` | `TransCora.app` |
-
-Windows enthält Python, FFmpeg und die BD-3D-Werkzeuge. Linux und macOS enthalten die Programmlaufzeit und Bildwerkzeuge; **FFmpeg einschließlich ffprobe und System-Perl müssen separat installiert sein**. Unter Ubuntu/Debian: `sudo apt install ffmpeg perl`. Mit Homebrew unter macOS: `brew install ffmpeg@7`. Das macOS-Paket ist nicht notarisiert.
-
-Halte den gesamten Programmordner zusammen. Eine eigene Python-Installation ist für diese Pakete nicht nötig. BD-3D-Kodierung ist im Windows-Paket verfügbar. Das Linux-Paket enthält zusätzlich den MVC-Decoder; das Apple-Silicon-Paket unterstützt derzeit gepacktes Stereo und normale Videos, ohne MVC-Decoder.
+![TransCora 1.0 mit Videoliste und Ausgabeeinstellungen](docs/Screenshots/TransCora_DE.png)
 
 ## Schnellstart
 
@@ -94,8 +80,22 @@ Speichere **Listen**, um einen Stapel mit seinen Einstellungen je Datei fortzuse
 
 Tastatur: **Strg+O** fügt Dateien hinzu; **Strg+A** markiert die Liste; **Strg+Klick** einzelne Einträge; **Umschalt+Klick** einen Bereich; **Entf** entfernt markierte Einträge; **Esc** bricht die aktive Verarbeitung ab. Unter macOS verwendest du **Command** zum Öffnen, Markieren aller Dateien und zur Einzelauswahl.
 
-## Quellcode und Lizenz
+## Portable Pakete und Quellcode
+
+Lade ein Paket unter [Releases](https://github.com/muelli1975/TransCora/releases/latest) herunter und entpacke das komplette Archiv in einen beschreibbaren Ordner.
+
+| System | Paket | Start |
+| --- | --- | --- |
+| Windows x64 | `TransCora_1.0_Windows_x64.zip` | `TransCora.exe` |
+| Linux x64 | `TransCora_1.0_Linux_x64.tar.gz` | `./TransCora` |
+| macOS Apple Silicon | `TransCora_1.0_macOS_AppleSilicon.tar.gz` | `TransCora.app` |
+
+Windows enthält Python, FFmpeg und die BD-3D-Werkzeuge. Linux und macOS enthalten die Programmlaufzeit und Bildwerkzeuge; **FFmpeg einschließlich ffprobe und System-Perl müssen separat installiert sein**. Unter Ubuntu/Debian: `sudo apt install ffmpeg perl`. Mit Homebrew unter macOS: `brew install ffmpeg@7`. Das macOS-Paket ist ad-hoc signiert und nicht notarisiert.
+
+Halte den gesamten Programmordner zusammen. Eine eigene Python-Installation ist für diese Pakete nicht nötig. BD-3D-Kodierung ist im Windows-Paket verfügbar. Das Linux-Paket enthält zusätzlich den MVC-Decoder; das Apple-Silicon-Paket unterstützt derzeit gepacktes Stereo und normale Videos, ohne MVC-Decoder.
 
 Die Pakete enthalten den zugehörigen Programmquellcode. Bauanleitung: [BUILD.md](BUILD.md). Ausführliche Formathinweise: [technische Referenz](docs/TECHNICAL_REFERENCE.md).
+
+## Lizenz
 
 Copyright Christoph Müller. TransCora steht unter der MIT-Lizenz; mitgelieferte Fremdwerkzeuge behalten ihre eigenen Lizenzen. Siehe [LICENSE](LICENSE) und [THIRD_PARTY.md](THIRD_PARTY.md).

@@ -48,7 +48,12 @@ def frame_rate(value: str) -> Fraction:
 def app_root() -> Path:
     # A one-folder frozen application keeps assets and tools beside its executable.
     if getattr(sys, "frozen", False):
-        return Path(sys.executable).resolve().parent
+        folder = Path(sys.executable).resolve().parent
+        if sys.platform == 'darwin' and folder.name == 'MacOS' and folder.parents[1].suffix == '.app':
+            # The portable app and its tools share an external application folder.
+            # Settings and exports must not modify signed bundle resources.
+            return folder.parents[2]
+        return folder
     return Path(__file__).resolve().parents[2]
 
 
