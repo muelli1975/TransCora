@@ -246,7 +246,7 @@ class GuiTests(unittest.TestCase):
             self.window.run_started = 30
             self.window.set_busy(True)
             self.window.update_elapsed()
-            self.assertIn('Wird ermittelt', self.window.elapsed.get())
+            self.assertEqual(self.window.elapsed.get(), 'Restzeit: —')
             self.window.estimate_remaining(1, 1, 50)
             self.assertEqual(self.window.elapsed.get(), 'Restzeit: ca. 01:10')
             self.assertEqual(self.window.elapsed_time.get(), 'Vergangene Zeit: 01:10')
@@ -258,6 +258,30 @@ class GuiTests(unittest.TestCase):
         self.assertEqual(self.window.elapsed.get(), 'Restzeit: —')
         self.assertEqual(self.window.elapsed_time.get(), 'Vergangene Zeit: 01:10')
         self.assertEqual(PreviewWindow.time_text(3661), '01:01:01')
+
+    def test_bd_audio_options_remain_available_and_phase_replaces_stale_estimate(self):
+        self.window.variables['target'].set('BD-3D · 1080p')
+        self.window.option_changed('target')
+        self.window.toggle_advanced()
+        self.root.update()
+        self.assertTrue(self.window.advanced.winfo_ismapped())
+        self.assertEqual(str(self.window.combos['codec'].cget('state')), 'disabled')
+        self.assertEqual(str(self.window.combos['audio_format'].cget('state')), 'disabled')
+        self.assertEqual(self.window.variables['audio_format'].get(), 'LPCM · 24 Bit')
+        self.assertEqual(str(self.window.combos['audio_tracks'].cget('state')), 'readonly')
+        self.window.variables['audio_tracks'].set('Ausgewählte Spuren')
+        self.window.option_changed('audio_tracks')
+        self.assertEqual(str(self.window.combos['audio_selection'].cget('state')), 'normal')
+        self.window.run_started = time.monotonic()-30
+        self.window.estimated_finish = time.monotonic()+100
+        self.window.speed.set('Alte Geschwindigkeit')
+        text = 'BD-3D: Fertige Ausgabe vollständig dekodieren und beide Halbbilder prüfen'
+        self.window.events.put(('phase', ('job', 1, 1, text)))
+        self.window.poll()
+        self.assertEqual(self.window.status.get(), text)
+        self.assertEqual(self.window.speed.get(), '')
+        self.assertEqual(self.window.elapsed.get(), 'Restzeit: —')
+        self.assertEqual(str(self.window.progress.cget('mode')), 'indeterminate')
 
     def test_log_has_dark_surfaces_and_scrollbar(self):
         self.window.show_log()

@@ -14,7 +14,7 @@ from tkinter import filedialog, messagebox, ttk
 
 from transcora import __version__
 from transcora.core.engine import Cancelled, execute, methods, plan_job, preview
-from transcora.core.model import Job, LAYOUTS, PROFILES, TARGETS, Options, VIDEO_EXTENSIONS, app_root, FPS_CHOICES, COMPATIBILITY_NOTE
+from transcora.core.model import Job, LAYOUTS, PROFILES, TARGETS, Options, VIDEO_EXTENSIONS, app_root, FPS_CHOICES, COMPATIBILITY_NOTE, AUDIO_FORMATS, AUDIO_TRACKS, AUDIO_CHANNELS
 from transcora.core.naming import effective_suffix, suffix_choices, reserve_output, filename_layout, fps_suffix, default_disc_title
 from transcora.core.storage import load_list, save_list, write_json, new_run_log, delete_run_logs, load_presets, save_presets, validate_preset_name
 from transcora.core.toolchain import Toolchain
@@ -137,7 +137,8 @@ class Window:
                          "method": {k: m["label"] for k, m in self.catalog.items()},
                          "container": {"mkv": "MKV", "mp4": "MP4", "iso": "Blu-ray-ISO", "m2ts": "M2TS (AVC/MVC)"},
                          "codec": {"h264": "H.264", "h265": "H.265 / HEVC"},
-                         "rate_mode": {"crf": "Qualität (CRF)", "abr": "Zielbitrate (Durchschnitt)"}}
+                         "rate_mode": {"crf": "Qualität (CRF)", "abr": "Zielbitrate (Durchschnitt)"},
+                         'audio_format': AUDIO_FORMATS, 'audio_tracks': AUDIO_TRACKS, 'audio_channels': AUDIO_CHANNELS}
         self.combos = {}
         self.option_frames = {}
         def combo(parent, row, col, key, label):
@@ -260,7 +261,23 @@ class Window:
             number.bind("<Return>", lambda event, k=key: self.option_changed(k))
             self.controls.append((number, "normal"))
             self.combos[key] = number
-        self.button(self.advanced, "Standardeinstellungen", self.reset_defaults).grid(row=1, column=2, sticky="e", pady=5)
+        combo(self.advanced, 1, 0, 'audio_format', 'Tonformat')
+        combo(self.advanced, 1, 1, 'audio_tracks', 'Tonspuren')
+        combo(self.advanced, 1, 2, 'audio_channels', 'Tonkanäle')
+        selection = ttk.Frame(self.advanced)
+        selection.grid(row=2, column=0, sticky='ew', padx=(0, 8), pady=3)
+        ttk.Label(selection, text='Spurnummern · z. B. 1, 3 oder 2-4').pack(anchor='w')
+        self.variables['audio_selection'] = tk.StringVar(value=self.defaults.audio_selection)
+        audio_selection = ttk.Entry(selection, textvariable=self.variables['audio_selection'])
+        audio_selection.pack(fill='x')
+        for event in ('<FocusOut>', '<Return>'):
+            audio_selection.bind(event, lambda e: self.option_changed('audio_selection'))
+        self.controls.append((audio_selection, 'normal'))
+        self.combos['audio_selection'] = audio_selection
+        self.audio_note = tk.StringVar()
+        ttk.Label(self.advanced, textvariable=self.audio_note, foreground=MUTED, wraplength=480).grid(
+            row=2, column=1, columnspan=2, sticky='w', pady=3)
+        self.button(self.advanced, "Standardeinstellungen", self.reset_defaults).grid(row=3, column=2, sticky="e", pady=5)
         self.status = tk.StringVar(value="Bereit")
         progress_info = ttk.Frame(outer)
         progress_info.grid(row=10, column=0, sticky="ew", pady=(6, 3))
@@ -446,6 +463,11 @@ class Window:
     def option_changed(self, key):
         if self.busy or self.updating:
             return
+        if key == 'audio_selection':
+            selected = self.selected_jobs()
+            options = [job.options for job in selected] if selected else [self.defaults]
+            if all(o.audio_selection == self.variables[key].get() for o in options):
+                return
         if key == "suffix" and self.variables[key].get() == self.last_suffix_display:
             return
         if key == 'disc_title' and self.variables[key].get() == self.last_title_display:
@@ -474,6 +496,8 @@ class Window:
                     result.suffix = None
                 if key == "codec" and value == "h265":
                     result.container = "mkv"
+                if key == 'audio_channels' and value == 'stereo' and options.target != 'bd3d':
+                    result.audio_format = 'aac'
                 result.validate()
                 return result
             candidates = self.selected_jobs()
@@ -487,14 +511,14 @@ class Window:
                 self.update_row(job)
             if key == "codec" and value == "h265":
                 self.variables["container"].set("MKV")
-            if key in {"target", "method", "target_fps", "layout", "disc_title", "container"}:
+            if key in {"target", "method", "target_fps", "layout", "disc_title", "container", 'audio_channels'}:
                 self.selection_changed()
             self.last_suffix_display = self.variables['suffix'].get()
             self.status.set("Einstellungen übernommen. Vor dem Start wird erneut geprüft.")
             self.refresh_controls()
         except (ValueError, StopIteration) as error:
             self.status.set(str(error) or "Ungültige Eingabe.")
-            if key in {"crf", "bitrate_mbps", "target_fps"}:
+            if key in {"crf", "bitrate_mbps", "target_fps", 'audio_selection'}:
                 selected = self.selected_jobs()
                 options = selected[0].options if selected else self.defaults
                 self.variables[key].set(str(getattr(options, key)))
@@ -512,17 +536,26 @@ class Window:
         self.option_frames['profile'].grid()
         self.combos['container'].configure(values=[self.mappings['container'][k] for k in
             (('iso', 'm2ts') if bd3d else ('mp4', 'mkv'))])
-        self.advanced_button.configure(state='disabled' if bd3d else 'normal')
-        if bd3d:
-            self.advanced.grid_remove()
+        self.advanced_button.configure(state='normal')
         self.swap_control.configure(state="disabled" if framerate else "normal")
         self.fps_frame.grid() if framerate else self.fps_frame.grid_remove()
         self.combos["method"].configure(state="readonly" if anaglyph else "disabled")
         self.combos["profile"].configure(state="readonly" if anaglyph else "disabled")
         self.combos["suffix"].configure(values=self.available_suffixes(options, selected[0] if selected else None))
         self.combos["container"].configure(state="disabled" if options.codec == "h265" else "readonly")
-        self.combos["crf"].configure(state="normal" if options.rate_mode == "crf" else "disabled")
-        self.combos["bitrate_mbps"].configure(state="normal" if options.rate_mode == "abr" else "disabled")
+        self.combos['codec'].configure(state='disabled' if bd3d else 'readonly')
+        self.combos['rate_mode'].configure(state='disabled' if bd3d else 'readonly')
+        self.combos["crf"].configure(state="normal" if options.rate_mode == "crf" and not bd3d else "disabled")
+        self.combos["bitrate_mbps"].configure(state="normal" if options.rate_mode == "abr" and not bd3d else "disabled")
+        no_audio = options.audio_tracks == 'none'
+        self.combos['audio_format'].configure(state='disabled' if bd3d or no_audio or options.audio_channels == 'stereo' else 'readonly')
+        self.variables['audio_format'].set('LPCM · 24 Bit' if bd3d else AUDIO_FORMATS[
+            'aac' if options.audio_channels == 'stereo' else options.audio_format])
+        self.combos['audio_channels'].configure(state='disabled' if no_audio else 'readonly')
+        self.combos['audio_selection'].configure(state='normal' if options.audio_tracks == 'selected' else 'disabled')
+        self.audio_note.set('BD-3D: LPCM mit 48 kHz und 24 Bit.' if bd3d else (
+            'AAC wird neu kodiert. Stereo mischt vorhandene Kanäle zusammen.' if options.audio_format == 'aac' or options.audio_channels == 'stereo'
+            else 'Originalton wird kopiert. Blu-ray-LPCM wird in MKV verlustfrei als FLAC gespeichert.'))
         active_field = "crf" if options.rate_mode == "crf" else "bitrate_mbps"
         for key, frame in self.rate_fields.items():
             frame.grid() if key == active_field else frame.grid_remove()
@@ -535,7 +568,7 @@ class Window:
                 if options.profile == "quality10":
                     text += " 10 Bit: Feinere Abstufungen; kein HDR-Modus."
         if framerate:
-            text = "Layout, Auflösung und Augenreihenfolge bleiben erhalten. Video wird neu kodiert; Ton wird kopiert."
+            text = "Layout, Auflösung und Augenreihenfolge bleiben erhalten. Video wird neu kodiert; Ton gemäß Erweitert."
         if bd3d:
             text = "1080p · 23,976 fps · AVC/MVC · Hohe Qualität. Andere konstante Quellbildraten werden direkt angepasst."
             if options.container == 'm2ts':
@@ -748,7 +781,7 @@ class Window:
         now = time.monotonic()
         self.elapsed_time.set('Vergangene Zeit: ' + PreviewWindow.time_text(max(0, now-self.run_started)))
         if self.estimated_finish is None or now-(self.estimate_updated or now) > 15:
-            self.elapsed.set('Restzeit: Wird ermittelt …')
+            self.elapsed.set('Restzeit: —')
         else:
             remaining = max(1, self.estimated_finish-now)
             self.elapsed.set('Restzeit: ca. ' + PreviewWindow.time_text(remaining))
@@ -801,6 +834,7 @@ class Window:
         self.option_changed("suffix")
         if self.variables['suffix'].get() != self.last_suffix_display:
             return
+        self.option_changed('audio_selection')
         candidates = [job for job in self.jobs if job.status != "completed"]
         if not candidates:
             self.status.set("Keine noch offenen Dateien in der Liste.")
@@ -813,6 +847,7 @@ class Window:
             with tempfile.TemporaryFile(dir=output):
                 pass
             tools = Toolchain.find()
+            self.events.put(('notice', 'Testen: Mitgelieferte Videowerkzeuge prüfen'))
             capabilities = tools.inspect()
             self.events.put(("log", capabilities["version"]))
             reserved, ready = set(), []
@@ -823,7 +858,9 @@ class Window:
                 self.events.put(("job", (job.id, "checking", "Technische Prüfung", None)))
                 self.events.put(("notice", f"Testen: Datei {index} von {len(candidates)} · {job.source.name}"))
                 try:
-                    plan = plan_job(tools, job, output, reserved, self.cancel, capabilities)
+                    def phase(text):
+                        self.events.put(('phase', (job.id, index, len(candidates), text)))
+                    plan = plan_job(tools, job, output, reserved, self.cancel, capabilities, phase=phase)
                     ready.append((job, plan))
                     self.events.put(("job", (job.id, "ready", "\n".join(plan.warnings), plan)))
                     self.events.put(("log", plan.summary + "\n" + "\n".join(plan.warnings)))
@@ -986,7 +1023,9 @@ class Window:
                         parts.append(value["fps"].replace(".", ",") + " fps")
                     self.speed.set(" · ".join(parts))
                 elif kind == "phase":
-                    self.speed.set(payload[3])
+                    self.status.set(payload[3])
+                    self.log_lines.append(payload[3])
+                    self.speed.set('')
                     self.progress.stop()
                     self.progress.configure(mode='indeterminate')
                     self.progress.start(15)

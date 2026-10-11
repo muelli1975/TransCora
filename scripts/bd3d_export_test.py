@@ -36,6 +36,7 @@ def main():
                                                  ('24000/1001', 'm2ts', 'Native 23.976', 6),
                                                  ('24000/1001', 'm2ts', 'Native 7.1', 8),
                                                  ('25', 'm2ts', 'Converted 25', 2),
+                                                 ('30', 'm2ts', 'Converted 30', 2),
                                                  ('60000/1001', 'm2ts', 'Converted 59.94', 2)]:
             case = container + '-' + str(channels) + ('-'+rate.replace('/', '-') if channels == 2 and container == 'm2ts' else '')
             source = OUT/f'source-{case}_full_sbs.mkv'
@@ -59,6 +60,9 @@ def main():
             execute(tools, plan, threading.Event(), lambda k, v: events.append((k, v)), OUT/f'{case}.log')
             if not plan.output.is_file() or not events or events[-1][1].get('percent') != 100:
                 raise ValueError('Export/progress failed')
+            log_text = (OUT/f'{case}.log').read_text(encoding='utf-8')
+            if log_text.count('-i:mvc') != 1:
+                raise ValueError('Production export must perform exactly one full MVC decode')
             packed = plan.output
             if container == 'iso':
                 # Cross-check the runtime reader against an independent UDF tool.

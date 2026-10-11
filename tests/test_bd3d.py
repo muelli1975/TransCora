@@ -138,6 +138,25 @@ class UdfLabelTests(unittest.TestCase):
 
 
 class MvcMetadataTests(unittest.TestCase):
+    def test_coded_comparison_accepts_mux_headers_but_catches_picture_and_parameter_changes(self):
+        from transcora.core.mvc import coded_fingerprint
+        prefix = b'\x00\x00\x01'
+        sps, pps, picture = b'\x67\xab\xcd\x80', b'\x68\xab\x80', b'\x65picture\x80'
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp)/'video.avc'
+            def fingerprint(nals, start=prefix):
+                path.write_bytes(b''.join(start+n for n in nals))
+                return coded_fingerprint(path)
+            expected = fingerprint([sps, pps, picture])
+            self.assertEqual(expected, fingerprint([b'\x09\xf0', sps, pps, sps, b'\x06SEI\x80', picture], b'\x00'+prefix))
+            self.assertNotEqual(expected, fingerprint([sps, pps, picture.replace(b'picture', b'changed')]))
+            self.assertNotEqual(expected, fingerprint([sps.replace(b'\xab', b'\xac'), pps, picture]))
+            self.assertNotEqual(expected, fingerprint([sps, pps, picture, picture]))
+            a, b = b'\x41A\x80', b'\x41B\x80'
+            self.assertNotEqual(fingerprint([sps, pps, a, b]), fingerprint([sps, pps, b, a]))
+            with self.assertRaises(ValueError):
+                fingerprint([sps, pps])
+
     def test_stream_rewrite_is_bounded_idempotent_and_preserves_slices(self):
         from transcora.core.mvc import annex_nals, tag_generated_stream, tag_sps
         import io

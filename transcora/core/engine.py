@@ -180,6 +180,7 @@ class Plan:
 
     @property
     def summary(self) -> str:
+        from .audio import summary as audio_summary
         video = self.info["video"]
         rate = video.get("avg_frame_rate", "?")
         try:
@@ -200,7 +201,7 @@ class Plan:
         return (f"{video['width']} × {video['height']} · {video.get('codec_name', '?')} · "
                 f"{fps} fps ({rate}){timing} → {self.size[0]} × {self.size[1]} · "
                 f"{codec} / {self.pixel_format}\n{self.layout_reason}\n"
-                f"{self.stereo_summary}\n{self.output}")
+                f"{self.stereo_summary}\n{audio_summary(self.info, self.options)}\n{self.output}")
 
 
 def build_graph(video: dict, options: Options, layout: str, swap: bool, colors: dict,
@@ -308,14 +309,17 @@ def build_graph(video: dict, options: Options, layout: str, swap: bool, colors: 
 
 
 def plan_job(tools: Toolchain, job: Job, output_root: Path, reserved: set[str],
-             cancel: threading.Event | None = None, capabilities: dict | None = None) -> Plan:
+             cancel: threading.Event | None = None, capabilities: dict | None = None, phase=None) -> Plan:
     options = Options.from_dict(vars(job.options))  # Freeze decisions for execution.
     catalog = methods()
     if options.method not in catalog:
         raise ValueError("Anaglyphenverfahren nicht im geprüften Batch-Katalog.")
     before = job.source.stat() if job.source.is_file() else None
     from .multiview import inspect_source, graph_prefix
-    info = inspect_source(tools, job.source, cancel, options.layout)
+    def stage(text):
+        if phase:
+            phase(('BD-3D: ' if options.target == 'bd3d' else 'Testen: ')+text)
+    info = inspect_source(tools, job.source, cancel, options.layout, phase=stage)
     after = job.source.stat()
     if not before or (before.st_mtime_ns, before.st_size) != (after.st_mtime_ns, after.st_size):
         raise ValueError("Die Quelldatei wurde während der Prüfung geändert.")
@@ -350,10 +354,12 @@ def plan_job(tools: Toolchain, job: Job, output_root: Path, reserved: set[str],
             raise ValueError('Diese Quelle enthält echte Multiview-Ansichten. Automatisch oder das passende Multiview-Format wählen.')
         if options.target == 'framerate':
             raise ValueError('Nur Framerate ändern erhält gepackte SBS/OU-Quellen. Für MVC/MV-HEVC zuerst das gewünschte Ausgabe-Layout wählen.')
-        layout, swap = 'full_sbs', options.swap
+        layout, swap = 'full_sbs', options.swap ^ bool(multiview.get('base_view_right', False))
         warnings.append('Zwei vollständige Multiview-Halbbilder werden dekodiert.')
         if multiview['kind'] == 'mvc':
-            warnings.append('MVC: Basisansicht wird als links verwendet. Bei rechts kodierter Basisansicht L/R tauschen wählen.')
+            warnings.append('MVC: Basisansicht laut Blu-ray-Playlist '+('rechts' if multiview['base_view_right'] else 'links')+'.'
+                if 'base_view_right' in multiview else
+                'MVC: Basisansicht als links angenommen. Reihenfolge im Kontrollbild prüfen; L/R tauschen ist verfügbar.')
         if multiview.get('playlist'):
             warnings.append('Blu-ray-ISO: Längste Film-Playlist '+multiview['playlist']+' ausgewählt.')
     elif options.layout == "auto":
@@ -392,11 +398,9 @@ def plan_job(tools: Toolchain, job: Job, output_root: Path, reserved: set[str],
     warnings.extend(color_warnings)
     if any(s.get("codec_type") == "subtitle" for s in info["streams"]):
         warnings.append("Untertitel werden in Version 0.1 nicht übernommen.")
-    audios = [s for s in info["streams"] if s.get("codec_type") == "audio"]
-    if options.container == "mp4":
-        unsupported = {s.get("codec_name", "?") for s in audios} - {"aac", "mp3", "ac3", "eac3", "alac"}
-        if unsupported:
-            raise ValueError("Audio passt nicht zum MP4-Kopierprofil (" + ", ".join(sorted(unsupported)) + "). MKV wählen.")
+    from .audio import validate
+    stage('Auflösung, Bildrate und Tonoptionen prüfen')
+    audios = validate(info, options)
     if options.target == "anaglyph":
         warnings.append(COMPATIBILITY_NOTE
                         if options.profile == "compatible" else "4:4:4 wird nicht von allen Playern/Hardwaredecodern unterstützt.")
@@ -407,7 +411,7 @@ def plan_job(tools: Toolchain, job: Job, output_root: Path, reserved: set[str],
         preparation = prepare(video, layout, swap)
         validate_audio(audios)
         warnings.extend(preparation.warnings)
-        warnings.append('BD-3D: Bildzeiten und beide Halbbilder werden beim Export vollständig geprüft. Ton wird als LPCM gespeichert.')
+        warnings.append('BD-3D: Bildzeiten und beide Halbbilder werden beim Export vollständig geprüft. Gewählter Ton wird als LPCM gespeichert.')
         graph, size, pixel_format = preparation.graph, (1920, 1080), 'yuv420p'
     else:
         graph, size, pixel_format = build_graph(video, options, layout, swap, colors, catalog[options.method])
@@ -449,7 +453,7 @@ def command(tools: Toolchain, plan: Plan, temporary: Path) -> list[str]:
             *(['-xerror', '-err_detect', 'explode'] if mv else []),
             "-progress", "pipe:1", "-stats_period", "0.3",
             "-protocol_whitelist", "file,pipe", "-noautorotate", *input_args(plan),
-            "-filter_complex", plan.graph, "-map", "[v]", "-map", "1:a?" if plan.info.get('runtime_input') else "0:a?", "-sn", "-dn",
+            "-filter_complex", plan.graph, "-map", "[v]", "-sn", "-dn",
             "-map_metadata", "-1", "-c:v", "libx264" if options.codec == "h264" else "libx265",
             "-preset", "slow", "-pix_fmt", plan.pixel_format,
             "-fps_mode", "passthrough", "-enc_time_base", "1/" + str(math.lcm(frame_rate(options.target_fps).numerator,
@@ -461,9 +465,8 @@ def command(tools: Toolchain, plan: Plan, temporary: Path) -> list[str]:
         args += ["-b:v", str(round(options.bitrate_mbps * 1_000_000))]
     else:
         args += ["-crf", str(options.crf)]
-    for index, audio in enumerate(s for s in plan.info['streams'] if s.get('codec_type') == 'audio'):
-        if audio.get('codec_name') == 'pcm_bluray':
-            args += [f'-c:a:{index}', 'flac', f'-sample_fmt:a:{index}', 's32', f'-bits_per_raw_sample:a:{index}', '24']
+    from .audio import arguments
+    args += arguments(plan.info, options, 1 if plan.info.get('runtime_input') else 0)
     layout = {("sbs", False): "left_right", ("sbs", True): "right_left",
               ("ou", False): "top_bottom", ("ou", True): "bottom_top"}.get(plan.stereo, "mono")
     args += ["-metadata:s:v:0", "stereo_mode=" + layout]
@@ -488,11 +491,15 @@ def verify(tools: Toolchain, plan: Plan, path: Path, cancel: threading.Event) ->
     if any(video.get(k) != plan.colors[v] for k, v in (
             ("color_space", "matrix"), ("color_transfer", "transfer"), ("color_primaries", "primaries"), ("color_range", "range"))):
         raise ValueError("Die Farbkennzeichnung der Ausgabe stimmt nicht mit dem Plan überein.")
-    expected_audio = [('flac' if s.get('codec_name') == 'pcm_bluray' else s.get('codec_name'))
-                      for s in plan.info['streams'] if s.get('codec_type') == 'audio']
+    from .audio import selected, codec, channels
+    tracks = selected(plan.info, plan.options)
+    expected_audio = [codec(s, plan.options) for s in tracks]
     actual_audio = [s.get("codec_name") for s in info["streams"] if s.get("codec_type") == "audio"]
     if actual_audio != expected_audio:
         raise ValueError("Die Audioübernahme stimmt nicht mit der Quelle überein.")
+    actual_channels = [s.get('channels') for s in info['streams'] if s.get('codec_type') == 'audio']
+    if actual_channels != [channels(s, plan.options) for s in tracks]:
+        raise ValueError('Die Kanalzahl des ausgegebenen Tons stimmt nicht mit dem Plan überein.')
     if metadata_layout(video) != plan.stereo:
         raise ValueError("Die Stereo-Kennzeichnung der Ausgabe stimmt nicht mit dem Plan überein: " + json.dumps(video.get('side_data_list', [])))
     if plan.options.container == "mp4" and plan.stereo:

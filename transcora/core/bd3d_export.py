@@ -16,7 +16,7 @@ import time
 from .bd3d import BD_RATE, prepare, Cadence, encoder_args, mux_meta
 from .engine import Cancelled, stop_process, publish_without_overwrite, capture, probe
 from .model import app_root
-from .mvc import tag_generated_stream
+from .mvc import tag_generated_stream, coded_fingerprint
 from .naming import default_disc_title
 from .toolchain import process_options
 from .udf import Disc, write_label
@@ -204,14 +204,20 @@ def encode(tools, bd, plan, base, dependent, cancel, emit, log, estimated_frames
         log.flush()
 
 
-def decoded_digest(bd, base, dependent, frames, cancel, log):
+def decoded_digest(bd, base, dependent, frames, cancel, log, emit=None):
     count, digest = 0, hashlib.sha256()
+    last_report = 0
     def pictures(pipe):
-        nonlocal count
+        nonlocal count, last_report
         while chunk := pipe.read(1024*1024):
             check_cancel(cancel)
             count += len(chunk)
             digest.update(chunk)
+            now = time.monotonic()
+            if emit and (now-last_report >= .5 or count == frames*FRAME_BYTES):
+                last_report = now
+                emit('progress', {'percent': 93+6*min(1, count/(frames*FRAME_BYTES)),
+                                  'seconds': count/FRAME_BYTES/float(BD_RATE)})
     run([bd.decoder, '-sw', '-i:mvc', base, dependent, '-sbs', '-o', '-'],
         cancel, log, bd.environment, pictures)
     if count != frames*FRAME_BYTES:
@@ -219,7 +225,8 @@ def decoded_digest(bd, base, dependent, frames, cancel, log):
     return digest.hexdigest()
 
 
-def verify_mux(tools, bd, plan, movie, base, dependent, frames, expected_hash, audios, cancel, log, folder, emit=None):
+def verify_mux(tools, bd, plan, movie, base, dependent, frames, fingerprints, audios, cancel, log, folder, emit=None):
+    from .audio import channels
     info = json.loads(capture([str(tools.ffprobe), '-v', 'error', '-protocol_whitelist', 'file,pipe',
                                '-show_streams', '-show_format', '-of', 'json', str(movie)], cancel))
     base_tracks = [s for s in info.get('streams', []) if s.get('id') == '0x1011' and s.get('codec_name') == 'h264']
@@ -234,7 +241,7 @@ def verify_mux(tools, bd, plan, movie, base, dependent, frames, expected_hash, a
         raise ValueError('BD-3D: Bildrate oder Farbkennzeichnung falsch.')
     tracks = [s for s in info['streams'] if s.get('codec_type') == 'audio']
     if len(tracks) != len(audios) or any(s.get('codec_name') != 'pcm_bluray' or s.get('sample_rate') != '48000'
-            or s.get('channels') != original.get('channels') or s.get('bits_per_raw_sample') != '24'
+            or s.get('channels') != channels(original, plan.options) or s.get('bits_per_raw_sample') != '24'
             for s, original in zip(tracks, audios)):
         raise ValueError('BD-3D: Verlustfreie Audioübernahme stimmt nicht mit der Quelle überein.')
     if any(abs(float(s.get('start_time', '0'))-float(video.get('start_time', '0'))) > 1/48000+.000001 for s in tracks):
@@ -246,20 +253,39 @@ def verify_mux(tools, bd, plan, movie, base, dependent, frames, expected_hash, a
                     f'V_MPEG4/ISO/MVC, "{movie}", track=4114\n', encoding='utf-8')
     run([bd.muxer, meta, demux], cancel, log, bd.environment)
     avc, mvc = list(demux.glob('*.264')), list(demux.glob('*.mvc'))
-    if len(avc) != 1 or len(mvc) != 1 or decoded_digest(bd, avc[0], mvc[0], frames, cancel, log) != expected_hash:
-        raise ValueError('BD-3D: Beide Halbbilder der gemuxten Ausgabe stimmen nicht mit der Kodierung überein.')
+    if len(avc) != 1 or len(mvc) != 1:
+        raise ValueError('BD-3D: Beide Halbbilder fehlen in der fertigen Ausgabe.')
+    if emit:
+        emit('phase', 'BD-3D: Kodierte Bilddaten mit der fertigen Ausgabe vergleichen')
+    for path, expected in zip((avc[0], mvc[0]), fingerprints):
+        if coded_fingerprint(path, lambda: check_cancel(cancel)) != expected:
+            raise ValueError('BD-3D: Kodierte Halbbilder oder Bildparameter wurden beim Verpacken verändert.')
+    if emit:
+        emit('phase', 'BD-3D: Fertige Ausgabe vollständig dekodieren und beide Halbbilder prüfen')
+    return decoded_digest(bd, avc[0], mvc[0], frames, cancel, log, emit)
 
 
 def export(tools, plan, cancel, emit, log_path, decoder=None):
+    from .audio import selected, channels
     bd = BdTools.find()
     config = prepare(plan.info['video'], plan.layout, plan.swap)
-    audios = [s for s in plan.info['streams'] if s.get('codec_type') == 'audio']
+    audios = selected(plan.info, plan.options)
     validate_audio(audios)
     plan.output.parent.mkdir(parents=True, exist_ok=True)
     log_path.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='.transcora-bd3d-', dir=plan.output.parent) as tmp, log_path.open('a', encoding='utf-8') as log:
         folder = Path(tmp)
         log.write('\nBD-3D '+json.dumps({'source': str(plan.source), 'output': str(plan.output), 'options': vars(plan.options)}, ensure_ascii=False)+'\n')
+        phase_started, previous_phase = time.monotonic(), None
+        def phase(text):
+            nonlocal phase_started, previous_phase
+            now = time.monotonic()
+            if previous_phase:
+                log.write(f'PHASE COMPLETED {now-phase_started:.3f}s {previous_phase}\n')
+            previous_phase, phase_started = text, now
+            log.write('PHASE '+text+'\n')
+            log.flush()
+            emit('phase', text)
         def unchanged():
             stat = plan.source.stat()
             if (stat.st_mtime_ns, stat.st_size) != (plan.info['source_mtime_ns'], plan.info['source_size']):
@@ -270,33 +296,32 @@ def export(tools, plan, cancel, emit, log_path, decoder=None):
             raise ValueError('BD-3D: Laufzeit für die Platzprüfung fehlt.')
         estimated_frames = max(2, round(duration*float(BD_RATE)))
         # Compressed views, audio, mux, extracted SSIF and demux; no raw video files.
-        required = duration*(40000*1000/8*4 + sum(s['channels']*48000*3 for s in audios)) + 256*1024*1024
+        required = duration*(40000*1000/8*4 + sum(channels(s, plan.options)*48000*3 for s in audios)) + 256*1024*1024
         if shutil.disk_usage(folder).free < required:
             raise ValueError(f'BD-3D: Für Ausgabe und Prüfdaten werden ungefähr {required/1024**3:.1f} GB freier Platz benötigt.')
-        for s in audios:
-            if duration*s['channels']*48000*3 >= 0xffff0000:
-                raise ValueError('BD-3D: Diese Audiospur überschreitet das geprüfte WAV-Limit von 4 GB. Kürzere Abschnitte verwenden.')
         emit('progress', {'percent': 5, 'seconds': 0})
-        emit('phase', 'BD-3D: Beide Halbbilder in hoher Qualität kodieren')
+        phase('BD-3D: Beide Halbbilder in hoher Qualität kodieren')
         base, dependent = folder/'base.avc', folder/'dependent.mvc'
         frames, video_start = encode(tools, bd, plan, base, dependent, cancel, emit, log, estimated_frames, decoder)
         duration = frames/float(BD_RATE)
-        emit('phase', 'BD-3D: Farbkennzeichnung und beide Halbbilder prüfen')
+        phase('BD-3D: BT.709-Farbkennzeichnung in beiden Bildspuren setzen')
         for p in (base, dependent):
             log.write(f'BT709 {p.name}: {tag_generated_stream(p, lambda: check_cancel(cancel))} parameter sets\n')
-        expected_hash = decoded_digest(bd, base, dependent, frames, cancel, log)
+        phase('BD-3D: Kodierte Bilddaten für den Ausgabevergleich erfassen')
+        fingerprints = [coded_fingerprint(p, lambda: check_cancel(cancel)) for p in (base, dependent)]
         emit('progress', {'percent': 80, 'seconds': duration})
         audio_paths = []
         samples = round(duration*48000)
         for number, audio in enumerate(audios):
-            emit('phase', f'BD-3D: Audiospur {number+1} verlustfrei vorbereiten')
-            path = folder/f'audio-{number}.wav'
+            phase(f'BD-3D: Audiospur {number+1} als LPCM vorbereiten')
+            path = folder/f'audio-{number}.w64'
             af = f'asetpts=PTS-{video_start}/TB,aresample=48000:async=1:first_pts=0,'+config.audio_filter+f',apad,atrim=end_sample={samples}'
             run([tools.ffmpeg, '-hide_banner', '-nostdin', '-v', 'error', '-n', '-copyts', '-protocol_whitelist',
                  'file,pipe', '-i', plan.info.get('runtime_input', {}).get('source', plan.source), '-map', f"0:{audio['index']}", '-af', af, '-ar', '48000',
-                 '-c:a', 'pcm_s24le', path], cancel, log, bd.environment)
+                 *(['-ac', '2'] if plan.options.audio_channels == 'stereo' else []),
+                 '-c:a', 'pcm_s24le', '-f', 'w64', path], cancel, log, bd.environment)
             audio_paths.append((path, audio.get('tags', {}).get('language', 'und')))
-        emit('phase', 'BD-3D: '+('Blu-ray-ISO erstellen' if plan.options.container == 'iso' else 'M2TS erstellen'))
+        phase('BD-3D: '+('Blu-ray-ISO erstellen' if plan.options.container == 'iso' else 'M2TS erstellen'))
         movie = folder/('movie.'+plan.options.container)
         meta = folder/'movie.meta'
         label = plan.options.disc_title or default_disc_title(plan.source)
@@ -304,7 +329,7 @@ def export(tools, plan, cancel, emit, log_path, decoder=None):
                                  label=label, audios=audio_paths), encoding='utf-8')
         run([bd.muxer, meta, movie], cancel, log, bd.environment)
         emit('progress', {'percent': 90, 'seconds': duration})
-        emit('phase', 'BD-3D: Fertige Ausgabe und beide Halbbilder prüfen')
+        phase('BD-3D: Fertige Ausgabe und Blu-ray-Struktur prüfen')
         packed = movie
         if plan.options.container == 'iso':
             write_label(movie, label)
@@ -321,9 +346,12 @@ def export(tools, plan, cancel, emit, log_path, decoder=None):
                         raise ValueError('BD-3D: Blu-ray-Struktur unvollständig.')
                 packed = folder/'verified.ssif'
                 disc.extract('BDMV/STREAM/SSIF/00000.ssif', packed, lambda: check_cancel(cancel))
-        verify_mux(tools, bd, plan, packed, base, dependent, frames, expected_hash, audios, cancel, log, folder, emit)
+        def verification_event(kind, value):
+            phase(value) if kind == 'phase' else emit(kind, value)
+        expected_hash = verify_mux(tools, bd, plan, packed, base, dependent, frames, fingerprints, audios, cancel, log, folder, verification_event)
         unchanged()
         check_cancel(cancel)
         publish_without_overwrite(movie, plan.output, cancel)
+        log.write(f'PHASE COMPLETED {time.monotonic()-phase_started:.3f}s {previous_phase}\n')
         log.write(f'VERIFIED BD3D frames={frames} rate={BD_RATE} both_views_sha256={expected_hash}\nCOMPLETED {plan.output}\n')
         emit('progress', {'percent': 100, 'seconds': duration})

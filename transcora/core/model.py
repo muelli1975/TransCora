@@ -22,6 +22,9 @@ COMPATIBILITY_NOTE = ("Breitere Player-Unterstützung, jedoch mit deutlich gerin
                       "Farbdetails und farbige Kanten können sichtbar leiden. "
                       "Für hochwertige Anaglyphen wird 4:4:4 empfohlen.")
 FPS_CHOICES = ("23,976", "24", "25", "29,97", "30", "50", "59,94", "60")
+AUDIO_FORMATS = {'copy': 'Original beibehalten', 'aac': 'AAC · Hohe Kompatibilität'}
+AUDIO_TRACKS = {'all': 'Alle übernehmen', 'selected': 'Ausgewählte Spuren', 'none': 'Ohne Ton'}
+AUDIO_CHANNELS = {'source': 'Quelle beibehalten', 'stereo': 'In Stereo umwandeln'}
 
 
 def frame_rate(value: str) -> Fraction:
@@ -59,6 +62,10 @@ class Options:
     rate_mode: str = "crf"
     crf: float = 18.0
     bitrate_mbps: float = 20.0
+    audio_format: str = 'copy'
+    audio_tracks: str = 'all'
+    audio_selection: str = '1'
+    audio_channels: str = 'source'
 
     @classmethod
     def from_dict(cls, data: dict) -> "Options":
@@ -87,6 +94,12 @@ class Options:
             raise ValueError("Ungültige L/R-Einstellung.")
         if not isinstance(self.method, str):
             raise ValueError("Ungültiges Anaglyphenverfahren.")
+        for name, choices in (('audio_format', AUDIO_FORMATS), ('audio_tracks', AUDIO_TRACKS),
+                              ('audio_channels', AUDIO_CHANNELS)):
+            if getattr(self, name) not in choices:
+                raise ValueError('Ungültige Toneinstellung: '+name+'.')
+        from .audio import selection_numbers
+        selection_numbers(self.audio_selection)
         if self.suffix is not None and (not isinstance(self.suffix, str) or len(self.suffix) > 80
                 or re.search(r'[<>:"/\\|?*\x00-\x1f]', self.suffix) or self.suffix.endswith((" ", "."))):
             raise ValueError("Dateinamenszusatz: Höchstens 80 Zeichen, ohne Pfad- oder ungültige Dateizeichen.")

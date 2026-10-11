@@ -7,6 +7,8 @@ This adapter is deliberately restricted to FRIM's generated High/Stereo High.
 import re
 import os
 import uuid
+import hashlib
+import struct
 from pathlib import Path
 
 
@@ -165,3 +167,30 @@ def tag_generated_stream(path: Path, check=None) -> int:
         return count
     finally:
         temporary.unlink(missing_ok=True)
+
+
+def coded_fingerprint(path: Path, check=None):
+    """Compare coded pictures and parameter sets despite muxer-added AUD/SEI.
+
+    tsMuxeR repeats parameter sets and may change Annex-B start code length.
+    The ordered slice/prefix payloads and the distinct SPS/PPS payloads must
+    remain identical. This is not a substitute for decoding the final movie.
+    """
+    digest, parameters, count = hashlib.sha256(), set(), 0
+    with path.open('rb') as source:
+        for _, nal in annex_nals(source, check):
+            nal = nal.rstrip(b'\x00')  # Annex-B trailing_zero_8bits, outside RBSP.
+            if not nal:
+                raise ValueError('BD-3D: Leere NAL-Einheit in der Bildspur.')
+            kind = nal[0]&31
+            if kind in (7, 8, 15):
+                parameters.add(nal)
+            elif kind in (1, 5, 14, 20):
+                digest.update(struct.pack('>Q', len(nal)))
+                digest.update(nal)
+                count += kind != 14
+            elif kind not in (6, 9, 10, 11, 12):
+                raise ValueError(f'BD-3D: Unerwartete NAL-Einheit {kind} in der Bildspur.')
+    if not count or not parameters:
+        raise ValueError('BD-3D: Kodierte Bilder oder Parameter fehlen.')
+    return digest.hexdigest(), frozenset(parameters), count

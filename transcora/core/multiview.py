@@ -36,6 +36,17 @@ def raw_probe(tools, source, cancel):
     return result, videos
 
 
+def playlist_base_right(data):
+    # AppInfoPlayList follows the fixed 40-byte MPLS header. The flag is the
+    # fourth bit after the 64-bit UO mask (libbluray/tsMuxeR layout).
+    if len(data) < 58 or data[:4] != b'MPLS':
+        raise ValueError('Blu-ray: AppInfoPlayList fehlt.')
+    length = int.from_bytes(data[40:44], 'big')
+    if length < 14 or 44+length > len(data):
+        raise ValueError('Blu-ray: AppInfoPlayList ist abgeschnitten.')
+    return bool(data[56] & 0x10)
+
+
 def iso_film(source):
     """Select the longest complete single-clip MVC playlist; never select a bonus instead."""
     from .udf import Disc
@@ -68,16 +79,17 @@ def iso_film(source):
                 clips.append((clip, int.from_bytes(item[12:16], 'big'), int.from_bytes(item[16:20], 'big')))
                 pos += 2+length
             if clips:
-                films.append((duration, name, clips))
+                films.append((duration, name, clips, playlist_base_right(data)))
         if not films:
             raise ValueError('Keine Film-Playlist in der Blu-ray-ISO.')
-        _, playlist, clips = max(films)
+        _, playlist, clips, base_right = max(films)
         if len(clips) != 1:
             raise ValueError('Diese Blu-ray verwendet mehrere Clips pro Film. Seamless Branching ist noch nicht freigegeben.')
         path = 'BDMV/STREAM/SSIF/'+clips[0][0]+'.ssif'
         disc.locate(path)
         # Trimming and alternate-angle branching need a dedicated playlist reader.
-        return {'iso_path': path, 'playlist': playlist, 'in': clips[0][1], 'out': clips[0][2]}
+        return {'iso_path': path, 'playlist': playlist, 'in': clips[0][1], 'out': clips[0][2],
+                'base_view_right': base_right}
 
 
 def iso_extract(source, descriptor, destination, cancel, sample=False):
@@ -250,14 +262,18 @@ def packet_clock(tools, source, desc, rate, cancel):
     return len(stamps)
 
 
-def inspect_source(tools, source, cancel=None, explicit='auto'):
+def inspect_source(tools, source, cancel=None, explicit='auto', phase=None):
     from .engine import capture
     from .mvc import annex_nals
     with tempfile.TemporaryDirectory(prefix='transcora-input-') as tmp:
         folder = Path(tmp)
+        if phase:
+            phase('Blu-ray-Playlist prüfen' if source.suffix.lower() == '.iso' else 'Video und Tonspuren analysieren')
         disc = iso_film(source) if source.suffix.lower() == '.iso' else None
         actual = source
         if disc:
+            if phase:
+                phase('Blu-ray-Filmdatei für die Prüfung lesen')
             actual = folder/'sample.ssif'
             iso_extract(source, disc, actual, cancel, sample=True)
         info, videos = raw_probe(tools, actual, cancel)
@@ -274,6 +290,8 @@ def inspect_source(tools, source, cancel=None, explicit='auto'):
                 raise ValueError('MV-HEVC: Zwei eindeutig als links/rechts gekennzeichnete Ansichten sind erforderlich.')
             desc = {'kind': 'mvhevc', 'source_index': video['index']}
         elif video.get('codec_name') == 'h264':
+            if phase:
+                phase('MVC-Kennzeichnung und beide Halbbilder prüfen')
             if len(videos) > 1:
                 if len(videos) != 2 or any(v.get('codec_name') != 'h264' for v in videos):
                     raise ValueError('MVC: Keine eindeutige AVC/MVC-Spurkombination.')
