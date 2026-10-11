@@ -59,7 +59,7 @@ window.progress['value'] = 94
 snap(root, 'bd3d-check.png')
 window.toggle_advanced()
 window.show_log()
-log = next(w for w in root.winfo_children() if isinstance(w, tk.Toplevel) and w.winfo_ismapped())
+log = next(w for w in root.winfo_children() if isinstance(w, tk.Toplevel) and w.title() == 'TransCora · Log')
 snap(log, 'log.png')
 log.destroy()
 viewer = PreviewWindow(root, lambda t: None)
