@@ -16,11 +16,12 @@ from transcora.core.engine import Cancelled
 from transcora.core.model import app_root, ROW_ORDERS
 from transcora.core.storage import write_json, new_run_log, validate_preset_name
 from transcora.core.toolchain import Toolchain
+from transcora.core.journal import Journal, Completion, request, restore, processing_text
 from .theme import checkbox, set_control_state, GOLD_LIGHT, MUTED, SECONDARY_BG, TEXT, APP_BG
 from .native import schedule_dark_titlebar
 from .localization import TextVar
 from .settings_area import SettingsArea, section, CurrentFile
-from .file_list import FileListSorter
+from .file_list import FileListSorter, remove_entries, completed_button
 
 STATUS = {'queued': 'Wartet', 'ready': 'Bereit', 'running': 'Läuft', 'completed': 'Fertig',
           'blocked': 'Prüfen!', 'failed': 'Fehler', 'cancelled': 'Abgebrochen'}
@@ -58,13 +59,13 @@ class ImagePanel:
         self.controls.append((self.preset_button, 'normal')); self.menu = owner.dark_menu(self.preset_button)
         self.menu.configure(postcommand=self.preset_menu); self.preset_button.configure(menu=self.menu)
         holder = ttk.Frame(box); holder.grid(row=2, column=0, sticky='nsew'); holder.rowconfigure(0, weight=1); holder.columnconfigure(0, weight=1)
-        self.tree = ttk.Treeview(holder, columns=('file', 'task', 'target', 'status'), show='headings', height=8, selectmode='extended')
-        for key, title, width in [('file', 'Datei', 300), ('task', 'Aufgabe', 165), ('target', 'Ziel', 200), ('status', 'Status', 95)]:
+        self.tree = ttk.Treeview(holder, columns=('file', 'task', 'target', 'status', 'processing'), show='headings', height=8, selectmode='extended')
+        for key, title, width in [('file', 'Datei', 260), ('task', 'Aufgabe', 155), ('target', 'Ziel', 185), ('status', 'Status', 80), ('processing', 'Bearbeitungszeit', 126)]:
             self.tree.heading(key, text=title); self.tree.column(key, width=width, stretch=key == 'file', minwidth=120 if key == 'file' else width)
         self.tree.grid(row=0, column=0, sticky='nsew'); scroll = ttk.Scrollbar(holder, command=self.tree.yview)
         scroll.grid(row=0, column=1, sticky='ns'); self.tree.configure(yscrollcommand=scroll.set)
         self.tree.bind('<<TreeviewSelect>>', self.selection_changed)
-        self.sorter = FileListSorter(self,dict(file='Datei',task='Aufgabe',target='Ziel',status='Status'))
+        self.sorter = FileListSorter(self,dict(file='Datei',task='Aufgabe',target='Ziel',status='Status',processing='Bearbeitungszeit'))
         self.tree.bind('<Control-a>', self.select_all)
         self.tree.bind('<Control-A>', self.select_all)
         if self.tree.tk.call('tk', 'windowingsystem') == 'aqua':
@@ -76,6 +77,9 @@ class ImagePanel:
         ttk.Label(scope,textvariable=self.scope,foreground=MUTED).pack(side='left')
         self.reset_button = self.button(scope,'Standardeinstellungen',self.reset_defaults)
         self.reset_button.pack(side='right')
+        self.remove_completed_button = self.button(scope, 'Fertige entfernen', self.remove_completed)
+        self.remove_completed_button.pack(side='right', padx=(0, 6))
+        completed_button(self)
         self.settings_area = SettingsArea(box)
         fields = self.settings_area.body
         _, source_fields = section(fields,0,'Quelle')
@@ -181,6 +185,21 @@ class ImagePanel:
         self.progress = ttk.Progressbar(box, mode='determinate', maximum=100); self.progress.grid(row=11, column=0, sticky='ew', pady=(8, 3))
         self.status = TextVar(owner.localizer, value='Bereit.'); ttk.Label(box, textvariable=self.status).grid(row=10, column=0, sticky='ew')
         self.current_file = CurrentFile(box,owner.localizer,9)
+        self.output.trace_add('write', self.output_changed)
+
+    def restore_result(self, job):
+        return restore(job, Path(self.output.get()).expanduser(), 'image', self.owner.journal_notice)
+
+    def output_changed(self, *args):
+        if self.busy or self.owner.busy:
+            return
+        for job in self.jobs:
+            job.result = None
+            job.status = 'queued'
+            job.detail = 'Ausgabeziel geändert; erneut prüfen.'
+            self.restore_result(job)
+        self.refresh()
+        self.selection_changed()
 
     def reset_defaults(self):
         if self.busy or self.owner.busy:return
@@ -266,7 +285,12 @@ class ImagePanel:
             if not selection:
                 self.defaults = updated(self.defaults)
             for job in selection:
-                job.options = updated(job.options); job.status = 'queued'; job.detail = 'Einstellungen geändert; erneut testen.'
+                options = updated(job.options)
+                if options == job.options:
+                    continue
+                job.options = options; job.status = 'queued'; job.detail = 'Einstellungen geändert; erneut testen.'
+                job.result = None
+                self.restore_result(job)
             self.refresh(); self.selection_changed()
         except (ValueError, StopIteration) as error:
             if key in {'size_pixels', 'screen_width', 'screen_height'}:
@@ -306,6 +330,7 @@ class ImagePanel:
         self.option_frames['method'].grid() if opts.task=='convert' and opts.target=='anaglyph' else self.option_frames['method'].grid_remove()
         self.option_frames['quality'].grid() if opts.format=='jpeg' and opts.task=='convert' else self.option_frames['quality'].grid_remove()
         self.preview_button.configure(state='normal' if not self.busy and not self.owner.busy and len(self.selected()) == 1 else 'disabled')
+        completed_button(self)
         self.custom_size.pack(fill='x', pady=(4, 0)) if opts.task == 'convert' and opts.size_mode == 'custom' and not rows else self.custom_size.pack_forget()
         self.size_entry.configure(state='normal' if opts.task == 'convert' and opts.size_mode == 'custom' and not rows and not self.busy else 'disabled')
         for key, combo in self.combos.items():
@@ -328,10 +353,11 @@ class ImagePanel:
 
     def refresh(self):
         for job in self.jobs:
-            values = (job.source.name, self.t(TASKS[job.options.task]), self.t(TARGETS[job.options.target]), self.t(STATUS[job.status]))
+            values = (job.source.name, self.t(TASKS[job.options.task]), self.t(TARGETS[job.options.target]), self.t(STATUS[job.status]), processing_text(job.result))
             if self.tree.exists(job.id): self.tree.item(job.id, values=values)
             else: self.tree.insert('', 'end', iid=job.id, values=values)
         self.sorter.refresh()
+        completed_button(self)
 
     def add_paths(self, paths, source_root=None):
         if self.busy or self.owner.busy: return
@@ -339,7 +365,9 @@ class ImagePanel:
         for item in paths:
             path = Path(item).expanduser().resolve(); key = str(path).casefold()
             if path.suffix.lower() in EXTENSIONS and key not in existing:
-                self.jobs.append(ImageJob(path, replace(self.defaults), source_root)); existing.add(key)
+                job = ImageJob(path, replace(self.defaults), source_root)
+                self.restore_result(job)
+                self.jobs.append(job); existing.add(key)
         self.refresh()
 
 
@@ -363,10 +391,12 @@ class ImagePanel:
         if value: self.output.set(value)
 
     def remove(self):
-        if self.busy: return
-        selected = self.tree.selection(); self.jobs = [j for j in self.jobs if j.id not in selected]
-        for id_ in selected: self.tree.delete(id_)
-        self.selection_changed()
+        if self.sorter.busy(): return
+        remove_entries(self, self.tree.selection())
+
+    def remove_completed(self):
+        if self.sorter.busy(): return
+        remove_entries(self, [j.id for j in self.jobs if j.status == 'completed'])
 
     def load(self):
         value = filedialog.askopenfilename(parent=self.root, filetypes=[(self.t('Bildliste'), '*.json')])
@@ -377,6 +407,7 @@ class ImagePanel:
                 for job in loaded:
                     key = str(job.source.resolve()).casefold()
                     if key not in existing:
+                        self.restore_result(job)
                         self.jobs.append(job); existing.add(key)
                 self.refresh(); self.selection_changed()
             except (ValueError, TypeError, OSError) as error: messagebox.showerror(self.t('Bildliste'), self.t(str(error)), parent=self.root)
@@ -404,7 +435,10 @@ class ImagePanel:
         if self.busy: return
         selected = self.selected()
         if not selected: self.defaults = replace(self.presets[name])
-        for job in selected: job.options = replace(self.presets[name]); job.status = 'queued'; job.detail = 'Voreinstellung geändert.'
+        for job in selected:
+            job.options = replace(self.presets[name]); job.status = 'queued'; job.detail = 'Voreinstellung geändert.'
+            job.result = None
+            self.restore_result(job)
         self.refresh(); self.selection_changed()
 
     def save_preset(self):
@@ -461,6 +495,9 @@ class ImagePanel:
     def run(self, convert):
         if self.busy or self.owner.busy or not self.jobs: return
         if not self.commit_entries(): return
+        for job in self.jobs:
+            self.restore_result(job)
+        self.refresh()
         snapshot = [ImageJob(j.source, replace(j.options), j.source_root, j.id) for j in self.jobs if j.status != 'completed']
         if not snapshot: self.status.set('Alle Bilder sind bereits fertig.'); return
         output = Path(self.output.get()).expanduser().resolve()
@@ -468,10 +505,14 @@ class ImagePanel:
         self.cancel.clear(); self.set_busy(True); self.progress['value'] = 0; self.status.set('Bildstapel prüfen …')
         def worker():
             try:
-                prepared = []; reserved = set(); blocked = failed = completed = 0
+                prepared = []; reserved = set(); receipts = {}; blocked = failed = completed = journal_failures = 0
                 for job in snapshot:
                     if self.cancel.is_set(): raise Cancelled()
                     try:
+                        try:
+                            receipts[job.source.resolve()] = request(job, 'image') if convert else None
+                        except (OSError, ValueError):
+                            receipts[job.source.resolve()] = None
                         plan = plans([job], output, self.cancel, reserved=reserved)[0]
                     except Cancelled:
                         raise
@@ -490,6 +531,7 @@ class ImagePanel:
                         self.events.put(('current',(plan.sources[0].name,number,len(prepared))))
                         self.events.put(('job', (plan.sources, 'running', plan.summary)))
                         try:
+                            file_started = time.monotonic()
                             if plan.options.task != 'mpo' and tools is None:
                                 tools = Toolchain.find()
                             execute_image(tools, plan, self.cancel, lambda kind, data: self.events.put((kind, data)), log)
@@ -500,13 +542,29 @@ class ImagePanel:
                             self.events.put(('job', (plan.sources, 'failed', str(error))))
                             self.owner.events.put(('log', plan.sources[0].name+': '+str(error)))
                         else:
+                            elapsed = max(0, time.monotonic() - file_started)
+                            completion = Completion(plan.outputs, elapsed, {})
+                            try:
+                                if receipts[plan.sources[0]] is None:
+                                    raise ValueError('Quelldaten für den Journalnachweis fehlen.')
+                                completion = Journal(output).complete(receipts[plan.sources[0]], plan.outputs, elapsed,
+                                    effective={'options': asdict(plan.options), 'layout': plan.layout, 'swap': plan.swap, 'size': plan.size},
+                                    tools={'image': 'Pillow ' + Image.__version__})
+                            except (OSError, ValueError) as error:
+                                journal_failures += 1
+                                self.owner.events.put(('log', 'Journal nicht gespeichert: ' + str(error)))
+                                self.events.put(('status', 'Ausgabe fertig; Journal nicht gespeichert.'))
+                            self.events.put(('result', (plan.sources, completion)))
                             completed += 1
                             self.events.put(('job', (plan.sources, 'completed', plan.summary)))
                         left = (time.monotonic()-started)/number*(len(prepared)-number)
                         self.events.put(('progress', (number/len(prepared)*100, f'{number}/{len(prepared)} · Restzeit etwa {left:.0f} s')))
                     if completed: self.owner.events.put(('sound', None))
-                self.events.put(('status', f'Bildstapel abgeschlossen: {completed} erfolgreich · {failed} Fehler · {blocked} blockiert.'
-                                 if convert else f'Bildprüfung abgeschlossen: {len(prepared)} bereit · {blocked} blockiert.'))
+                summary = (f'Bildstapel abgeschlossen: {completed} erfolgreich · {failed} Fehler · {blocked} blockiert.'
+                           if convert else f'Bildprüfung abgeschlossen: {len(prepared)} bereit · {blocked} blockiert.')
+                if journal_failures:
+                    summary += ' · ' + self.t('Journal nicht gespeichert: ') + str(journal_failures)
+                self.events.put(('status', summary))
             except Cancelled: self.events.put(('error', ('cancelled', 'Bildstapel abgebrochen.')))
             except Exception as error: self.events.put(('error', ('failed' if convert else 'blocked', str(error))))
             finally: self.events.put(('done', None))
@@ -546,6 +604,11 @@ class ImagePanel:
                     for job in self.jobs:
                         if job.source.resolve() in sources: job.status = status; job.detail = detail
                     self.refresh(); self.detail.set(detail.replace('\n', ' · ')[:220])
+                elif kind == 'result':
+                    sources, completion = data
+                    for job in self.jobs:
+                        if job.source.resolve() in sources:
+                            job.result = completion
                 elif kind == 'error':
                     status, detail = data; self.status.set(detail); self.owner.log_lines.append(detail)
                     for job in self.jobs:

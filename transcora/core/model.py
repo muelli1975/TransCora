@@ -175,6 +175,7 @@ class Job:
     plan: object | None = None
     source_fps: str | None = None
     source_duration: float | None = None
+    result: object | None = None
 
     def serializable(self) -> dict:
         return {"source": str(self.source), "source_root": str(self.source_root) if self.source_root else None,

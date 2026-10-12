@@ -2,11 +2,14 @@
 
 Stand: 12. Oktober 2026. Entwicklungszweig: `prepare/v1.1`.
 
-Diese Datei beschreibt geplante Funktionen. Sie sind noch nicht in der Anwendung
-implementiert. Grundlage ist `main` bei
+Diese Datei beschreibt den vereinbarten Umfang. Journal, Bearbeitungszeit,
+Listenaktionen und die Bereinigung doppelter Hinweise sind als erster
+Entwicklungsstand implementiert; Pause, neue Eingaben und neue Ausgabeziele folgen.
+Die Abnahme ist im Testplan dokumentiert. Grundlage ist `main` bei
 `7ef801f8aff9697ecd40882a763fdac0cdd2d3fe`; die veröffentlichte 1.0 wurde aus
 `c3f23155db3c56da8377bc7e4dd7bf9bc1eb35e8` gebaut. Die Vorbereitung ändert
-weder die ausgelieferten Funktionen noch das Release `v1.0`.
+weder die ausgelieferten Funktionen noch das Release `v1.0`; Anwendungscode von
+1.1 bleibt bis zur Freigabe ausschließlich auf dem Entwicklungszweig.
 
 ## 1. Dateiliste und Bedienung
 
@@ -33,6 +36,9 @@ weder die ausgelieferten Funktionen noch das Release `v1.0`.
   Bedienung dürfen nicht durch eine spätere Aktualisierung zurückgesetzt werden.
 - Konsequent **Halbbild/Halbbilder** in deutschen Oberflächentexten und Anleitungen.
   Technische Bezeichnungen wie **Frame sequential** bleiben in beiden Sprachen.
+- Hinweise nur einmal über alle Infobereiche hinweg anzeigen. Gold, Fettschrift
+  und Warndreieck ausschließlich bei erforderlicher Benutzerhandlung. Übliche
+  SDR-Farbannahmen, Ablaufhinweise und normale Statusmeldungen bleiben neutral.
 
 Betroffene Stellen: `gui/window.py`, `gui/images_panel.py`, `gui/file_list.py`,
 Jobmodelle in `core/model.py` und `core/images.py`, vorhandene GUI-Übersetzungen.

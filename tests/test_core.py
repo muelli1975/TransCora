@@ -43,8 +43,8 @@ class CoreTests(unittest.TestCase):
             inferred=dict(video)
             for key in ('color_space','color_primaries','color_transfer'):inferred.pop(key)
             inferred_plan=planned(Options(layout='full_sbs',target='bd3d',container='iso'),inferred)
-            self.assertTrue(inferred_plan.review_warnings)
-            self.assertTrue(all(note.startswith('Farbannahme') for note in inferred_plan.review_warnings))
+            self.assertTrue(any(note.startswith('Farbannahme') for note in inferred_plan.warnings))
+            self.assertEqual(inferred_plan.review_warnings, [])
 
     def test_catalog_is_exactly_batch_without_cielab(self):
         batch = (app_root() / 'reference/AnaglyphBatch_DE.bat').read_text(encoding='utf-8-sig')

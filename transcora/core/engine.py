@@ -501,7 +501,8 @@ def plan_job(tools: Toolchain, job: Job, output_root: Path, reserved: set[str],
         raise ValueError("Das gepackte Raster lässt sich nicht in zwei gleich große Halbbilder teilen.")
     colors, color_warnings = color_spec(video, layout)
     warnings.extend(color_warnings)
-    review_warnings.extend(color_warnings)
+    # Established SDR defaults are explanations, not requests for user action.
+    # Unsupported/ambiguous input still reports its existing actionable error.
     if layout.startswith('half_') and options.target in {'full_sbs', 'full_ou', 'cross_sbs'}:
         warnings.append('Half → Full: Die gestauchte Achse wird hochskaliert. Verlorene Bilddetails werden nicht wiederhergestellt.')
     if any(s.get("codec_type") == "subtitle" for s in info["streams"]):
@@ -553,6 +554,8 @@ def plan_job(tools: Toolchain, job: Job, output_root: Path, reserved: set[str],
     reason = (f"{multiview['kind'].upper()} · Zwei vollständige Halbbilder aus dem Bitstream" if multiview else
               f"{LAYOUTS[layout]} · " + ((f"erkannt am Dateizusatz in {job.source.name}" if filename_layout(job.source.stem)
                   else 'erkannt an Stereo-Metadaten und Halbbildgeometrie') if options.layout == "auto" else "manuell gewählt"))
+    warnings = list(dict.fromkeys(warnings))
+    review_warnings = list(dict.fromkeys(review_warnings))
     return Plan(job.source.resolve(), output, options, info, layout, swap, size, pixel_format, graph, duration, warnings, output_colors, reason, review_warnings)
 
 

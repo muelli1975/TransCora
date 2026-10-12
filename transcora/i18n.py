@@ -2,6 +2,20 @@
 import re
 LANGUAGES = {'de': 'Deutsch', 'en': 'English'}
 EN = {'Log':'Log', 'Kopieren':'Copy', 'Video':'Video', 'Audio':'Audio', 'Bitrate':'Bitrate',
+ 'Bearbeitungszeit': 'Processing time',
+ 'Fertige entfernen': 'Remove completed',
+ 'Bereits verarbeitet.': 'Already processed.',
+ 'Journal: ': 'Journal: ',
+ 'Journal nicht gespeichert: ': 'Journal not saved: ',
+ 'Ausgabe fertig; Journal nicht gespeichert.': 'Output completed; journal not saved.',
+ 'Journal konnte nicht gelesen werden: ': 'Could not read journal: ',
+ 'Unbekanntes Journalformat.': 'Unknown journal format.',
+ 'Journal ist zu groß.': 'Journal is too large.',
+ 'Journal wird von einem anderen Lauf geschrieben.': 'Another run is writing the journal.',
+ 'Ungültige Bearbeitungszeit.': 'Invalid processing time.',
+ 'Quelle wurde während der Verarbeitung geändert; Abschluss nicht zugeordnet.': 'Source changed during processing; completion not recorded.',
+ 'Keine fertigen Ausgaben für das Journal.': 'No completed outputs for the journal.',
+ 'Quelldaten für den Journalnachweis fehlen.': 'Source information for the journal receipt is missing.',
  '\nFehler: {0}\n{1}\n': '\nError: {0}\n{1}\n',
  '\nGespeichert: ': '\nSaved: ',
  ' Bildprotokoll: {0}': ' Image log: {0}',
@@ -1118,6 +1132,9 @@ def translate(text, language='de'):
     # Preserve track titles/language codes when the presentation is rendered.
     if text.startswith('Audio: '):
         return text
+    for prefix in ('Journal: ', 'Journal nicht gespeichert: ', 'Journal konnte nicht gelesen werden: '):
+        if text.startswith(prefix):
+            return EN[prefix] + translate(text[len(prefix):], language)
     for pattern, target in PATTERNS:
         match = pattern.fullmatch(text)
         if match:

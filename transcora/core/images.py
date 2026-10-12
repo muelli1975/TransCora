@@ -89,6 +89,7 @@ class ImageJob:
     id: str = field(default_factory=lambda: uuid.uuid4().hex)
     status: str = 'queued'
     detail: str = 'Noch nicht geprüft'
+    result: object | None = None
 
     def serializable(self):
         return {'source': str(self.source), 'source_root': str(self.source_root) if self.source_root else None,

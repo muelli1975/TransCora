@@ -3,6 +3,28 @@
 Dies ist die geplante Abnahme, keine Behauptung bereits bestandener Anwendungstests.
 Die Umsetzung steht in [PLAN_1.1.md](PLAN_1.1.md).
 
+## Erster Implementierungsstand
+
+Journal, Ergebniszeiten, numerische Zeitsortierung, Fertige entfernen und die
+Tastaturauswahl sind implementiert. Zusätzlich erscheinen gleiche Hinweise nur
+einmal; übliche SDR-Farbannahmen sind neutrale Informationen. Unverändertes
+Übernehmen eines Eingabefelds setzt fertige Aufträge nicht mehr zurück.
+
+Lokale Regression: 131 Tests ausgeführt, davon 129 bestanden, ein nativer CIELAB-
+Test ohne lokalen Build ausgelassen und ein ExifTool-Metadatentest mangels lokal
+lauffähigem Werkzeug nicht ausführbar. Die DLL-Startbeschränkung wurde auch mit
+der bereitgestellten Windows-ExifTool-Datei bestätigt. Der Buildserver muss diese
+beiden Prüfungen mit den regulären Werkzeugen durchführen. Danach ergänzter Test
+für Journal-Schreibfehler und gezielte Nachprüfungen: 17 Tests bestanden.
+
+Die echte 20-Dateien-GUI-Konvertierung wurde um Entfernen/Wiederhinzufügen und
+Erledigt-Erkennung ohne erneute Kodierung erweitert. Mehrteiliger MPO-Export,
+Journalverlust, beschädigtes Journal, Schreibfehler sowie konkurrierende Thread-
+und Prozessschreiber sind erfasst. Bei Journal-Schreibfehler bleiben Ausgaben
+und Erfolgsstatus erhalten; die Abschlussmeldung weist auf fehlende Einträge hin.
+
+Vollständige CI und Pakettests dieses Entwicklungsstands stehen noch aus.
+
 ## Bereits geprüft bei der Vorbereitung
 
 - 1.0-Basis: veröffentlichter Build `c3f2315`, aktueller Dokumentationsstand `7ef801f`.

@@ -17,7 +17,8 @@ from transcora import __version__
 from transcora.i18n import LANGUAGES
 from transcora.gui.localization import Localizer, TextVar
 from transcora.gui.settings_area import SettingsArea, section, CurrentFile
-from transcora.gui.file_list import FileListSorter
+from transcora.gui.file_list import FileListSorter, remove_entries, completed_button
+from transcora.core.journal import Journal, Completion, JournalError, request, restore, processing_text
 from transcora.core.engine import Cancelled, execute, methods, plan_job, preview
 from transcora.core.model import Job, LAYOUTS, PROFILES, TARGETS, Options, VIDEO_EXTENSIONS, app_root, FPS_CHOICES, FPS_MODES, COMPATIBILITY_NOTE, ANAGLYPH_PLAYER_NOTE, AUDIO_FORMATS, AUDIO_TRACKS, AUDIO_CHANNELS, VIDEO_SIZES, BD_BITRATES, BD_MODES, ROW_ORDERS
 from transcora.core.naming import effective_suffix, suffix_choices, reserve_output, filename_layout, fps_suffix, default_disc_title
@@ -47,6 +48,7 @@ class Window:
         self.updating = False
         self.controls = []
         self.log_lines = []
+        self.journal_messages = set()
         self.catalog = methods()
         self.defaults = Options()
         self.language = 'de'
@@ -186,9 +188,10 @@ class Window:
         holder.grid(row=2, column=0, sticky="nsew")
         holder.columnconfigure(0, weight=1)
         holder.rowconfigure(0, weight=1)
-        self.tree = ttk.Treeview(holder, columns=("file", "layout", "fps", "duration", "target", "status"), show="headings", height=6, selectmode="extended")
-        for key, label, width in (("file", "Datei", 245), ("layout", "Quelle", 110), ("fps", "fps", 60),
-                                  ("duration", "Dauer", 75), ("target", "Ziel", 200), ("status", "Status", 95)):
+        self.tree = ttk.Treeview(holder, columns=("file", "layout", "fps", "duration", "target", "status", "processing"), show="headings", height=6, selectmode="extended")
+        for key, label, width in (("file", "Datei", 190), ("layout", "Quelle", 100), ("fps", "fps", 55),
+                                  ("duration", "Dauer", 70), ("target", "Ziel", 185), ("status", "Status", 80),
+                                  ("processing", "Bearbeitungszeit", 126)):
             self.tree.heading(key, text=label)
             self.tree.column(key, width=width, minwidth=120 if key == "file" else width, stretch=key == "file")
         self.tree.grid(row=0, column=0, sticky="nsew")
@@ -196,7 +199,7 @@ class Window:
         scrollbar.grid(row=0, column=1, sticky="ns")
         self.tree.configure(yscrollcommand=scrollbar.set)
         self.tree.bind("<<TreeviewSelect>>", self.selection_changed)
-        self.sorter = FileListSorter(self,dict(file='Datei',layout='Quelle',fps='fps',duration='Dauer',target='Ziel',status='Status'))
+        self.sorter = FileListSorter(self,dict(file='Datei',layout='Quelle',fps='fps',duration='Dauer',target='Ziel',status='Status',processing='Bearbeitungszeit'))
         self.tree.bind('<Control-a>', self.select_all)
         self.tree.bind('<Control-A>', self.select_all)
         if self.root.tk.call('tk', 'windowingsystem') == 'aqua':
@@ -208,6 +211,9 @@ class Window:
         ttk.Label(scope,textvariable=self.selection_text,foreground=MUTED).pack(side='left')
         self.reset_button = self.button(scope,'Standardeinstellungen',self.reset_defaults)
         self.reset_button.pack(side='right')
+        self.remove_completed_button = self.button(scope, 'Fertige entfernen', self.remove_completed)
+        self.remove_completed_button.pack(side='right', padx=(0, 6))
+        completed_button(self)
         self.settings_area = SettingsArea(outer)
         fields = self.settings_area.body
         _, source_fields = section(fields,0,'Quelle')
@@ -343,15 +349,24 @@ class Window:
         detail_scroll.grid(row=0, column=1, sticky="ns")
         self.detail_text.configure(yscrollcommand=detail_scroll.set)
         def show_details(*args):
+            if getattr(self, 'updating_details', False):
+                return
             self.detail_text.configure(state="normal")
             self.detail_text.delete("1.0", "end")
-            if self.attention.get():
-                self.detail_text.insert('end', '⚠ '+self.attention.get()+'\n', 'attention')
+            seen = set()
+            def insert(source, attention=False):
+                for line in source.splitlines():
+                    translated = self.t(line).strip()
+                    identity = translated.removeprefix('⚠').strip()
+                    if identity and identity not in seen:
+                        seen.add(identity)
+                        self.detail_text.insert('end', ('⚠ ' if attention else '') + identity + '\n',
+                                                ('attention',) if attention else ())
+            insert(self.attention.source, True)
             represented = self.attention.source.splitlines()+self.file_notes.source.splitlines()
             if self.option_attention.source and self.option_attention.source not in represented:
-                self.detail_text.insert('end', '⚠ '+self.option_attention.get()+'\n', 'attention')
-            if self.file_notes.get():
-                self.detail_text.insert('end',self.file_notes.get()+'\n')
+                insert(self.option_attention.source, True)
+            insert(self.file_notes.source)
             # File warnings already explain these options. Keep only additional
             # option notes (such as the 10-bit explanation) below them.
             notes = self.warning.source
@@ -359,9 +374,10 @@ class Window:
                 if shown:
                     notes = notes.replace(shown, '')
             if notes.strip():
-                self.detail_text.insert('end', self.t(notes.strip())+'\n')
-            self.detail_text.insert('end', self.details.get())
+                insert(notes.strip())
+            insert(self.details.source)
             self.detail_text.configure(state="disabled")
+        self.render_details = show_details
         self.detail_text.tag_configure('attention', foreground=GOLD_LIGHT, font=('Segoe UI',9,'bold'))
         self.detail_text.tag_raise('sel')
         self.attention.trace_add('write', show_details)
@@ -609,6 +625,8 @@ class Window:
                 job.options = replace(options, disc_title=job.options.disc_title)
                 job.plan = None
                 job.status, job.detail = 'queued', 'Voreinstellung geladen; erneut prüfen.'
+                job.result = None
+                self.restore_result(job)
                 self.update_row(job)
         else:
             self.defaults = replace(options, disc_title=None)
@@ -646,6 +664,8 @@ class Window:
 
     def update_row(self, job):
         layout = job.plan.layout if job.plan else job.options.layout
+        if not job.plan and job.result:
+            layout = job.result.record.get('effective', {}).get('layout', layout)
         if job.plan:
             job.source_fps = job.plan.info["video"].get("avg_frame_rate")
             job.source_duration = job.plan.duration or None
@@ -664,11 +684,27 @@ class Window:
             seconds = int(job.source_duration + .5)
             duration = f"{seconds//3600:02}:{seconds//60%60:02}:{seconds%60:02}"
         values = (job.source.name, self.t(LAYOUTS.get(layout, "?")), fps, duration,
-                  self.t(('BD-3D · ' + self.t(BD_MODES[job.options.bd_mode]) if job.options.target == 'bd3d' else TARGETS[job.options.target])), self.t(STATUS[job.status]))
+                  self.t(('BD-3D · ' + self.t(BD_MODES[job.options.bd_mode]) if job.options.target == 'bd3d' else TARGETS[job.options.target])), self.t(STATUS[job.status]), processing_text(job.result))
         if self.tree.exists(job.id):
             self.tree.item(job.id, values=values)
         else:
             self.tree.insert("", "end", iid=job.id, values=values)
+        completed_button(self)
+
+    def journal_notice(self, message):
+        if message not in self.journal_messages:
+            self.journal_messages.add(message)
+            self.log_lines.append(message)
+            self.status.set(message)
+
+    def restore_result(self, job):
+        completion = restore(job, self.output_path(), 'video', self.journal_notice)
+        if completion:
+            geometry = completion.record.get('effective', {}).get('source_geometry')
+            if (isinstance(geometry, list) and len(geometry) == 3
+                    and all(isinstance(n, int) and n > 0 for n in geometry[:2]) and geometry[2] in LAYOUTS):
+                self.source_geometry[job.id] = tuple(geometry)
+        return completion
 
     def selection_changed(self, event=None):
         selected = self.selected_jobs()
@@ -715,11 +751,16 @@ class Window:
         warnings = list(dict.fromkeys(getattr(job.plan,'warnings',()))) if job.plan else []
         review = list(dict.fromkeys(getattr(job.plan,'review_warnings',warnings))) if job.plan else []
         attention = job.detail if job.status in {'blocked','failed'} else '\n'.join(review)
-        self.attention.set(attention)
-        self.file_notes.set('\n'.join(note for note in warnings if note not in review))
         summary = (job.plan.summary_text(self.t) if hasattr(job.plan,'summary_text') else job.plan.summary) if job.plan else str(job.source)
         extra = job.detail if job.status not in {'blocked','failed'} and job.detail != '\n'.join(getattr(job.plan,'warnings',())) else ''
-        self.details.set(summary+('\n'+extra if extra else ''))
+        self.updating_details = True
+        try:
+            self.attention.set(attention)
+            self.file_notes.set('\n'.join(note for note in warnings if note not in review))
+            self.details.set(summary+('\n'+extra if extra else ''))
+        finally:
+            self.updating_details = False
+        self.render_details()
 
     def option_changed(self, key):
         if self.busy or self.updating:
@@ -777,9 +818,13 @@ class Window:
             if key != 'disc_title' and not candidates:
                 self.defaults = changed(self.defaults, candidates[0].source if candidates else None)
             for job, options in updates:
+                if job.options == options:
+                    continue
                 job.options = options
                 job.plan = None
+                job.result = None
                 job.status, job.detail = "queued", "Einstellungen geändert; erneut prüfen."
+                self.restore_result(job)
                 self.update_row(job)
             if key == "codec" and value == "h265":
                 self.variables["container"].set("MKV")
@@ -956,10 +1001,11 @@ class Window:
             return
         self.last_output = output
         for job in self.jobs:
-            if job.status != "completed":
-                job.plan = None
-                job.status, job.detail = "queued", "Ausgabeziel geändert; erneut prüfen."
-                self.update_row(job)
+            job.plan = None
+            job.result = None
+            job.status, job.detail = "queued", "Ausgabeziel geändert; erneut prüfen."
+            self.restore_result(job)
+            self.update_row(job)
         self.update_output_name()
 
     def add_paths(self, paths, source_root=None):
@@ -971,6 +1017,7 @@ class Window:
             if key in existing or path.suffix.lower() not in VIDEO_EXTENSIONS:
                 continue
             job = Job(path, replace(self.defaults), source_root)
+            self.restore_result(job)
             self.jobs.append(job)
             existing.add(key)
             self.update_row(job)
@@ -1016,13 +1063,16 @@ class Window:
         self.background(work, "Ordner durchsuchen")
 
     def remove(self):
-        if self.busy:
+        if self.sorter.busy():
             return
-        ids = set(self.tree.selection())
-        self.jobs = [job for job in self.jobs if job.id not in ids]
-        for id_ in ids:
-            self.tree.delete(id_)
-        self.status.set(f"{len(ids)} Listeneinträge entfernt; Quelldateien bleiben erhalten.")
+        count = remove_entries(self, self.tree.selection())
+        self.status.set(f"{count} Listeneinträge entfernt; Quelldateien bleiben erhalten.")
+
+    def remove_completed(self):
+        if self.sorter.busy():
+            return
+        count = remove_entries(self, [j.id for j in self.jobs if j.status == 'completed'])
+        self.status.set(f"{count} Listeneinträge entfernt; Quelldateien bleiben erhalten.")
 
     def load(self):
         if self.busy:
@@ -1040,6 +1090,7 @@ class Window:
                 if os.path.normcase(str(job.source)) not in existing:
                     self.jobs.append(job)
                     existing.add(os.path.normcase(str(job.source)))
+                    self.restore_result(job)
                     self.update_row(job)
             if output:
                 self.output_var.set(str(output))
@@ -1177,6 +1228,7 @@ class Window:
         for widget, normal in self.controls:
             set_control_state(widget, "disabled" if value else normal)
         self.abort_button.configure(state="normal" if value else "disabled")
+        completed_button(self)
         if not value:
             self.update_elapsed()
             self.elapsed.set('Restzeit: Datei — · Stapel —')
@@ -1244,6 +1296,9 @@ class Window:
         if self.variables['suffix'].get() != self.last_suffix_display:
             return
         self.option_changed('audio_selection')
+        for job in self.jobs:
+            self.restore_result(job)
+            self.update_row(job)
         candidates = [job for job in self.jobs if job.status != "completed"]
         if not candidates:
             self.status.set("Keine noch offenen Dateien in der Liste.")
@@ -1259,7 +1314,7 @@ class Window:
             self.events.put(('notice', 'Testen: Mitgelieferte Videowerkzeuge prüfen'))
             capabilities = tools.inspect()
             self.events.put(("log", capabilities["version"]))
-            reserved, ready = set(), []
+            reserved, ready, receipts = set(), [], {}
             blocked = 0
             for index, job in enumerate(candidates, 1):
                 if self.cancel.is_set():
@@ -1268,6 +1323,10 @@ class Window:
                 self.events.put(("job", (job.id, "checking", "Technische Prüfung", None)))
                 self.events.put(("notice", f"Testen: Datei {index} von {len(candidates)}"))
                 try:
+                    try:
+                        receipts[job.id] = request(job, 'video') if run else None
+                    except (OSError, ValueError):
+                        receipts[job.id] = None
                     def phase(text):
                         self.events.put(('phase', (job.id, index, len(candidates), text)))
                     plan = plan_job(tools, job, output, reserved, self.cancel, capabilities, phase=phase)
@@ -1291,6 +1350,7 @@ class Window:
             if ready:
                 log_path = new_run_log(app_root())
             counts = {"completed": 0, "failed": 0, "cancelled": 0}
+            journal_failures = 0
             for index, (job, plan) in enumerate(ready, 1):
                 if self.cancel.is_set():
                     for remaining, _ in ready[index - 1:]:
@@ -1303,7 +1363,23 @@ class Window:
                 def emit(kind, payload):
                     self.events.put((kind, (job.id, index, len(ready), payload)))
                 try:
+                    started = time.monotonic()
                     execute(tools, plan, self.cancel, emit, log_path)
+                    elapsed = max(0, time.monotonic() - started)
+                    completion = Completion((plan.output,), elapsed, {})
+                    try:
+                        if receipts[job.id] is None:
+                            raise JournalError('Quelldaten für den Journalnachweis fehlen.')
+                        completion = Journal(output).complete(receipts[job.id], (plan.output,), elapsed,
+                            effective={'options': asdict(plan.options), 'layout': plan.layout, 'swap': plan.swap, 'size': plan.size,
+                                       'source_fps': plan.info['video'].get('avg_frame_rate'), 'source_duration': plan.duration,
+                                       'source_geometry': [plan.info['video']['width'], plan.info['video']['height'], plan.layout]},
+                            tools={'video': capabilities['version']})
+                    except (OSError, ValueError) as error:
+                        journal_failures += 1
+                        self.events.put(('log', 'Journal nicht gespeichert: ' + str(error)))
+                        self.events.put(('notice', 'Ausgabe fertig; Journal nicht gespeichert.'))
+                    self.events.put(('result', (job.id, completion)))
                     counts["completed"] += 1
                     self.events.put(("job", (job.id, "completed", "Gespeichert · " + plan.stereo_summary + "\nGespeichert: " + str(plan.output), plan)))
                 except Cancelled:
@@ -1317,6 +1393,8 @@ class Window:
                     self.events.put(("log", job.source.name + ": " + str(error)))
             summary = (f"{counts['completed']} erfolgreich · {counts['failed']} Fehler · {blocked} blockiert · "
                        f"{counts['cancelled']} abgebrochen. Log: {log_path or self.t('Kein Lauf gestartet')}")
+            if journal_failures:
+                summary += ' · ' + self.t('Journal nicht gespeichert: ') + str(journal_failures)
             self.events.put(("notice", summary))
             self.events.put(("log", summary))
             if ready and not self.cancel.is_set():
@@ -1448,6 +1526,10 @@ class Window:
                         if id_ in self.tree.selection():
                             self.refresh_dimensions()
                             self.show_job_details(job)
+                elif kind == 'result':
+                    job = next((j for j in self.jobs if j.id == payload[0]), None)
+                    if job:
+                        job.result = payload[1]
                 elif kind in {"notice", "error"}:
                     self.status.set(payload)
                     if kind == "error":
