@@ -6,6 +6,8 @@ TransCora is a local desktop program for converting stereoscopic videos and imag
 
 Everything runs locally, without an account, cloud or tracking. The interface can be switched between German and English.
 
+![TransCora 1.0 video batch and output settings](docs/TransCora-1.0.png)
+
 ## Quick start
 
 1. Open **Videos** or **Images** and add files or a folder. Enable **Include subfolders** if needed.
