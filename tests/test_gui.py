@@ -610,7 +610,7 @@ class GuiTests(unittest.TestCase):
         from PIL import Image
         tools=Toolchain.find()
         with tempfile.TemporaryDirectory() as tmp, patch('transcora.gui.window.app_root',return_value=Path(tmp)):
-            base=Path(tmp);folder=base/'videos';folder.mkdir()
+            base=Path(tmp).resolve();folder=base/'videos';folder.mkdir()
             sample=base/'sample.mp4'
             capture([str(tools.ffmpeg),'-v','error','-f','lavfi','-i','testsrc2=s=128x32:r=30',
                      '-frames:v','1','-c:v','libx264','-pix_fmt','yuv420p','-colorspace','bt709',
