@@ -4,7 +4,7 @@ Stand: 10. Oktober 2026. Recherche und Entwicklungsvorschlag, keine implementier
 
 ## 1. Empfehlung
 
-TransCora bleibt ein kompakter Konverter mit einer gemeinsamen Jobliste für einzelne Dateien, frei zusammengestellte Listen und Ordnerimporte. Full-SBS bleibt der erste Referenzweg. Zusätzliche gepackte Eingaben werden als kleine Erweiterung derselben Verarbeitung geplant: Full/Half-SBS und Full/Half-OU, jeweils mit expliziter Augenreihenfolge.
+TransCora bleibt ein kompakter Konverter mit einer gemeinsamen Jobliste für einzelne Dateien, frei zusammengestellte Listen und Ordnerimporte. Full-SBS bleibt der erste Referenzweg. Zusätzliche gepackte Eingaben werden als kleine Erweiterung derselben Verarbeitung geplant: Full/Half-SBS und Full/Half-OU, jeweils mit expliziter Halbbildreihenfolge.
 
 Für Anaglyphen empfehlen sich zunächst MKV/H.264 mit 4:4:4 und 8 Bit sowie ein optionales, gesondert gekennzeichnetes Profil mit 4:4:4 und 10 Bit. Methoden folgen ausschließlich AnaglyphBatch ohne CIELab. Die alten Anaglyphenketten der Textdatei sind Beispiele; sie werden nicht als zusätzliche Produktvarianten oder auswählbarer Legacy-Modus übernommen. Die Bittiefe verändert die Ausgabequantisierung, nicht die Verfahrensdefinition.
 
@@ -45,7 +45,7 @@ MP4, MKV, MOV, M2TS/TS und AVI bleiben die sinnvollen Eingabecontainer. Ein Cont
 | Vorgeschlagene gepackte Eingabe | Reihenfolge | FFmpeg-Bezeichnung | Behandlung |
 | --- | --- | --- | --- |
 | Full-SBS | Links / rechts | sbsl | Erster Referenzweg |
-| Full-SBS | Rechts / links | sbsr | Identischer Weg mit korrigierter Augenreihenfolge |
+| Full-SBS | Rechts / links | sbsr | Identischer Weg mit korrigierter Halbbildreihenfolge |
 | Half-SBS | Links / rechts | sbs2l | Geometrie entzerren; verlorene Auflösung bleibt verloren |
 | Half-SBS | Rechts / links | sbs2r | Wie zuvor, mit Tausch |
 | Full-OU / TAB | Links oben | tbl / abl | Vertikal gepackte Augen trennen |
@@ -57,9 +57,9 @@ Diese Layoutbezeichnungen sind durch die FFmpeg-Filterdokumentation belegt. Die 
 
 In der GUI reichen vier Layouts plus „L/R tauschen“. Die Jobdaten speichern die tatsächliche Reihenfolge. Ein Standard für alle neu hinzugefügten Dateien ist möglich; abweichende Dateien erhalten eine eigene Einstellung. Eine gemischte Liste darf nicht unbemerkt als ein einziges Quelllayout behandelt werden.
 
-Beispiel mit beabsichtigtem 16:9-Bild pro Auge und quadratischen Zielpixeln:
+Beispiel mit beabsichtigtem 16:9-Bild pro Halbbild und quadratischen Zielpixeln:
 
-| Layout | Gepacktes Raster | Gespeicherte Pixel pro Auge | Gemeinte Geometrie pro Auge |
+| Layout | Gepacktes Raster | Gespeicherte Pixel pro Halbbild | Gemeinte Geometrie pro Halbbild |
 | --- | --- | --- | --- |
 | Full-SBS | 3840 × 1080 | 1920 × 1080 | 16:9 |
 | Half-SBS | 1920 × 1080 | 960 × 1080 | 16:9 nach horizontaler Entzerrung |
@@ -180,7 +180,7 @@ Die folgenden Prüfpunkte sichern tatsächlich verschiedene Anforderungen; sie s
 1. Gleiche L/R-Testbilder in Full/Half-SBS und Full/Half-OU; Augenmarkierungen, Kreise und Auflösungslinien. Reihenfolge, Zielraster und Geometrie überprüfen. Half gegen eine fachlich passende herunterabgetastete Referenz vergleichen, nicht verlustfreie Gleichheit behaupten.
 2. Gleiche Farbtafeln korrekt als sRGB-Bild und BT.709-Video kodieren; zentralen AnaglyphBatch-Methodenadapter vergleichen. Clip- und LUT-Reihenfolge bewusst einbeziehen.
 3. 8-/10-Bit-Anaglyphen mit Gradienten und Farbkanten in passenden Softwaredecodern vergleichen. Ausgabeformat und Farbkennzeichnungen per ffprobe prüfen; Qualität nicht aus dem Profilnamen ableiten.
-4. Kombinierte Suffixe mit und ohne Container-Metadaten in den konkreten Windows-Versionen von Kodi, Bino und Stereoscopic Player prüfen. Widersprüchliche Alt-Tags als Negativfall testen. Full/Half, Augenreihenfolge und Anzeigengeometrie getrennt betrachten.
+4. Kombinierte Suffixe mit und ohne Container-Metadaten in den konkreten Windows-Versionen von Kodi, Bino und Stereoscopic Player prüfen. Widersprüchliche Alt-Tags als Negativfall testen. Full/Half, Halbbildreihenfolge und Anzeigengeometrie getrennt betrachten.
 5. Gemischte Dateiliste aus mehreren Ordnern, gleichnamige Quellen, vorhandene Ausgaben, VFR, fehlende Dauer, Abbruch und Fehler prüfen. Keine unbeabsichtigte Framerate- oder Audioänderung.
 
 Erst nach dem ersten Full-SBS-Referenzdurchstich weitere Adapter freigeben. So erweitern wir den Eingang, ohne verschiedene Methodenimplementierungen oder eine überladene Oberfläche einzuführen.

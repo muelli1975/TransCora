@@ -70,7 +70,7 @@ Container ist eine getrennte Entscheidung. Vorschlag: MP4/H.264 für übliche St
 
 ### An ein Verfahren gebunden
 
-- Stereo-Ausgabecode und Augenreihenfolge.
+- Stereo-Ausgabecode und Halbbildreihenfolge.
 - `frame-packing=3` für SBS beziehungsweise `4` für Top/Bottom. Diese Werte signalisieren die Anordnung im H.264-Stream [3]; sie sind kein MVC-Encoder und kein Blu-ray-Authoring.
 - Matrixkoeffizienten, sämtliche LUT-Exponenten und ihre Reihenfolge.
 - Position des Clippings und der Addition.
@@ -180,13 +180,13 @@ Die Vorlagen enthalten weder `-r` noch `fps`, `minterpolate` oder `setpts`. Sie 
 
 V1 soll Quell-Timing erhalten, soweit Encoder und Container es ermöglichen, und dies anhand von Zeitstempeln prüfen. `avg_frame_rate` und `r_frame_rate` reichen für eine sichere VFR-Erkennung nicht immer aus; bei Bedarf müssen Frame-/Packet-Zeitstempel untersucht werden. 24/1 und 24000/1001 bleiben unterschiedliche Raten. MVC/Blu-ray-Zielraten und Audioanpassung werden erst im Spezialmodus bewertet. Keine automatische „24 fps“-Option.
 
-### Skalierung, SAR und Augenreihenfolge
+### Skalierung, SAR und Halbbildreihenfolge
 
 Die 1080p-Profile sind unmittelbar passend für Full-SBS mit 16:9-Augen und quadratischen Quellpixeln. Bei 3840 × 1080 ergeben sich 1920 × 1080 gepackt; bei 7680 × 2160 werden zusätzlich die Augen verkleinert.
 
 Eigenes Testresultat: `stereo3d=sbsl:sbs2l` verändert bei 384 × 108 zuerst den SAR zu 1:2, nicht schon die gespeicherte Breite. `tb2l` liefert 192 × 216 und SAR 2:1. Erst die folgende Skalierung liefert hier 1920 × 1080 mit SAR 1:1. Eine pauschale Aussage „stereo3d halbiert physisch die Breite/Höhe“ wäre für diese Ketten falsch.
 
-Bei einer 320 × 120-Quelle mit 4:3-Augen ergeben beide Original-1080p-Ketten SAR 3:4 und DAR 4:3. Daher nicht einfach `setsar=1` anhängen: Das könnte den beabsichtigten Geometrieerhalt ändern. Für solche Quellen braucht es eine bewusst gewählte Ausgabegröße oder Padding pro Auge. Warnung vor Start statt stiller Dehnung. Getrennt prüfen: Rotation, geradzahlige Quellbreite, nötige Teilbild-Teilbarkeit und Encoderanforderungen. Auflösung allein beweist kein Full-SBS.
+Bei einer 320 × 120-Quelle mit 4:3-Halbbildern ergeben beide Original-1080p-Ketten SAR 3:4 und DAR 4:3. Daher nicht einfach `setsar=1` anhängen: Das könnte den beabsichtigten Geometrieerhalt ändern. Für solche Quellen braucht es eine bewusst gewählte Ausgabegröße oder Padding pro Halbbild. Warnung vor Start statt stiller Dehnung. Getrennt prüfen: Rotation, geradzahlige Quellbreite, nötige Teilbild-Teilbarkeit und Encoderanforderungen. Auflösung allein beweist kein Full-SBS.
 
 ### Farbe und Anaglyphenqualität
 
@@ -219,7 +219,7 @@ Lokale Testumgebung: FFmpeg/ffprobe 6.1.1-3ubuntu5, Linux, mit libx264 und libzi
 | Drei kurze Dubois-Verfahren | Alle erfolgreich | 192 × 108, SAR 1:1 | yuv444p, High 4:4:4 Predictive | je 6, 24000/1001 |
 | Vier lange Anaglyphenketten | Alle erfolgreich | 192 × 108, SAR 1:1 | yuv444p, High 4:4:4 Predictive | je 6, 24000/1001 |
 
-AAC-Audio wurde jeweils übernommen. Die ersten Frames der zwei Stereo-Ausgaben enthalten Stereo-3D-Side-Data. Zusätzlicher Filtertest mit 4:3-Augen bestätigt den oben beschriebenen SAR 3:4 nach der Skalierung.
+AAC-Audio wurde jeweils übernommen. Die ersten Frames der zwei Stereo-Ausgaben enthalten Stereo-3D-Side-Data. Zusätzlicher Filtertest mit 4:3-Halbbildern bestätigt den oben beschriebenen SAR 3:4 nach der Skalierung.
 
 Nachgewiesen sind Syntax/Lauffähigkeit auf diesem Build, Ausgabemaße, ausgehandeltes Pixelformat und die Rate/Framezahl dieses kurzen CFR-Beispiels. Nicht nachgewiesen sind die Farbrichtigkeit aller Verfahren, Brillenwirkung, Langzeit-A/V-Synchronität, VFR-Verhalten, Gerätekompatibilität, Windows-Portable-Build oder beliebige Container-/Audio-Kombinationen. Diese Checks müssen gezielt vor Implementierungsfreigabe nachgeholt werden; sie erfordern keine vorschnelle GUI.
 
