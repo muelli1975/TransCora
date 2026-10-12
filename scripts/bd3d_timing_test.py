@@ -21,7 +21,7 @@ def main():
     out = ROOT/'output/bd3d-timing'
     out.mkdir(parents=True, exist_ok=True)
     tools = Toolchain.find()
-    BdTools.find()
+    bd = BdTools.find()
     capabilities = tools.inspect()
     report = {}
     for name, container, timing, duration in [
