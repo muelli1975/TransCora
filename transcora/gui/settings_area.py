@@ -19,8 +19,9 @@ class SettingsArea:
         self.window = self.canvas.create_window(0, 0, window=self.body, anchor='nw')
         self.body.columnconfigure(0, weight=1)
         self.canvas.bind('<Configure>', self.layout)
-        self.body.bind('<Configure>', self.layout)
+        self.body.bind('<Configure>', self.content_changed)
         self.parent = parent
+        self.advanced = None
         parent.rowconfigure(2, minsize=140)
         self.pending = False
         self.closed = False
@@ -46,6 +47,17 @@ class SettingsArea:
             self.pending = True
             self.callback = self.parent.after_idle(self.fit)
 
+    def normal_height(self):
+        height = self.body.winfo_reqheight()
+        if self.advanced is not None and self.advanced.winfo_manager():
+            row = int(self.advanced.grid_info()['row'])
+            height -= self.body.grid_bbox(0, row, 0, row)[3]
+        return height
+
+    def content_changed(self, event=None):
+        self.layout()
+        self.schedule()
+
     def fit(self):
         self.pending = False
         if self.closed or not self.parent.winfo_exists():
@@ -58,7 +70,9 @@ class SettingsArea:
             value = info.get('pady', 0)
             pad = value if isinstance(value, tuple) else self.parent.tk.splitlist(str(value))
             other += widget.winfo_reqheight()+sum(int(v) for v in pad)*(2 if len(pad)==1 else 1)
-        height = max(90, min(290, self.parent.winfo_height()-other-140-8))
+        # Fit the ordinary settings; expanding advanced options keeps the list
+        # and footer in place and uses this same viewport.
+        height = max(90, min(self.normal_height(), self.parent.winfo_height()-other-140-8))
         if abs(self.canvas.winfo_reqheight()-height)>1:
             self.canvas.configure(height=height)
         self.canvas.grid()
@@ -73,6 +87,23 @@ class SettingsArea:
         else:
             self.scroll.grid_remove()
             self.canvas.yview_moveto(0)
+        self.guard_combos(self.body)
+
+    def guard_combos(self, parent):
+        # Tk changes closed combobox values on wheel events, before the
+        # toplevel's scrolling handler runs. Scroll settings without editing.
+        for widget in parent.winfo_children():
+            if isinstance(widget, ttk.Combobox) and not getattr(widget, '_settings_wheel_guard', False):
+                widget._settings_wheel_guard = True
+                for event in ('<MouseWheel>', '<Button-4>', '<Button-5>'):
+                    widget.bind(event, self.combo_wheel, add='+')
+            self.guard_combos(widget)
+
+    def combo_wheel(self, event):
+        if self.body.winfo_reqheight()>self.canvas.winfo_height():
+            up = getattr(event,'delta',0)>0 or getattr(event,'num',None)==4
+            self.canvas.yview_scroll(-1 if up else 1, 'units')
+        return 'break'
 
     def contains(self, widget):
         return str(widget).startswith(str(self.body)+'.')

@@ -58,7 +58,7 @@ Zeitlich interlaced aufgenommene Videos werden progressiv ausgegeben, mit erhalt
 
 Unter **Erweitert** wählst du H.264 oder H.265 (MKV), CRF-Qualität oder eine Zielbitrate. Anaglyphen bieten 4:4:4-Farbqualität und optional 4:2:0 für Player, die dies benötigen. Zeilenverschachtelte Videos verwenden 4:4:4, damit die Augenzeilen getrennt bleiben.
 
-**Tonoptionen** übernehmen alle Spuren, ausgewählte Spuren oder keinen Ton. Du kannst Originalton beibehalten, nach AAC wandeln oder auf Stereo heruntermischen. BD-3D verwendet LPCM und fest 23,976 fps; die gemeinsame AVC/MVC-Zielbitrate ist zwischen 20 und 40 Mbit/s wählbar.
+**Tonoptionen** übernehmen alle Spuren, ausgewählte Spuren oder keinen Ton. Du kannst Originalton beibehalten, nach AAC wandeln oder auf Stereo heruntermischen. Bei BD-3D stehen die Tonoptionen und die Bitrate unter **Erweitert**, getrennt nach Video und Audio. BD-3D verwendet LPCM und fest 23,976 fps; die gemeinsame AVC/MVC-Zielbitrate ist zwischen 20 und 40 Mbit/s wählbar, mit 40 Mbit/s als Werkseinstellung.
 
 ## Polfilter-Monitore
 

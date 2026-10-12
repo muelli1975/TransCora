@@ -67,6 +67,13 @@ class Window:
         self._style()
         self._build()
         self.apply_language()
+        self.root.update_idletasks()
+        # The initial size should fit ordinary settings plus a useful file list.
+        # On shorter screens the bounded settings viewport remains scrollable.
+        extra = max(0, self.settings_area.normal_height()-self.settings_area.canvas.winfo_height())
+        screen_limit = max(680,self.root.winfo_screenheight()-80)
+        height = min(screen_limit,max(860,self.root.winfo_height()+extra+max(0,180-self.tree.winfo_height())))
+        self.root.geometry(f'860x{height}')
         root.after_idle(self.settings_area.layout)
         root.after_idle(self.images.settings_area.layout)
         schedule_dark_titlebar(root)
@@ -208,6 +215,7 @@ class Window:
         _, format_fields = section(fields,2,'Format')
         self.advanced_section, self.advanced = section(fields,3,'Erweitert')
         self.advanced_section.grid_remove()
+        self.settings_area.advanced = self.advanced_section
         _, save_fields = section(fields,4,'Speichern')
         self.variables = {}
         self.mappings = {"layout": LAYOUTS, "target": TARGETS, "profile": PROFILES,
@@ -240,7 +248,7 @@ class Window:
                 ttk.Label(frame, text=label).pack(anchor="w")
             var = tk.StringVar(value=self.t(self.mappings[key][getattr(self.defaults, key)]))
             self.variables[key] = var
-            widget = ttk.Combobox(frame, textvariable=var, values=[self.t(v) for v in self.mappings[key].values()], state="readonly", width=22)
+            widget = ttk.Combobox(frame, textvariable=var, values=[self.t(v) for v in self.mappings[key].values()], state="readonly", width=1)
             widget.pack(fill="x")
             widget.bind("<<ComboboxSelected>>", lambda event, k=key: self.option_changed(k))
             self.controls.append((widget, "readonly"))
@@ -266,7 +274,7 @@ class Window:
         self.combos["suffix"] = suffix
         self.controls.append((suffix, "normal"))
         self.title_frame = ttk.Frame(output_fields)
-        self.title_frame.grid(row=1, column=2, sticky="ew", padx=(0, 8), pady=3)
+        self.title_frame.grid(row=1, column=0, sticky="ew", padx=(0, 8), pady=3)
         ttk.Label(self.title_frame, text="Disc-Titel").pack(anchor="w")
         self.variables['disc_title'] = tk.StringVar()
         title_entry = ttk.Entry(self.title_frame, textvariable=self.variables['disc_title'])
@@ -280,7 +288,7 @@ class Window:
         fps_controls = ttk.Frame(self.fps_frame)
         fps_controls.pack(fill='x')
         self.variables['fps_mode'] = tk.StringVar(value=self.t(FPS_MODES[self.defaults.fps_mode]))
-        fps_mode = ttk.Combobox(fps_controls, textvariable=self.variables['fps_mode'], values=[self.t(v) for v in FPS_MODES.values()], state='readonly', width=17)
+        fps_mode = ttk.Combobox(fps_controls, textvariable=self.variables['fps_mode'], values=[self.t(v) for v in FPS_MODES.values()], state='readonly', width=1)
         fps_mode.pack(side='left', fill='x', expand=True, padx=(0, 4))
         fps_mode.bind('<<ComboboxSelected>>', lambda e: self.option_changed('fps_mode'))
         self.combos['fps_mode'] = fps_mode
@@ -294,8 +302,9 @@ class Window:
         self.controls.append((fps, "normal"))
         combo(fields, 2, 1, "video_size", "Ausgabegröße")
         self.output_name = TextVar(self.localizer, )
-        ttk.Label(save_fields, textvariable=self.output_name, foreground=GOLD_LIGHT, wraplength=790).grid(
-            row=1, column=1, columnspan=2, sticky="ew", pady=(3, 0))
+        output_example = ttk.Label(save_fields, textvariable=self.output_name, foreground=GOLD_LIGHT, width=1)
+        output_example.grid(row=1, column=1, columnspan=2, sticky="ew", pady=(3, 0))
+        output_example.bind('<Configure>',lambda e:output_example.configure(wraplength=max(1,e.width)))
         output = ttk.Frame(save_fields)
         output.grid(row=0, column=0, columnspan=3, sticky="ew", pady=(0, 8))
         output.columnconfigure(1, weight=1)
@@ -314,6 +323,7 @@ class Window:
         check.pack(side="left", padx=(0, 10))
         self.controls.append((check, "normal"))
         self.warning = TextVar(self.localizer, )
+        self.attention = TextVar(self.localizer, )
 
         self.details = TextVar(self.localizer, value="Dateien hinzufügen oder eine gespeicherte Liste laden.")
         detail_frame = ttk.Frame(outer, style="Bordered.TFrame", padding=1)
@@ -329,11 +339,15 @@ class Window:
         def show_details(*args):
             self.detail_text.configure(state="normal")
             self.detail_text.delete("1.0", "end")
+            if self.attention.get():
+                self.detail_text.insert('end', '⚠ '+self.attention.get()+'\n', 'attention')
             if self.warning.get():
                 self.detail_text.insert('end', self.warning.get()+'\n', 'warning')
             self.detail_text.insert('end', self.details.get())
             self.detail_text.configure(state="disabled")
         self.detail_text.tag_configure('warning', foreground=GOLD_LIGHT)
+        self.detail_text.tag_configure('attention', foreground=GOLD_LIGHT, font=('Segoe UI',9,'bold'))
+        self.attention.trace_add('write', show_details)
         self.warning.trace_add('write', show_details)
         self.details.trace_add("write", show_details)
         show_details()
@@ -342,10 +356,11 @@ class Window:
         self.advanced_button = self.button(actions, "Erweitert ▸", self.toggle_advanced)
         self.advanced_button.pack(side="left")
         self.button(actions, "Kontrollbild", self.show_preview).pack(side="left", padx=5)
-        ttk.Button(actions, text="Protokoll", command=self.show_log).pack(side="left")
+        ttk.Button(actions, text="Log", command=self.show_log).pack(side="left")
         combo(self.advanced, 0, 0, "codec", "Videocodec")
         combo(self.advanced, 0, 1, "rate_mode", "Qualitätssteuerung")
         numeric = ttk.Frame(self.advanced)
+        self.numeric_fields = numeric
         numeric.grid(row=0, column=2, sticky="ew", padx=(0, 8), pady=3)
         self.rate_fields = {}
         numeric.columnconfigure(0, weight=1)
@@ -364,8 +379,13 @@ class Window:
             number.bind("<Return>", lambda event, k=key: self.option_changed(k))
             self.controls.append((number, "normal"))
             self.combos[key] = number
-        combo(output_fields, 1, 2, "bd_bitrate_mbps", "BD-3D-Bitrate")
-        self.option_frames['bd_bitrate_mbps'].grid_configure(pady=0, padx=0)
+        self.bd_video = ttk.Frame(self.advanced)
+        self.bd_video.grid(row=0,column=0,columnspan=3,sticky='ew',pady=3)
+        self.bd_video.columnconfigure(1,weight=1)
+        ttk.Label(self.bd_video,text='Video',width=9).grid(row=0,column=0,sticky='w')
+        combo(self.bd_video, 0, 1, "bd_bitrate_mbps", "Bitrate")
+        self.combos['bd_bitrate_mbps'].configure(width=12)
+        self.option_frames['bd_bitrate_mbps'].grid_configure(sticky='w')
         self.rate_fields["bd_bitrate_mbps"] = self.option_frames["bd_bitrate_mbps"]
         self.video_dimensions = ttk.Frame(self.option_frames['video_size'])
         self.video_dimensions.pack(fill='x', pady=(4, 0))
@@ -396,8 +416,18 @@ class Window:
             self.combos[key] = entry
             self.controls.append((entry, 'normal'))
         combo(fields, 1, 0, 'row_first', 'Erste Bildschirmzeile')
-        self.advanced_audio_button = self.button(format_fields, 'Tonoptionen …', self.show_audio_options)
-        self.advanced_audio_button.grid(row=0,column=2,sticky='sw',padx=(0,8),pady=3)
+        self.audio_row = ttk.Frame(self.advanced)
+        self.audio_row.grid(row=1,column=0,columnspan=3,sticky='ew',pady=(6,3))
+        self.audio_row.columnconfigure(2,weight=1)
+        ttk.Label(self.audio_row,text='Audio',width=9).grid(row=0,column=0,sticky='w')
+        self.advanced_audio_button = self.button(self.audio_row, 'Tonoptionen …', self.show_audio_options)
+        self.advanced_audio_button.grid(row=0,column=1,sticky='w',padx=(0,8))
+        self.audio_summary = TextVar(self.localizer, )
+        audio_summary = ttk.Label(self.audio_row,textvariable=self.audio_summary,foreground=MUTED,width=1)
+        audio_summary.grid(row=0,column=2,sticky='ew')
+        audio_summary.bind('<Configure>',lambda e:audio_summary.configure(wraplength=max(1,e.width)))
+        self.format_audio_button = self.button(format_fields,'Tonoptionen …',self.show_audio_options)
+        self.format_audio_button.grid(row=0,column=2,sticky='sw',padx=(0,8),pady=3)
         # Keep the main window usable at its minimum height. Audio controls live
         # in a reusable dialog so their values and state follow the same selection.
         self.audio_dialog = tk.Toplevel(self.root, background=APP_BG)
@@ -624,6 +654,7 @@ class Window:
     def selection_changed(self, event=None):
         selected = self.selected_jobs()
         if not selected:
+            self.attention.set('')
             self.details.set("Dateien hinzufügen oder eine gespeicherte Liste laden.")
             self.selection_text.set("Vorgaben für neue Dateien")
             self.updating = True
@@ -657,8 +688,14 @@ class Window:
         self.last_title_display = self.variables['disc_title'].get()
         self.selection_text.set(f"Für {len(selected)} ausgewählte Datei(en)" + (" · Gemischte Werte" if any(any(getattr(j.options,k)!=getattr(selected[0].options,k) for j in selected[1:]) for k in self.variables) else ""))
         job = selected[0]
-        self.details.set((job.plan.summary if job.plan else str(job.source)) + "\n" + job.detail)
+        self.show_job_details(job)
         self.refresh_controls()
+
+    def show_job_details(self, job):
+        attention = job.detail if job.status in {'blocked','failed'} else '\n'.join(getattr(job.plan,'warnings',())) if job.plan else ''
+        self.attention.set(attention)
+        summary = job.plan.summary if job.plan else str(job.source)
+        self.details.set(summary+('' if attention else '\n'+job.detail))
 
     def option_changed(self, key):
         if self.busy or self.updating:
@@ -776,6 +813,12 @@ class Window:
         self.combos["container"].configure(state="disabled" if options.codec == "h265" else "readonly")
         self.combos['codec'].configure(state='disabled' if bd3d else 'readonly')
         self.combos['rate_mode'].configure(state='disabled' if bd3d else 'readonly')
+        for key in ('codec','rate_mode'):
+            self.option_frames[key].grid_remove() if bd3d else self.option_frames[key].grid()
+        self.numeric_fields.grid_remove() if bd3d else self.numeric_fields.grid()
+        self.bd_video.grid() if bd3d else self.bd_video.grid_remove()
+        self.audio_row.grid() if bd3d else self.audio_row.grid_remove()
+        self.format_audio_button.grid_remove() if bd3d else self.format_audio_button.grid()
         self.combos["crf"].configure(state="normal" if options.rate_mode == "crf" and not bd3d else "disabled")
         self.combos["bitrate_mbps"].configure(state="normal" if options.rate_mode == "abr" and not bd3d else "disabled")
         no_audio = options.audio_tracks == 'none'
@@ -789,6 +832,8 @@ class Window:
         self.audio_note.set('BD-3D: LPCM mit 48 kHz und 24 Bit.' if bd3d else (
             'AAC wird neu kodiert. Stereo mischt vorhandene Kanäle zusammen.' if options.audio_format == 'aac' or options.audio_channels == 'stereo'
             else 'Originalton wird kopiert. Blu-ray-LPCM wird in MKV verlustfrei als FLAC gespeichert.'))
+        self.audio_summary.set('Ohne Ton' if no_audio else
+            self.t(formats[0])+' · '+self.t(AUDIO_TRACKS[options.audio_tracks])+' · '+self.t(AUDIO_CHANNELS[options.audio_channels]))
         active_field = "bd_bitrate_mbps" if bd3d else "crf" if options.rate_mode == "crf" else "bitrate_mbps"
         for key, frame in self.rate_fields.items():
             frame.grid() if key == active_field else frame.grid_remove()
@@ -1302,12 +1347,42 @@ class Window:
         holder.rowconfigure(0, weight=1)
         text = tk.Text(holder, background=PANEL_BG, foreground=TEXT, wrap="word", width=90, height=25,
             borderwidth=0, highlightthickness=0, insertbackground=TEXT,
-            selectbackground=GOLD_LIGHT, selectforeground=APP_BG)
+            selectbackground=GOLD_LIGHT, selectforeground=APP_BG, exportselection=False,
+            inactiveselectbackground=GOLD_LIGHT)
         text.grid(row=0, column=0, sticky='nsew')
         scroll = ttk.Scrollbar(holder, orient='vertical', command=text.yview)
         scroll.grid(row=0, column=1, sticky='ns')
         text.configure(yscrollcommand=scroll.set)
         self.localizer.text(text, "\n\n".join(self.log_lines[-150:]) or "Noch keine technischen Meldungen.")
+        menu = self.dark_menu(text)
+        text.copy_menu = menu
+        def copy_selected(event=None):
+            if text.tag_ranges('sel'):
+                text.clipboard_clear()
+                text.clipboard_append(text.get('sel.first','sel.last'))
+            return 'break'
+        menu.add_command(label=self.t('Kopieren'), command=copy_selected)
+        def popup(event):
+            menu.entryconfigure(0,label=self.t('Kopieren'),
+                                state='normal' if text.tag_ranges('sel') else 'disabled')
+            try:
+                menu.tk_popup(event.x_root,event.y_root)
+            finally:
+                menu.grab_release()
+            return 'break'
+        text.bind('<Button-1>',lambda e:text.focus_set(),add='+')
+        text.bind('<Button-3>',popup)
+        if self.root.tk.call('tk','windowingsystem')=='aqua':
+            text.bind('<Button-2>',popup)
+            text.bind('<Control-Button-1>',popup)
+        text.bind('<<Copy>>',copy_selected)
+        def select_all(event=None):
+            text.tag_add('sel','1.0','end-1c')
+            return 'break'
+        text.bind('<Control-a>',select_all)
+        text.bind('<Control-A>',select_all)
+        if self.root.tk.call('tk','windowingsystem')=='aqua':
+            text.bind('<Command-a>',select_all)
         button = self.button(dialog, 'Logs löschen', lambda: self.clear_logs(text))
         button.pack(anchor='e', padx=8, pady=8)
         button.configure(state='disabled' if self.busy else 'normal')
@@ -1352,7 +1427,7 @@ class Window:
                         self.update_row(job)
                         if id_ in self.tree.selection():
                             self.refresh_dimensions()
-                            self.details.set((plan.summary + "\n" if plan else str(job.source) + "\n") + detail)
+                            self.show_job_details(job)
                 elif kind in {"notice", "error"}:
                     self.status.set(payload)
                     if kind == "error":

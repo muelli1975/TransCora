@@ -58,10 +58,17 @@ snap(root, 'bd3d-audio.png')
 window.show_audio_options()
 snap(window.audio_dialog, 'audio-options.png')
 window.close_audio_options()
-window.status.set('BD-3D: Fertige Ausgabe vollständig dekodieren und beide Halbbilder prüfen')
+window.status.set('BD-3D: M2TS-Ausgabe erstellen')
 window.elapsed.set('Restzeit: ca. 02:15')
 window.progress['value'] = 94
 snap(root, 'bd3d-check.png')
+job=window.jobs[0]
+job.status='blocked'
+job.detail='Full/Half-Layout nicht eindeutig erkennbar. Quelllayout für diese Datei auswählen.'
+job.plan=None
+window.selection_changed()
+snap(root,'source-warning.png')
+job.status='queued';job.detail='';window.selection_changed()
 window.show_log()
 log = next(w for w in root.winfo_children() if isinstance(w, tk.Toplevel) and w.title() == 'TransCora · Log')
 snap(log, 'log.png')

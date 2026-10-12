@@ -58,7 +58,7 @@ Temporal interlaced sources are converted to progressive pictures while retainin
 
 Under **Advanced**, select H.264 or H.265 (MKV), CRF quality or a target bitrate. Anaglyph quality modes use 4:4:4 colour; a 4:2:0 compatibility mode is available for players that need it. Row-interleaved video uses 4:4:4 to preserve the separate eye rows.
 
-**Audio options** select all tracks, individual tracks or no audio. Keep the original audio, convert to AAC, or downmix to stereo. BD-3D uses LPCM audio and a fixed 23.976 fps output; its selectable total AVC/MVC target bitrate is 20–40 Mbit/s.
+**Audio options** select all tracks, individual tracks or no audio. Keep the original audio, convert to AAC, or downmix to stereo. For BD-3D, audio options and bitrate are grouped under **Advanced**, in separate video and audio rows. BD-3D uses LPCM audio and a fixed 23.976 fps output; its selectable total AVC/MVC target bitrate is 20–40 Mbit/s, with a factory default of 40 Mbit/s.
 
 ## Polarised monitors
 

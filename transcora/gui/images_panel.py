@@ -81,6 +81,7 @@ class ImagePanel:
         _, format_fields = section(fields,2,'Format')
         self.advanced_section, advanced = section(fields,3,'Erweitert')
         self.advanced_section.grid_remove()
+        self.settings_area.advanced = self.advanced_section
         _, save_fields = section(fields,4,'Speichern')
         self.option_frames = {}
         self.mappings = {'task': TASKS, 'layout': LAYOUTS, 'target': TARGETS, 'format': FORMATS,
@@ -173,7 +174,7 @@ class ImagePanel:
         self.abort_button = ttk.Button(actions, text='Abbrechen', command=self.abort, state='disabled', style='Danger.TButton'); self.abort_button.pack(side='right', padx=6)
         self.button(actions, 'Start', lambda: self.run(True), style='Primary.TButton').pack(side='right',padx=5)
         self.button(actions, 'Testen', lambda: self.run(False), style='Primary.TButton').pack(side='right')
-        self.button(actions, 'Protokoll', owner.show_log).pack(side='left')
+        self.button(actions, 'Log', owner.show_log).pack(side='left')
         self.button(actions, 'Details', self.show_details).pack(side='left', padx=6)
         self.progress = ttk.Progressbar(box, mode='determinate', maximum=100); self.progress.grid(row=11, column=0, sticky='ew', pady=(8, 3))
         self.status = TextVar(owner.localizer, value='Bereit.'); ttk.Label(box, textvariable=self.status).grid(row=10, column=0, sticky='ew')

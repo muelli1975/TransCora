@@ -229,9 +229,9 @@ jobs:
           fi
           if gh release view v1.0 >/dev/null 2>&1; then
             release_head=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v1.0" --jq '.object.sha')
-            # Only replace this release's initial candidates from the same session.
+            # Only replace the explicitly approved revisions of this release.
             case "$release_head" in
-              "$GITHUB_SHA"|35d7ea128d37358b847c1007d1b1f7bf20392986|b77593433e2495c1b89bf713e18ee0c70e069065|b1d6ff713a8ef7e92fd7d48d9881cdff21046c4f|9538f9faa7e9c5f0e3861c68205a3729fe60bec7) ;;
+              "$GITHUB_SHA"|35d7ea128d37358b847c1007d1b1f7bf20392986|b77593433e2495c1b89bf713e18ee0c70e069065|b1d6ff713a8ef7e92fd7d48d9881cdff21046c4f|9538f9faa7e9c5f0e3861c68205a3729fe60bec7|b315c91bc012261dea6f645496e9abc4b1c93aa9) ;;
               *) echo 'Release v1.0 belongs to a different revision; leaving it unchanged.'; exit 1 ;;
             esac
             gh release upload v1.0 release-files/* --clobber

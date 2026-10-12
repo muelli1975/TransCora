@@ -1,7 +1,8 @@
 """German source messages with a local English catalogue; never translate user data."""
 import re
 LANGUAGES = {'de': 'Deutsch', 'en': 'English'}
-EN = {'\nFehler: {0}\n{1}\n': '\nError: {0}\n{1}\n',
+EN = {'Log':'Log', 'Kopieren':'Copy', 'Video':'Video', 'Audio':'Audio', 'Bitrate':'Bitrate',
+ '\nFehler: {0}\n{1}\n': '\nError: {0}\n{1}\n',
  '\nGespeichert: ': '\nSaved: ',
  ' Bildprotokoll: {0}': ' Image log: {0}',
  ' H.265: MKV, längere Rechenzeit und Zielplayer prüfen; CRF ist codecabhängig.': ' H.265: MKV, longer '

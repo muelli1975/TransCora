@@ -418,6 +418,93 @@ class GuiTests(unittest.TestCase):
         self.assertLessEqual(self.window.start_button.winfo_rooty()+self.window.start_button.winfo_height(),
                              self.root.winfo_rooty()+self.root.winfo_height())
 
+    def test_normal_settings_fit_and_bd_advanced_controls_stay_in_bounds(self):
+        from transcora.core.model import TARGETS
+        self.window.add_paths([Path('slideshow_full_sbs.mp4')])
+        self.window.tree.selection_set(self.window.jobs[0].id)
+        self.window.selection_changed()
+        # The CI desktop can be shorter than a normal desktop. Test the client
+        # area independently, then check the bounded small-window view too.
+        self.root.geometry('860x860'); self.root.update()
+        for language in ('de','en'):
+            self.window.language=language; self.window.apply_language()
+            for target in ('anaglyph','row_interleaved','bd3d'):
+                self.window.variables['target'].set(self.window.t(TARGETS[target]))
+                self.window.option_changed('target'); self.root.update()
+                area=self.window.settings_area
+                self.assertLessEqual(area.body.winfo_reqheight(),area.canvas.winfo_height())
+                self.assertFalse(area.scroll.winfo_ismapped())
+                self.assertGreaterEqual(self.window.tree.winfo_height(),140)
+            self.assertFalse(self.window.combos['bd_bitrate_mbps'].winfo_ismapped())
+            self.assertFalse(self.window.advanced_audio_button.winfo_ismapped())
+            self.window.toggle_advanced(); self.root.update()
+            self.assertTrue(self.window.combos['bd_bitrate_mbps'].winfo_ismapped())
+            self.assertTrue(self.window.advanced_audio_button.winfo_ismapped())
+            for key in ('codec','rate_mode','crf','bitrate_mbps'):
+                self.assertFalse(self.window.combos[key].winfo_ismapped())
+            self.root.geometry('780x680'); self.root.update()
+            for widget in (self.window.combos['bd_bitrate_mbps'],self.window.advanced_audio_button):
+                self.assertLessEqual(widget.winfo_rootx()+widget.winfo_width(),
+                                     area.canvas.winfo_rootx()+area.canvas.winfo_width())
+            self.window.close_advanced(); self.root.geometry('860x860'); self.root.update()
+
+    def test_language_and_wheel_preserve_bd_bitrate_and_per_file_settings(self):
+        from transcora.core.model import BD_BITRATES, TARGETS
+        self.assertEqual(Options().bd_bitrate_mbps,40)
+        self.window.add_paths([Path('one_full_sbs.mp4'),Path('two_full_sbs.mp4')])
+        first,second=self.window.jobs
+        first.options=replace(first.options,target='bd3d',container='iso',bd_bitrate_mbps=35)
+        second.options=replace(second.options,target='bd3d',container='iso',bd_bitrate_mbps=40)
+        self.window.tree.selection_set(first.id); self.window.selection_changed()
+        self.window.toggle_advanced(); self.root.geometry('780x680'); self.root.update()
+        for language in ('en','de','en'):
+            self.window.language=language; self.window.apply_language(); self.root.update()
+            self.assertEqual(self.window.variables['bd_bitrate_mbps'].get(),'35 Mbit/s')
+            self.assertEqual(second.options.bd_bitrate_mbps,40)
+            self.assertEqual(self.window.defaults.bd_bitrate_mbps,40)
+            for value in BD_BITRATES:
+                first.options=replace(first.options,bd_bitrate_mbps=value)
+                self.window.selection_changed(); self.root.update()
+                for delta in (120,-120):
+                    self.window.combos['bd_bitrate_mbps'].event_generate('<MouseWheel>',delta=delta)
+                    self.root.update()
+                    self.assertEqual(first.options.bd_bitrate_mbps,value)
+                    self.assertEqual(self.window.variables['bd_bitrate_mbps'].get(),f'{value} Mbit/s')
+            first.options=replace(first.options,bd_bitrate_mbps=35)
+        self.window.tree.selection_remove(first.id); self.window.selection_changed()
+        self.window.variables['target'].set(self.window.t(TARGETS['bd3d']))
+        self.window.option_changed('target')
+        self.assertEqual(self.window.variables['bd_bitrate_mbps'].get(),'40 Mbit/s')
+        self.window.add_paths([Path('new_full_sbs.mp4')])
+        self.assertEqual(self.window.jobs[-1].options.bd_bitrate_mbps,40)
+        with tempfile.TemporaryDirectory() as tmp, patch('transcora.gui.window.app_root',return_value=Path(tmp)):
+            self.window.persist_settings()
+            self.window.defaults=replace(self.window.defaults,bd_bitrate_mbps=20)
+            self.window._load_settings()
+            self.assertEqual(self.window.defaults.bd_bitrate_mbps,40)
+
+    def test_file_warnings_are_highlighted_and_follow_selection_and_language(self):
+        from types import SimpleNamespace
+        message='Full/Half-Layout nicht eindeutig erkennbar. Quelllayout für diese Datei auswählen.'
+        self.window.add_paths([Path('unclear.mp4'),Path('good_full_sbs.mp4')])
+        first,second=self.window.jobs
+        first.status,first.detail='blocked',message
+        self.window.tree.selection_set(first.id); self.window.selection_changed()
+        for language in ('de','en'):
+            self.window.language=language; self.window.apply_language(); self.root.update()
+            text=self.window.detail_text
+            self.assertTrue(text.get('1.0','end').startswith('⚠ '+self.window.t(message)))
+            self.assertIn('attention',text.tag_names('1.0'))
+            self.assertEqual(text.tag_cget('attention','foreground'),GOLD_LIGHT)
+        self.window.tree.selection_set(second.id); self.window.selection_changed()
+        self.assertEqual(self.window.attention.get(),'')
+        second.plan=SimpleNamespace(summary='Summary',warnings=['Check your player'],layout='full_sbs',
+                                    info={'video':{'width':3840,'height':1080}},duration=10)
+        self.window.events.put(('job',(second.id,'ready','Check your player',second.plan)))
+        self.window.poll()
+        self.assertTrue(self.window.detail_text.get('1.0','end').startswith('⚠ Check your player'))
+        self.assertEqual(self.window.detail_text.get('1.0','end').count('Check your player'),1)
+
     def setUp(self):
         try:
             self.root = tk.Tk()
@@ -711,6 +798,7 @@ class GuiTests(unittest.TestCase):
         self.window.set_busy(False)
 
     def test_log_has_dark_surfaces_and_scrollbar(self):
+        self.window.log_lines=['alpha beta gamma']
         self.window.show_log()
         self.root.update()
         dialog = next(w for w in self.root.winfo_children() if isinstance(w, tk.Toplevel) and w.winfo_ismapped())
@@ -720,6 +808,23 @@ class GuiTests(unittest.TestCase):
         self.assertEqual(text.cget('background'), PANEL_BG)
         self.assertEqual(text.cget('highlightthickness'), 0)
         self.assertTrue(text.cget('yscrollcommand'))
+        text.event_generate('<ButtonPress-1>',x=text.bbox('1.0')[0]+1,y=text.bbox('1.0')[1]+3)
+        text.event_generate('<B1-Motion>',x=text.bbox('1.5')[0]-1,y=text.bbox('1.5')[1]+3)
+        text.event_generate('<ButtonRelease-1>',x=text.bbox('1.5')[0]-1,y=text.bbox('1.5')[1]+3)
+        self.root.update()
+        self.assertEqual(text.get('sel.first','sel.last'),'alpha')
+        with patch.object(text.copy_menu,'tk_popup') as popup:
+            text.event_generate('<Button-3>',x=10,y=10); self.root.update()
+            popup.assert_called_once()
+            self.assertEqual(text.copy_menu.entrycget(0,'state'),'normal')
+            text.copy_menu.invoke(0)
+        self.assertEqual(self.root.clipboard_get(),'alpha')
+        self.assertEqual(text.get('1.0','end-1c'),'alpha beta gamma')
+        self.assertEqual(str(text.cget('state')),'disabled')
+        text.tag_remove('sel','1.0','end')
+        with patch.object(text.copy_menu,'tk_popup'):
+            text.event_generate('<Button-3>',x=10,y=10); self.root.update()
+            self.assertEqual(text.copy_menu.entrycget(0,'state'),'disabled')
         dialog.destroy()
         self.window.set_busy(True)
         self.window.set_busy(False)

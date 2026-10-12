@@ -8,6 +8,7 @@ TransCora converts stereoscopic videos and images for 3D players, cross-view vie
 - Row-interleaved images and videos for polarised monitors, with adjustable screen resolution and eye order.
 - Windows Blu-ray 3D export to ISO or M2TS, with AVC/MVC video, LPCM audio and a selectable 20–40 Mbit/s bitrate. Valid variable frame rates and timestamp jitter are accepted.
 - Batch processing, saved presets, previews, duration and frame-rate columns, per-file logs and cancellation.
+- Ordinary settings fit the initial window on sufficiently tall displays. Advanced BD-3D settings group video bitrate and audio options, with irrelevant codec/CRF controls hidden. File warnings use a gold warning triangle; scrolling closed settings menus preserves their values. The factory BD-3D bitrate remains 40 Mbit/s in both languages; individual file settings remain independent. The Log view supports mouse selection and copying selected text from its context menu.
 
 ## Downloads and requirements
 
