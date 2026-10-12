@@ -11,8 +11,6 @@ import re
 import subprocess
 import tempfile
 import threading
-import time
-import io
 
 from .model import app_root
 from .toolchain import process_options

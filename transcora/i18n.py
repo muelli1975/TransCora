@@ -1053,6 +1053,14 @@ EN.update({
     'Gespeichert':'Saved',
 })
 
+EN.update({
+ 'Layout, Auflösung und Halbbildreihenfolge bleiben erhalten. Video wird neu kodiert; Ton gemäß Tonoptionen.':
+ 'Layout, resolution and eye image order are retained. Video is re-encoded; audio follows Audio options.',
+ 'Ton passt nicht zum MP4-Ausgabeformat ({0}). Unter Tonoptionen AAC wählen oder MKV verwenden.':
+ 'Audio does not fit the MP4 output format ({0}). Select AAC under Audio options or use MKV.',
+ '). Unter Tonoptionen AAC wählen oder MKV verwenden.': '). Select AAC under Audio options or use MKV.',
+})
+
 PATTERNS = []
 for source, target in EN.items():
     parts = re.split(r"(\{\d+\})", source)

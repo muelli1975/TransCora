@@ -51,7 +51,7 @@ def validate(info, options):
         unsupported = {codec(s, options) for s in tracks} - {'aac', 'mp3', 'ac3', 'eac3', 'alac'}
         if unsupported:
             raise ValueError('Ton passt nicht zum MP4-Ausgabeformat ('+', '.join(sorted(unsupported))+
-                             '). Unter Erweitert AAC wählen oder MKV verwenden.')
+                             '). Unter Tonoptionen AAC wählen oder MKV verwenden.')
     if any(not isinstance(s.get('channels'), int) or not 1 <= s['channels'] <= 8 for s in tracks):
         raise ValueError('Ton: Verlässliche Kanalzahl von 1 bis 8 erforderlich.')
     return tracks

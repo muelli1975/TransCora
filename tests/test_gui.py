@@ -244,7 +244,7 @@ class GuiTests(unittest.TestCase):
         self.window.variables['video_size'].set(self.window.t('Benutzerdefiniert'))
         self.window.option_changed('video_size')
         self.root.update()
-        self.assertFalse(self.window.advanced_dialog.winfo_ismapped())
+        self.assertFalse(self.window.advanced_section.winfo_ismapped())
         self.assertEqual(self.window.tree.winfo_height(), height)
         self.assertEqual(self.window.video_dimensions.master, self.window.option_frames['video_size'])
         self.window.variables['video_width'].set('2560')

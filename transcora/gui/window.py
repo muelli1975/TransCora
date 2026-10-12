@@ -206,8 +206,8 @@ class Window:
         _, source_fields = section(fields,0,'Quelle')
         _, output_fields = section(fields,1,'Ausgabe')
         _, format_fields = section(fields,2,'Format')
-        self.advanced_dialog, self.advanced = section(fields,3,'Erweitert')
-        self.advanced_dialog.grid_remove()
+        self.advanced_section, self.advanced = section(fields,3,'Erweitert')
+        self.advanced_section.grid_remove()
         _, save_fields = section(fields,4,'Speichern')
         self.variables = {}
         self.mappings = {"layout": LAYOUTS, "target": TARGETS, "profile": PROFILES,
@@ -800,7 +800,7 @@ class Window:
                 if options.profile == "quality10":
                     text += " 10 Bit: Feinere Abstufungen; kein HDR-Modus."
         if framerate:
-            text = "Layout, Auflösung und Halbbildreihenfolge bleiben erhalten. Video wird neu kodiert; Ton gemäß Erweitert."
+            text = "Layout, Auflösung und Halbbildreihenfolge bleiben erhalten. Video wird neu kodiert; Ton gemäß Tonoptionen."
         if bd3d:
             text = "1080p · 23,976 fps · AVC/MVC · Hohe Qualität."
             if options.container == 'm2ts':
@@ -997,20 +997,20 @@ class Window:
     def toggle_advanced(self):
         if self.busy:
             return
-        if self.advanced_dialog.winfo_ismapped():
+        if self.advanced_section.winfo_ismapped():
             self.close_advanced()
             return
         if not self.commit_entries():
             return
         self.refresh_controls()
-        self.advanced_dialog.grid()
+        self.advanced_section.grid()
         self.advanced_button.configure(text='Erweitert ▾')
         self.settings_area.show_end(self.advanced)
 
     def close_advanced(self):
         if not self.commit_entries(('crf', 'bitrate_mbps')):
             return
-        self.advanced_dialog.grid_remove()
+        self.advanced_section.grid_remove()
         self.advanced_button.configure(text='Erweitert ▸')
         self.settings_area.canvas.yview_moveto(0)
 

@@ -8,7 +8,7 @@ Everything runs locally, without an account, cloud or tracking. The interface ca
 
 ## Quick start
 
-1. Open **Videos** or **Images** and add files or a folder. Enable **Process subfolders** if needed.
+1. Open **Videos** or **Images** and add files or a folder. Enable **Include subfolders** if needed.
 2. Select the files you want to process. Changes apply to the selected entries; without a selection, they set the defaults for new files.
 3. Choose the source layout and output. Use **Swap L/R** if the eyes are reversed.
 4. Choose the size and output folder. Use **Preview** to check the result before encoding; the preview has a fit view and a scrollable 1:1 pixel view.
@@ -39,7 +39,7 @@ The current file remains visible beside progress information when the processing
 
 ### Resolution and cross-view
 
-Choose **Original**, **1080p**, **2160p** or **Custom**. Standard retains the reconstructed source size for full layouts and uses 1080p for half layouts. Custom width and height always describe the **complete output picture**. The aspect ratio is preserved, with borders when necessary.
+Choose **Original**, **1080p**, **2160p** or **Custom**. Automatic retains the reconstructed source size for full layouts and uses 1080p for half layouts. Custom width and height always describe the **complete output picture**. The aspect ratio is preserved, with borders when necessary.
 
 | Example | Complete picture | Stored pixels per eye |
 | --- | --- | --- |
