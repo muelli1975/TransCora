@@ -13,12 +13,12 @@ import threading
 import time
 
 from .bd3d import BD_RATE, prepare, encoder_args, mux_meta
-from .engine import Cancelled, stop_process, publish_without_overwrite, capture, probe
+from .engine import Cancelled, stop_process, publish_without_overwrite, capture
 from .model import app_root
 from .mvc import tag_generated_stream, coded_fingerprint
 from .naming import default_disc_title
 from .toolchain import process_options
-from .udf import Disc, write_label
+from .udf import write_label
 
 FRAME_BYTES = 1920*1080*3  # two I420 views
 
@@ -113,7 +113,6 @@ def run(args, cancel, log, env, on_output=None, on_line=None):
 
 def encode(tools, bd, plan, base, dependent, cancel, emit, log, estimated_frames, decoder=None):
     from .multiview import input_args, check_decoder
-    config = prepare(plan.info['video'], plan.layout, plan.swap)
     frames = 0
     # FFmpeg supplies progress; source timing and cadence are not approval gates.
     graph = plan.graph+';[left][right]hstack=inputs=2[packed]'

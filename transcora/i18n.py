@@ -1061,6 +1061,10 @@ EN.update({
  '). Unter Tonoptionen AAC wählen oder MKV verwenden.': '). Select AAC under Audio options or use MKV.',
 })
 
+EN.update({'Dateiformat':'File format', 'Gemischte Werte':'Mixed values',
+           'Testen: Datei {0} von {1}':'Checking: file {0} of {1}',
+           'Datei {0} von {1}':'File {0} of {1}'})
+
 PATTERNS = []
 for source, target in EN.items():
     parts = re.split(r"(\{\d+\})", source)

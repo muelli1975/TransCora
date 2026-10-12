@@ -23,7 +23,7 @@ from transcora.core.storage import load_list, save_list, write_json, new_run_log
 from transcora.core.toolchain import Toolchain
 from transcora.gui.native import schedule_dark_titlebar
 from transcora.gui.preview_window import PreviewWindow
-from transcora.gui.theme import checkbox, set_control_state, apply_theme, GOLD_LIGHT, MUTED, TEXT, PANEL_BG, APP_BG, SECONDARY_BG, BORDER
+from transcora.gui.theme import checkbox, set_control_state, apply_theme, GOLD_LIGHT, MUTED, TEXT, PANEL_BG, APP_BG, SECONDARY_BG
 
 
 STATUS = {"queued": "Wartet", "checking": "Prüfung", "ready": "Bereit", "blocked": "Prüfen!",
@@ -254,7 +254,7 @@ class Window:
         combo(fields, 0, 2, "target", "Ziel")
         combo(fields, 1, 0, "method", "Anaglyphenverfahren")
         combo(fields, 1, 1, "profile", "Anaglyph-Ausgabeprofil")
-        combo(fields, 1, 2, "container", "Container")
+        combo(fields, 1, 2, "container", "Dateiformat")
         suffix_frame = ttk.Frame(save_fields)
         suffix_frame.grid(row=1, column=0, sticky="ew", padx=(0, 8), pady=3)
         ttk.Label(suffix_frame, text="Dateinamenszusatz · frei editierbar").pack(anchor="w")
@@ -654,7 +654,7 @@ class Window:
         self.updating = False
         self.last_suffix_display = self.variables['suffix'].get()
         self.last_title_display = self.variables['disc_title'].get()
-        self.selection_text.set(f"Für {len(selected)} ausgewählte Datei(en)")
+        self.selection_text.set(f"Für {len(selected)} ausgewählte Datei(en)" + (" · Gemischte Werte" if any(any(getattr(j.options,k)!=getattr(selected[0].options,k) for j in selected[1:]) for k in self.variables) else ""))
         job = selected[0]
         self.details.set((job.plan.summary if job.plan else str(job.source)) + "\n" + job.detail)
         self.refresh_controls()
@@ -1207,7 +1207,7 @@ class Window:
                     raise Cancelled()
                 self.events.put(("current", (job.source.name,index,len(candidates))))
                 self.events.put(("job", (job.id, "checking", "Technische Prüfung", None)))
-                self.events.put(("notice", f"Testen: Datei {index} von {len(candidates)} · {job.source.name}"))
+                self.events.put(("notice", f"Testen: Datei {index} von {len(candidates)}"))
                 try:
                     def phase(text):
                         self.events.put(('phase', (job.id, index, len(candidates), text)))
@@ -1237,7 +1237,7 @@ class Window:
                     break
                 self.events.put(("current", (job.source.name,index,len(ready))))
                 self.events.put(("job", (job.id, "running", "Verarbeitung", plan)))
-                self.events.put(("notice", f"Datei {index} von {len(ready)} · {job.source.name}"))
+                self.events.put(("notice", f"Datei {index} von {len(ready)}"))
                 def emit(kind, payload):
                     self.events.put((kind, (job.id, index, len(ready), payload)))
                 try:

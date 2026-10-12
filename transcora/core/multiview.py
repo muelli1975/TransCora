@@ -206,7 +206,7 @@ def compressed_views(tools, source, info, folder, cancel, sample=False):
     args = [str(tools.ffmpeg), '-v', 'error', '-nostdin', '-protocol_whitelist', 'file,pipe', '-i', str(source)]
     if sample:
         args += ['-t', '2']
-    capture(args+['-map', '0:'+str(desc['source_index']), '-c', 'copy', '-an', '-f', 'h264', str(base)], cancel, timeout=3600)
+    capture(args+['-map', '0:'+str(desc['source_index']), '-c', 'copy', '-an', '-f', 'h264', str(base)], cancel)
     return base, None
 
 
@@ -388,7 +388,7 @@ def runtime(tools, plan, cancel, seconds=None, emit=None):
     if not desc or desc['kind'] != 'mvc':
         yield plan, None
         return
-    from .engine import capture, stop_process, Cancelled
+    from .engine import stop_process, Cancelled
     with tempfile.TemporaryDirectory(prefix='transcora-mvc-') as tmp:
         if emit:
             emit('phase', 'MVC: Komprimierte Eingabespuren vorbereiten')

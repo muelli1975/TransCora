@@ -8,11 +8,11 @@ import threading
 import time
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
-from PIL import Image, ImageTk, ImageOps
+from PIL import Image
 
 from transcora.core.images import (ImageJob, ImageOptions, EXTENSIONS, TASKS, LAYOUTS, TARGETS, FORMATS,
     plans, execute_image, save_images, load_images, SIZES, SIZE_EDGES, image_methods)
-from transcora.core.engine import Cancelled, methods
+from transcora.core.engine import Cancelled
 from transcora.core.model import app_root, ROW_ORDERS
 from transcora.core.storage import write_json, new_run_log, validate_preset_name
 from transcora.core.toolchain import Toolchain
@@ -94,7 +94,7 @@ class ImagePanel:
                 parent,row,col = locations[key]
                 cell = ttk.Frame(parent); self.option_frames[key] = cell
                 cell.grid(row=row, column=col, sticky='ew', padx=(0, 8), pady=3)
-                label = {'task': 'Aufgabe', 'layout': 'Quelllayout', 'target': 'Ziel', 'format': 'Bildformat',
+                label = {'task': 'Aufgabe', 'layout': 'Quelllayout', 'target': 'Ziel', 'format': 'Dateiformat',
                          'method': 'Anaglyphenverfahren', 'quality': 'JPEG-Qualität'}[key]
                 ttk.Label(cell, text=label).pack(anchor='w')
                 var = tk.StringVar(value=self.t(self.mappings[key][getattr(self.defaults, key)])); self.variables[key] = var
@@ -172,7 +172,7 @@ class ImagePanel:
         self.preview_dialog = None
         self.abort_button = ttk.Button(actions, text='Abbrechen', command=self.abort, state='disabled', style='Danger.TButton'); self.abort_button.pack(side='right', padx=6)
         self.button(actions, 'Start', lambda: self.run(True), style='Primary.TButton').pack(side='right',padx=5)
-        self.button(actions, 'Testen', lambda: self.run(False)).pack(side='right')
+        self.button(actions, 'Testen', lambda: self.run(False), style='Primary.TButton').pack(side='right')
         self.button(actions, 'Protokoll', owner.show_log).pack(side='left')
         self.button(actions, 'Details', self.show_details).pack(side='left', padx=6)
         self.progress = ttk.Progressbar(box, mode='determinate', maximum=100); self.progress.grid(row=11, column=0, sticky='ew', pady=(8, 3))
@@ -242,7 +242,7 @@ class ImagePanel:
             else:
                 var.set(self.t(self.mappings[key][value]) if key in self.mappings else value)
         self.updating = False
-        self.scope.set(f'Für {len(selection)} ausgewählte Datei(en)' if selection else
+        self.scope.set((f'Für {len(selection)} ausgewählte Datei(en)' + (' · Gemischte Werte' if any(any(getattr(j.options,k)!=getattr(selection[0].options,k) for j in selection[1:]) for k in self.variables) else '')) if selection else
                        'Vorgaben für neue Dateien')
         if selection: self.detail.set(selection[0].detail.replace('\n', ' · ')[:220])
         self.sensitivity()
