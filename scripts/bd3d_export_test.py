@@ -90,7 +90,11 @@ def main():
                         raise ValueError('Unicode disc title not preserved')
                     packed = OUT/'iso-packed.ssif'
                     disc.extract('BDMV/STREAM/SSIF/00000.ssif', packed)
-            video = json.loads(capture([str(tools.ffprobe), '-v', 'error', '-show_streams', '-of', 'json', str(packed)]))['streams'][0]
+            streams = json.loads(capture([str(tools.ffprobe), '-v', 'error', '-show_streams', '-of', 'json', str(packed)]))['streams']
+            base_tracks = [stream for stream in streams if stream.get('id') == '0x1011' and stream.get('codec_name') == 'h264']
+            if len(base_tracks) != 1 or not any(stream.get('id') == '0x1012' for stream in streams):
+                raise ValueError('Muxed AVC/MVC track pair missing')
+            video = base_tracks[0]
             if (video['width'],video['height']) != (width,height) or Fraction(video['r_frame_rate']) != output_rate:
                 raise ValueError('Muxed BD dimensions/frame rate mismatch')
             # Independently compare each eye with the prepared source. This catches

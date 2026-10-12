@@ -532,6 +532,31 @@ class GuiTests(unittest.TestCase):
         self.assertTrue(self.window.detail_text.get('1.0','end').startswith('⚠ Check your player'))
         self.assertEqual(self.window.detail_text.get('1.0','end').count('Check your player'),1)
 
+    def test_english_check_log_translates_audio_labels_and_keeps_track_metadata(self):
+        from types import SimpleNamespace
+        from transcora.core.engine import Plan
+        window=self.window
+        window.language='en';window.language_var.set('English');window.apply_language()
+        window.add_paths([Path('film_full_sbs.mp4')])
+        job=window.jobs[0]
+        video=dict(width=3840,height=1080,index=0,codec_name='h264',avg_frame_rate='30/1')
+        audio=dict(index=1,codec_type='audio',codec_name='aac',channels=2,
+                   tags={'language':'und','title':'Fertig · Wartet; Original'})
+        plan=Plan(job.source,Path('C:/Output/film.mp4'),job.options,
+                  dict(video=video,streams=[video,audio]),'full_sbs',False,(1920,1080),
+                  'yuv420p','',60,[],{},'Full-SBS · manuell gewählt',[])
+        with patch('transcora.gui.window.Toolchain.find',return_value=SimpleNamespace(inspect=lambda:{'version':'Fixture tools'})), \
+             patch('transcora.gui.window.plan_job',return_value=plan), \
+             patch('transcora.gui.window.threading.Thread') as thread:
+            thread.return_value.start.side_effect=lambda:thread.call_args.kwargs['target']()
+            window.check(False);window.poll()
+        text='\n'.join(window.log_lines)
+        self.assertIn('Audio: Track 1:',text)
+        self.assertIn('2 channels',text)
+        self.assertIn('und · Fertig · Wartet; Original',text)
+        self.assertNotIn('Spur 1:',text)
+        self.assertEqual(window.status.get(),'Check finished: 1 ready · 0 blocked.')
+
     def test_notes_are_distinct_from_review_warnings_and_selection_has_contrast(self):
         from types import SimpleNamespace
         from transcora.core.model import ANAGLYPH_PLAYER_NOTE, COMPATIBILITY_NOTE

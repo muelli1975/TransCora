@@ -1273,7 +1273,7 @@ class Window:
                     plan = plan_job(tools, job, output, reserved, self.cancel, capabilities, phase=phase)
                     ready.append((job, plan))
                     self.events.put(("job", (job.id, "ready", "\n".join(plan.warnings), plan)))
-                    self.events.put(("log", plan.summary + "\n" + "\n".join(plan.warnings)))
+                    self.events.put(("log", plan.summary_text(self.t) + "\n" + "\n".join(plan.warnings)))
                 except Cancelled:
                     self.events.put(("job", (job.id, "cancelled", "Prüfung abgebrochen", None)))
                     raise
