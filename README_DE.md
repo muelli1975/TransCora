@@ -1,18 +1,18 @@
-# TransCora 1.0
+# TransCora 1.1 — Entwicklung
 
 [English](README.md)
 
-TransCora ist ein lokales Desktopprogramm zum Umwandeln stereoskopischer Videos und Bilder. Es unterstützt SBS, Over/Under, Kreuzblick, Anaglyphen und zeilenverschachtelte Ausgaben für Polfilter-Monitore. Unter Windows erstellt es außerdem Blu-ray-3D-ISOs und AVC/MVC-M2TS. MPO-Dateien lassen sich ohne JPEG-Neukodierung in ihre beiden Augenbilder aufteilen. Videos und Bilder haben eigene Stapellisten, Einstellungen und Kontrollbilder.
+TransCora ist ein lokales Desktopprogramm zum Umwandeln stereoskopischer Videos und Bilder. Es unterstützt SBS, Over/Under, Kreuzblick, Anaglyphen und zeilenverschachtelte Ausgaben für Polfilter-Monitore. Unter Windows erstellt es außerdem Blu-ray-3D-ISOs und AVC/MVC-M2TS. MPO-Dateien lassen sich ohne JPEG-Neukodierung in ihre beiden Halbbilder aufteilen. Videos und Bilder haben eigene Stapellisten, Einstellungen und Kontrollbilder.
 
 Alles läuft lokal, ohne Account, Cloud oder Tracking. Die Oberfläche lässt sich zwischen Deutsch und Englisch umschalten.
 
-![TransCora 1.0: Videostapel und Ausgabeeinstellungen](docs/TransCora-1.0.png)
+![Screenshot aus TransCora 1.0: Videostapel und Ausgabeeinstellungen](docs/TransCora-1.0.png)
 
 ## Schnellstart
 
 1. Öffne **Videos** oder **Bilder** und füge Dateien oder einen Ordner hinzu. Aktiviere bei Bedarf **Unterordner mitverarbeiten**.
 2. Markiere die gewünschten Dateien. Änderungen gelten für die markierten Einträge; ohne Auswahl bilden sie die Vorgabe für neue Dateien.
-3. Wähle Quelllayout und Ziel. Mit **L/R tauschen** korrigierst du eine vertauschte Augenreihenfolge.
+3. Wähle Quelllayout und Ziel. Mit **L/R tauschen** korrigierst du eine vertauschte Halbbildreihenfolge.
 4. Wähle Größe und Ausgabeordner. **Kontrollbild** zeigt das Ergebnis vor der Kodierung, wahlweise ans Fenster angepasst oder in einer verschiebbaren 1:1-Pixelansicht.
 5. **Testen** prüft den Stapel; **Start** verarbeitet ihn. Fortschritt, Dauer und Quellbildrate erscheinen im Fenster.
 
@@ -28,18 +28,24 @@ Die aktuelle Datei bleibt beim Fortschritt sichtbar, auch wenn der Verarbeitungs
 
 Klicke auf einen Spaltenkopf, um die Dateiliste auf- oder absteigend zu sortieren. Bildrate und Dauer werden numerisch sortiert; die sichtbare Reihenfolge gilt auch für den nächsten Verarbeitungslauf. Eingabe- und Ausgabeordner dürfen identisch sein. Beim rekursiven Import wird ein darunterliegender Ausgabe-Unterordner ausgelassen.
 
+Fertige Aufträge zeigen **Bearbeitungszeit** hinter **Status**. **Fertige entfernen** neben **Standardeinstellungen** leert erfolgreiche Einträge aus der Liste. Entf markiert anschließend den nächsten sichtbaren Eintrag, am Listenende den vorherigen.
+
+Erfolgreiche Ausgaben stehen in **TransCora-Journal.json** im Ausgabeordner. Unveränderte Quellen, Einstellungen und Ergebnisdateien werden beim erneuten Hinzufügen wiedererkannt. Entfernen aus der Liste erhält das Journal; Löschen der Journaldatei setzt den gespeicherten Verlauf zurück. Alte Ausgaben ohne Nachweis werden nicht übernommen.
+
+Während eines Stapels wird **Start** zu **Nach Datei pausieren**. Erneutes Klicken hebt den Wunsch auf. Die aktuelle Datei wird fertiggestellt, danach wartet der Stapel; **Fortsetzen** setzt ihn fort. **Abbrechen** bleibt erreichbar. Bei Mono-Ausgabe wählst du das linke oder rechte Halbbild.
+
 ## Videoausgaben
 
 | Ziel | Verwendung |
 | --- | --- |
-| Full-SBS / Full-OU | Zwei vollständige Augenbilder nebeneinander oder übereinander |
+| Full-SBS / Full-OU | Zwei vollständige Halbbilder nebeneinander oder übereinander |
 | Half-SBS / Half-OU | Kompakte Stereoformate für passende Player und Bildschirme |
-| Kreuzblick · Full-SBS R/L | Freies Betrachten: rechtes Auge links, linkes Auge rechts |
+| Kreuzblick · Full-SBS R/L | Freies Betrachten: rechtes Halbbild links, linkes Halbbild rechts |
 | Anaglyph | Stereo mit Farbbrille; 17 Verfahren aus AnaglyphBatch |
-| Mono | Linkes Auge als gewöhnliches Video ausgeben |
+| Mono | Gewähltes linkes oder rechtes Halbbild als gewöhnliches Video ausgeben |
 | Layout beibehalten | Anordnung erhalten und neu kodieren, optional mit anderer Bildrate |
 | Zeilenverschachtelt | Direkte Ausgabe für einen passenden Polfilter-Monitor |
-| BD-3D | Blu-ray-3D-ISO oder AVC/MVC-M2TS: 1080p mit 23,976 fps oder 720p mit 50/59,94 fps je Auge |
+| BD-3D | Blu-ray-3D-ISO oder AVC/MVC-M2TS: 1080p mit 23,976 fps oder 720p mit 50/59,94 fps je Halbbild |
 
 **MP4 ist voreingestellt; MKV bleibt wählbar**, auch für Kreuzblick. MKV erhält die passende Stereo-Kennzeichnung. Kreuzblick-MP4 behält die R/L-Anordnung ohne irreführenden L/R-Marker. Die Player-Unterstützung unterscheidet sich; prüfe die erste Ausgabe auf dem vorgesehenen Gerät.
 
@@ -47,12 +53,12 @@ Klicke auf einen Spaltenkopf, um die Dateiliste auf- oder absteigend zu sortiere
 
 Wähle **Original**, **1080p**, **2160p** oder **Benutzerdefiniert**. Automatisch erhält bei vollständigen Layouts die rekonstruierte Quellgröße und verwendet bei Half-Layouts 1080p. Frei eingegebene Breite und Höhe bezeichnen immer das **gesamte Ausgabebild**. Das Seitenverhältnis bleibt erhalten; falls nötig entstehen Ränder.
 
-| Beispiel | Gesamtes Bild | Gespeicherte Pixel je Auge |
+| Beispiel | Gesamtes Bild | Gespeicherte Pixel je Halbbild |
 | --- | --- | --- |
-| Kreuzblick, 1080p je Auge | 3840 × 1080 | 1920 × 1080 |
+| Kreuzblick, 1080p je Halbbild | 3840 × 1080 | 1920 × 1080 |
 | Kreuzblick, benutzerdefiniert 1920 × 540 | 1920 × 540 | 960 × 540 |
 | Half-SBS in UHD | 3840 × 2160 | 1920 × 2160 |
-| Full-SBS mit UHD je Auge | 7680 × 2160 | 3840 × 2160 |
+| Full-SBS mit UHD je Halbbild | 7680 × 2160 | 3840 × 2160 |
 
 Kreuzblick bleibt in jeder Größe Full-SBS: Beide Bilder werden proportional verkleinert, nicht auf halbe Breite gestaucht. Eine größere Ausgabe kann fehlende Quelldetails nicht zurückholen.
 
@@ -62,19 +68,19 @@ Normalerweise bleibt die Bildrate unverändert. Mit **Zielbildrate wählen** kan
 
 Zeitlich interlaced aufgenommene Videos werden progressiv ausgegeben, mit erhaltener Halbbildzeit: Aus 25 verschachtelten Vollbildern mit 50 Halbbildern werden beispielsweise 50 progressive Bilder pro Sekunde. Eine gewählte Zielbildrate kann diese Bildfolge anschließend anpassen.
 
-Unter **Erweitert** wählst du H.264 oder H.265 (MKV), CRF-Qualität oder eine Zielbitrate. Anaglyphen bieten 4:4:4-Farbqualität und optional 4:2:0 für Player, die dies benötigen. Zeilenverschachtelte Videos verwenden 4:4:4, damit die Augenzeilen getrennt bleiben.
+Unter **Erweitert** wählst du H.264 oder H.265 (MKV), CRF-Qualität oder eine Zielbitrate. Anaglyphen bieten 4:4:4-Farbqualität und optional 4:2:0 für Player, die dies benötigen. Zeilenverschachtelte Videos verwenden 4:4:4, damit die Zeilen der Halbbilder getrennt bleiben.
 
 **Tonoptionen** übernehmen alle Spuren, ausgewählte Spuren oder keinen Ton. Du kannst Originalton beibehalten, nach AAC wandeln oder auf Stereo heruntermischen. Bei BD-3D stehen die Tonoptionen und die Bitrate unter **Erweitert**, getrennt nach Video und Audio. BD-3D verwendet LPCM; unter **Ausgabegröße je Halbbild** wählst du 1080p/23,976 oder 720p/50 beziehungsweise 720p/59,94. Die 720p-Modi bieten flüssigere Bewegung bei geeigneten Quellen, mit geringerer räumlicher Auflösung. Bildpaare werden bei Bedarf ausgelassen oder wiederholt, ohne Bewegungsinterpolation; Laufzeit und Ton bleiben erhalten (nur 24 → 23,976 wird um 0,1 % verlangsamt). Die gemeinsame AVC/MVC-Zielbitrate ist zwischen 20 und 40 Mbit/s wählbar, mit 40 Mbit/s als Werkseinstellung.
 
 ## Polfilter-Monitore
 
-Wähle bei Bildern oder Videos **Zeilenverschachtelt**. Trage die native Monitorbreite und -höhe ein, zunächst 1920 × 1080, und bestimme das Auge für die erste Bildschirmzeile. Linke und rechte Bildzeilen wechseln sich ab.
+Wähle bei Bildern oder Videos **Zeilenverschachtelt**. Trage die native Monitorbreite und -höhe ein, zunächst 1920 × 1080, und bestimme das Halbbild für die erste Bildschirmzeile. Die Zeilen des linken und rechten Halbbilds wechseln sich ab.
 
-Zeige das Ergebnis bildschirmfüllend in exakt nativer Auflösung, ohne Skalierung oder weitere Stereo-Umwandlung. Ist die Tiefe vertauscht, ändere das Auge der ersten Zeile. Für Bilder empfiehlt sich verlustfreies PNG. Ein vorhandenes Half-OU-/abq-Bild mit 1920 × 1080 enthält bereits 1920 × 540 Pixel je Auge und lässt sich für einen Full-HD-Monitor direkt verschachteln.
+Zeige das Ergebnis bildschirmfüllend in exakt nativer Auflösung, ohne Skalierung oder weitere Stereo-Umwandlung. Ist die Tiefe vertauscht, ändere das Halbbild für die erste Zeile. Für Bilder empfiehlt sich verlustfreies PNG. Ein vorhandenes Half-OU-/abq-Bild mit 1920 × 1080 enthält bereits 1920 × 540 Pixel je Halbbild und lässt sich für einen Full-HD-Monitor direkt verschachteln.
 
 ## Bilder und MPO
 
-Öffne JPEG/JPS, PNG/PNS, TIFF, BMP, WebP und MPO mit zwei Augenbildern. Wandle in SBS, Over/Under, Anaglyphen, einzelne Augenbilder oder Zeilenverschachtelung um. Speichere JPEG, PNG, TIFF oder verlustfreies WebP. Bildgrößen: Original, 1080p, 2160p, 2048 Pixel an der langen Seite sowie frei wählbare lange/kurze Seite.
+Öffne JPEG/JPS, PNG/PNS, TIFF, BMP, WebP und MPO mit zwei Halbbildern. Wandle in SBS, Over/Under, Anaglyphen, einzelne Halbbilder oder Zeilenverschachtelung um. Speichere JPEG, PNG, TIFF oder verlustfreies WebP. Bildgrößen: Original, 1080p, 2160p, 2048 Pixel an der langen Seite sowie frei wählbare lange/kurze Seite.
 
 **MPO verlustfrei teilen** speichert die beiden Original-JPEGs als `_l.jpg` und `_r.jpg`, ohne Neukodierung. Auch die zusätzlichen Füllbytes von Fujifilm-Kameras werden berücksichtigt. Bildanaglyphen bieten neben den 17 Videoverfahren **CIELAB Least Squares**. JPEG verwendet normalerweise Qualität 90 mit 4:4:4, optional 95.
 

@@ -4,7 +4,8 @@ Stand: 12. Oktober 2026. Entwicklungszweig: `prepare/v1.1`.
 
 Diese Datei beschreibt den vereinbarten Umfang. Journal, Bearbeitungszeit,
 Listenaktionen und die Bereinigung doppelter Hinweise sind als erster
-Entwicklungsstand implementiert; Pause, neue Eingaben und neue Ausgabeziele folgen.
+Entwicklungsstand implementiert. Pausensteuerung und Mono-Halbbildwahl sind
+ebenfalls umgesetzt und lokal geprüft; neue Eingaben und neue Ausgabeziele folgen.
 Die Abnahme ist im Testplan dokumentiert. Grundlage ist `main` bei
 `7ef801f8aff9697ecd40882a763fdac0cdd2d3fe`; die veröffentlichte 1.0 wurde aus
 `c3f23155db3c56da8377bc7e4dd7bf9bc1eb35e8` gebaut. Die Vorbereitung ändert
@@ -210,8 +211,8 @@ nur Artefakte, die Veröffentlichung von 1.1 erhält einen eigenen ausdrücklich
 ausgelösten Release-Lauf und darf `v1.0` nicht verschieben oder überschreiben.
 
 Zur späteren Versionierung gehören `transcora/__init__.py`, Fenstertitel,
-Paket-Selbsttest, Dokumentation, Downloadnamen und Release Notes. Während dieser
-Vorbereitung bleibt die Anwendungsversion bei 1.0, da die neuen Funktionen fehlen.
+Paket-Selbsttest, Dokumentation, Downloadnamen und Release Notes. Der Entwicklungsstand verwendet
+`1.1-dev`; Downloadlinks verweisen weiterhin auf die veröffentlichte stabile 1.0.
 
 Nicht vorgesehen: HDMI-Frame-Packing-Dateiexport, fertige Ausgaben in TransCora
 nachträglich kontrollieren, Übernahme alter Ausgaben ohne Journal, Journal-

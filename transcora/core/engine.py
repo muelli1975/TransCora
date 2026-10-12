@@ -338,8 +338,10 @@ def build_graph(video: dict, options: Options, layout: str, swap: bool, colors: 
         size = (out_w * (2 if options.target in {'full_sbs', 'cross_sbs'} else 1),
                 out_h * (2 if options.target == 'full_ou' else 1))
     elif options.target == "mono":
-        graph.append("[r]nullsink")
-        graph.append("[l]null[composite]")
+        selected = 'l' if options.mono_eye == 'left' else 'r'
+        other = 'r' if selected == 'l' else 'l'
+        graph.append(f"[{other}]nullsink")
+        graph.append(f"[{selected}]null[composite]")
         size = (display_w, display_h)
     else:
         mode = method["pipeline_type"]

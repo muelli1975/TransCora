@@ -18,6 +18,120 @@ from tkinter import ttk
 
 
 class GuiTests(unittest.TestCase):
+    def test_video_pause_preserves_completed_export_and_freezes_elapsed(self):
+        import threading
+        import shutil
+        from transcora.gui.window import execute as actual_execute
+        from transcora.core.journal import Journal
+        tools = Toolchain.find(); window = self.window
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve(); sample = root / 'sample.mp4'
+            capture([str(tools.ffmpeg), '-v', 'error', '-f', 'lavfi', '-i', 'testsrc2=s=128x32:r=30',
+                     '-frames:v', '1', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-colorspace', 'bt709',
+                     '-color_trc', 'bt709', '-color_primaries', 'bt709', '-color_range', 'tv', str(sample)])
+            sources = []
+            for n in range(2):
+                source = root / f'clip{n}_full_sbs.mp4'; shutil.copy2(sample, source); sources.append(source)
+            window.defaults = replace(Options(), target='full_ou', container='mkv', video_size='original')
+            window.output_var.set(str(root / 'out')); window.add_paths(sources)
+            entered, release = threading.Event(), threading.Event(); calls = []
+            def export(tools, plan, *args):
+                calls.append(plan.source)
+                if len(calls) == 1:
+                    entered.set()
+                    if not release.wait(5): raise AssertionError('Test did not release current video')
+                return actual_execute(tools, plan, *args)
+            def wait_for(predicate):
+                deadline = time.monotonic() + 15
+                while not predicate() and time.monotonic() < deadline:
+                    self.root.update(); time.sleep(.01)
+                self.assertTrue(predicate(), window.status.get())
+            with patch('transcora.gui.window.execute', side_effect=export):
+                window.check(True)
+                try:
+                    wait_for(entered.is_set)
+                    window.start_or_pause(); release.set()
+                    wait_for(lambda: window.pause.paused and window.jobs[0].status == 'completed')
+                    window.poll(); window.update_elapsed()
+                    self.assertEqual(window.status.get(), 'Stapel pausiert')
+                    self.assertEqual(window.start_text.get(), 'Fortsetzen')
+                    self.assertEqual(len(Journal(root / 'out').read()['completed']), 1)
+                    elapsed = window.elapsed_time.get()
+                    with patch('transcora.gui.window.time.monotonic', return_value=time.monotonic() + 100):
+                        window.update_elapsed()
+                    self.assertEqual(window.elapsed_time.get(), elapsed)
+                    self.assertLessEqual(window.start_button.winfo_rootx() + window.start_button.winfo_width(),
+                                         self.root.winfo_rootx() + self.root.winfo_width())
+                    window.start_or_pause(); wait_for(lambda: not window.busy)
+                    self.assertEqual(len(calls), 2)
+                    self.assertTrue(all(j.status == 'completed' for j in window.jobs))
+                finally:
+                    release.set(); window.cancel.set(); wait_for(lambda: not window.busy)
+
+    def test_pause_finishes_the_current_image_then_resumes_or_aborts(self):
+        import threading
+        from PIL import Image
+        from transcora.core.images import ImageOptions
+        from transcora.gui.images_panel import execute_image as actual_execute
+        from transcora.core.journal import Journal
+        panel = self.window.images
+        for abort in (False, True):
+            with tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp).resolve(); sources = []
+                for n in range(3):
+                    source = root / f'pair{n}.mpo'
+                    Image.new('RGB', (32, 24), 'red').save(source, format='MPO', save_all=True,
+                                                        append_images=[Image.new('RGB', (32, 24), 'blue')])
+                    sources.append(source)
+                panel.jobs.clear(); panel.tree.delete(*panel.tree.get_children())
+                panel.defaults = ImageOptions(task='mpo'); panel.output.set(str(root / 'out')); panel.add_paths(sources)
+                entered, release = threading.Event(), threading.Event(); calls = []
+                def execute_file(tools, plan, *args):
+                    calls.append(plan.sources[0])
+                    if len(calls) == 1:
+                        entered.set()
+                        if not release.wait(5): raise AssertionError('Test did not release current export')
+                    return actual_execute(tools, plan, *args)
+                def wait_for(predicate):
+                    deadline = time.monotonic() + 8
+                    while not predicate() and time.monotonic() < deadline:
+                        self.root.update(); time.sleep(.01)
+                    self.assertTrue(predicate(), panel.status.get())
+                with patch('transcora.gui.images_panel.execute_image', side_effect=execute_file):
+                    panel.run(True)
+                    try:
+                        wait_for(entered.is_set)
+                        panel.start_or_pause()
+                        self.assertEqual(panel.start_text.get(), self.window.t('Pause vorgemerkt'))
+                        release.set(); wait_for(lambda: panel.pause.paused)
+                        # Flush the completed-file and pause messages together.
+                        panel.poll()
+                        self.assertEqual([j.status for j in panel.jobs], ['completed', 'ready', 'ready'])
+                        self.assertEqual(len(Journal(root / 'out').read()['completed']), 1)
+                        self.assertEqual(panel.start_text.get(), self.window.t('Fortsetzen'))
+                        panel.abort() if abort else panel.start_or_pause()
+                        wait_for(lambda: not panel.busy)
+                        self.assertEqual(len(calls), 1 if abort else 3)
+                        self.assertEqual(panel.jobs[0].status, 'completed')
+                    finally:
+                        release.set(); panel.cancel.set()
+                        wait_for(lambda: not panel.busy)
+
+    def test_mono_half_image_choice_is_visible_only_for_mono_and_updates_name(self):
+        window = self.window
+        window.add_paths([Path('film_full_sbs.mp4')])
+        window.variables['target'].set('Mono'); window.option_changed('target')
+        self.root.update()
+        self.assertTrue(window.option_frames['mono_eye'].winfo_ismapped())
+        window.variables['mono_eye'].set('Rechtes Halbbild'); window.option_changed('mono_eye')
+        self.assertEqual(window.jobs[0].options.mono_eye, 'right')
+        self.assertIn('_mono_r', window.output_name.get())
+        window.language = 'en'; window.apply_language()
+        self.assertEqual(window.variables['mono_eye'].get(), 'Right half-image')
+        window.variables['target'].set('Half-SBS'); window.option_changed('target')
+        self.root.update()
+        self.assertFalse(window.option_frames['mono_eye'].winfo_ismapped())
+
     def test_journal_write_error_does_not_turn_completed_image_export_into_failure(self):
         from PIL import Image
         from transcora.core.images import ImageOptions, mpo_jpegs

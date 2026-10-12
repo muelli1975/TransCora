@@ -37,7 +37,7 @@ def clean_stem(stem: str) -> str:
     # Remove recognized compound markers only; preserve ordinary words containing '3D'.
     stem = re.sub(r"(?:[-. _])3d[-. _]+h?(?:sbs|tab)(?=$|[-. _])", "", stem, flags=re.I)
     stem = re.sub(r"-(?:half-sbs|half-ou|hsbs|hou|sbs|lrh|rlh|lrq|rlq|tbh|bth|abq|baq|lr|rl|tb|bt|ab|ba|2d)$", "", stem, flags=re.I)
-    stem = re.sub(r"_(?:full_sbs|half_sbs|full_ou|half_ou|mono_l)$", "", stem, flags=re.I)
+    stem = re.sub(r"_(?:full_sbs|half_sbs|full_ou|half_ou|mono_[lr])$", "", stem, flags=re.I)
     stem = re.sub(r"_\d+(?:\.\d+)?(?:_\d+)?fps$", "", stem, flags=re.I)
     stem = re.sub(r"_fps\d+(?:\.\d+)?(?:_\d+)?$", "", stem, flags=re.I)
     stem = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", stem).strip(" ._-") or "Video"
@@ -67,7 +67,7 @@ def suffix_choices(options: Options, method_suffix: str, layout: str | None = No
     choices = {"half_sbs": ["_half_sbs", "-lrh", "-lrq", ".3D.HSBS", ".3D.HSBS-lrh"],
                "half_ou": ["_half_ou", "-tbh", "-abq", ".3D.HTAB", ".3D.HTAB-tbh"],
                "full_sbs": ["_full_sbs", "-lr"], "full_ou": ["_full_ou", "-tb", "-ab"],
-               "mono": ["_mono_l", "-2d"], "bd3d": [], "anaglyph": ["_" + method_suffix]}.get(target, [])
+               "mono": ["_mono_" + ('l' if options.mono_eye == 'left' else 'r'), "-2d"], "bd3d": [], "anaglyph": ["_" + method_suffix]}.get(target, [])
     if options.target == "framerate":
         if swap:
             choices = {"half_sbs": ["-rlh", "-rlq"], "full_sbs": ["-rl"],
@@ -99,9 +99,9 @@ def effective_suffix(options: Options, method_suffix: str, source: Path | None =
     if options.naming == "original":
         return ""
     if options.naming == "layout":
-        return "_" + ("mono_l" if options.target == "mono" else options.target)
+        return "_" + ("mono_" + ('l' if options.mono_eye == 'left' else 'r') if options.target == "mono" else options.target)
     return {"half_sbs": ".3D.HSBS-lrh", "half_ou": ".3D.HTAB-tbh", "full_sbs": ".3D.SBS-lr",
-            "full_ou": ".3D.TAB-tb", "mono": "_mono_l-2d"}[options.target]
+            "full_ou": ".3D.TAB-tb", "mono": "_mono_" + ('l' if options.mono_eye == 'left' else 'r') + "-2d"}[options.target]
 
 
 def output_parts(source: Path, options: Options, method_suffix: str) -> tuple[str, str]:

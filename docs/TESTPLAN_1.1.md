@@ -10,12 +10,16 @@ Tastaturauswahl sind implementiert. Zusätzlich erscheinen gleiche Hinweise nur
 einmal; übliche SDR-Farbannahmen sind neutrale Informationen. Unverändertes
 Übernehmen eines Eingabefelds setzt fertige Aufträge nicht mehr zurück.
 
-Lokale Regression: 131 Tests ausgeführt, davon 129 bestanden, ein nativer CIELAB-
-Test ohne lokalen Build ausgelassen und ein ExifTool-Metadatentest mangels lokal
-lauffähigem Werkzeug nicht ausführbar. Die DLL-Startbeschränkung wurde auch mit
-der bereitgestellten Windows-ExifTool-Datei bestätigt. Der Buildserver muss diese
-beiden Prüfungen mit den regulären Werkzeugen durchführen. Danach ergänzter Test
-für Journal-Schreibfehler und gezielte Nachprüfungen: 17 Tests bestanden.
+Vollständige CI des ersten Entwicklungsstands (`53191f2`): **132 Tests auf
+Windows, Linux und macOS bestanden**, einschließlich 43 GUI-Tests. Die nativen
+BD-3D-/MVC-/MV-HEVC-/MPO-Prüfungen und die gestarteten gepackten Anwendungen
+waren erfolgreich. Ein vorausgehender Lauf scheiterte am HTTP-504 beim Download
+der CIELAB-Abhängigkeit; der wiederholte Lauf war vollständig erfolgreich.
+
+Pausensteuerung und Mono-Halbbildwahl: **85 lokale Regressionen bestanden**.
+Die Tests verarbeiten echte Video- und MPO-Dateien, pausieren nach Veröffentlichung
+und Journaleintrag, prüfen Fortsetzen/Abbrechen und die eingefrorene Zeitmessung.
+Unterschiedliche farbige Halbbilder prüfen beide Mono-Auswahlen und L/R-Tausch.
 
 Die echte 20-Dateien-GUI-Konvertierung wurde um Entfernen/Wiederhinzufügen und
 Erledigt-Erkennung ohne erneute Kodierung erweitert. Mehrteiliger MPO-Export,
@@ -23,7 +27,8 @@ Journalverlust, beschädigtes Journal, Schreibfehler sowie konkurrierende Thread
 und Prozessschreiber sind erfasst. Bei Journal-Schreibfehler bleiben Ausgaben
 und Erfolgsstatus erhalten; die Abschlussmeldung weist auf fehlende Einträge hin.
 
-Vollständige CI und Pakettests dieses Entwicklungsstands stehen noch aus.
+Die plattformübergreifenden Pakettests für den erweiterten Stand mit Pause und
+Mono-Auswahl werden gesondert ausgeführt.
 
 ## Bereits geprüft bei der Vorbereitung
 
@@ -32,7 +37,7 @@ Vollständige CI und Pakettests dieses Entwicklungsstands stehen noch aus.
   Abhängigkeiten; keine HEIC/HEIF/AVIF-Endungen im aktuellen Bildimport.
 - Lokaler Python-Testhost: Pillow **12.1.0** mit AVIF; kein `pillow-heif`.
   Diese Hostausstattung beweist keine Unterstützung im ausgelieferten Paket.
-- Journal fehlt; Listen speichern bisher nur Quellpfade und Einstellungen.
+- 1.0-Listen speichern nur Quellpfade und Einstellungen; 1.1 ergänzt das Journal.
 - Das aktuelle `libx265`-Ziel kodiert gepacktes H.265; MV-HEVC-Ausgabe fehlt.
 - FFmpeg-Voraussetzung mit `scripts/probe_1_1_inputs.py` reproduzierbar prüfen.
   Der Bericht enthält genaue Werkzeugversion und tatsächliche Ergebnisse. Die Probe

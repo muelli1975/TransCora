@@ -19,6 +19,7 @@ from transcora.gui.localization import Localizer, TextVar
 from transcora.gui.settings_area import SettingsArea, section, CurrentFile
 from transcora.gui.file_list import FileListSorter, remove_entries, completed_button
 from transcora.core.journal import Journal, Completion, JournalError, request, restore, processing_text
+from transcora.core.batch_pause import BatchPause
 from transcora.core.engine import Cancelled, execute, methods, plan_job, preview
 from transcora.core.model import Job, LAYOUTS, PROFILES, TARGETS, Options, VIDEO_EXTENSIONS, app_root, FPS_CHOICES, FPS_MODES, COMPATIBILITY_NOTE, ANAGLYPH_PLAYER_NOTE, AUDIO_FORMATS, AUDIO_TRACKS, AUDIO_CHANNELS, VIDEO_SIZES, BD_BITRATES, BD_MODES, ROW_ORDERS
 from transcora.core.naming import effective_suffix, suffix_choices, reserve_output, filename_layout, fps_suffix, default_disc_title
@@ -41,6 +42,9 @@ class Window:
         self.events = queue.Queue()
         self.cancel = threading.Event()
         self.busy = False
+        self.processing = False
+        self.pause = BatchPause()
+        self.pause_started = None
         self.run_started = None
         self.estimate_weights = []
         self.remaining_time = RemainingTime()
@@ -225,6 +229,7 @@ class Window:
         _, save_fields = section(fields,4,'Speichern')
         self.variables = {}
         self.mappings = {"layout": LAYOUTS, "target": TARGETS, "profile": PROFILES,
+                         'mono_eye': {'left': 'Linkes Halbbild', 'right': 'Rechtes Halbbild'},
                          "method": {k: m["label"] for k, m in self.catalog.items()},
                          "container": {"mkv": "MKV", "mp4": "MP4", "iso": "Blu-ray-ISO", "m2ts": "M2TS (AVC/MVC)"},
                          "codec": {"h264": "H.264", "h265": "H.265 / HEVC"},
@@ -239,6 +244,7 @@ class Window:
             routes = {'layout':(source_fields,0,0),'target':(output_fields,0,0),
                       'video_size':(output_fields,0,1),'method':(output_fields,1,0),
                       'profile':(output_fields,1,1),'row_first':(output_fields,1,0),
+                      'mono_eye':(output_fields,1,0),
                       'container':(format_fields,0,0)}
             parent,row,col = routes.get(key,(parent,row,col))
             frame = ttk.Frame(parent)
@@ -266,6 +272,7 @@ class Window:
         self.swap_control = swap
         self.controls.append((swap, "normal"))
         combo(fields, 0, 2, "target", "Ziel")
+        combo(fields, 1, 0, 'mono_eye', 'Halbbild')
         combo(fields, 1, 0, "method", "Anaglyphenverfahren")
         combo(fields, 1, 1, "profile", "Anaglyph-Ausgabeprofil")
         combo(fields, 1, 2, "container", "Dateiformat")
@@ -523,7 +530,8 @@ class Window:
         timing_visibility()
         self.abort_button = ttk.Button(footer, text="Abbrechen", command=self.abort, state="disabled", style="Danger.TButton")
         self.abort_button.pack(side="right")
-        self.start_button = self.button(footer, "Start", lambda: self.check(True), style="Primary.TButton")
+        self.start_text = TextVar(self.localizer, 'Start')
+        self.start_button = self.button(footer, "Start", self.start_or_pause, style="Primary.TButton", textvariable=self.start_text)
         self.start_button.pack(side="right", padx=5)
         self.test_button = self.button(footer, "Testen", lambda: self.check(False), style="Primary.TButton")
         self.test_button.pack(side="right")
@@ -684,7 +692,9 @@ class Window:
             seconds = int(job.source_duration + .5)
             duration = f"{seconds//3600:02}:{seconds//60%60:02}:{seconds%60:02}"
         values = (job.source.name, self.t(LAYOUTS.get(layout, "?")), fps, duration,
-                  self.t(('BD-3D · ' + self.t(BD_MODES[job.options.bd_mode]) if job.options.target == 'bd3d' else TARGETS[job.options.target])), self.t(STATUS[job.status]), processing_text(job.result))
+                  self.t(('BD-3D · ' + self.t(BD_MODES[job.options.bd_mode]) if job.options.target == 'bd3d' else
+                          'Mono · ' + self.t(self.mappings['mono_eye'][job.options.mono_eye]) if job.options.target == 'mono' else TARGETS[job.options.target])),
+                  self.t(STATUS[job.status]), processing_text(job.result))
         if self.tree.exists(job.id):
             self.tree.item(job.id, values=values)
         else:
@@ -828,7 +838,7 @@ class Window:
                 self.update_row(job)
             if key == "codec" and value == "h265":
                 self.variables["container"].set("MKV")
-            if key in {"target", "method", "target_fps", "layout", "disc_title", "container", 'audio_channels', "video_size", 'bd_mode', 'row_first', 'fps_mode'}:
+            if key in {"target", "method", "target_fps", "layout", "disc_title", "container", 'audio_channels', "video_size", 'bd_mode', 'row_first', 'fps_mode', 'mono_eye'}:
                 self.selection_changed()
             self.last_suffix_display = self.variables['suffix'].get()
             self.status.set("Einstellungen übernommen. Vor dem Start wird erneut geprüft.")
@@ -856,6 +866,7 @@ class Window:
         self.title_frame.grid() if bd3d and selected else self.title_frame.grid_remove()
         self.option_frames['method'].grid() if anaglyph else self.option_frames['method'].grid_remove()
         self.option_frames['row_first'].grid() if rows else self.option_frames['row_first'].grid_remove()
+        self.option_frames['mono_eye'].grid() if options.target == 'mono' else self.option_frames['mono_eye'].grid_remove()
         self.option_frames['profile'].grid() if anaglyph else self.option_frames['profile'].grid_remove()
         self.combos['container'].configure(values=[self.t(self.mappings['container'][k]) for k in
             (('iso', 'm2ts') if bd3d else ('mp4', 'mkv'))])
@@ -1230,6 +1241,9 @@ class Window:
         self.abort_button.configure(state="normal" if value else "disabled")
         completed_button(self)
         if not value:
+            self.processing = False
+        self.update_start_button()
+        if not value:
             self.update_elapsed()
             self.elapsed.set('Restzeit: Datei — · Stapel —')
             self.run_started = None
@@ -1241,7 +1255,7 @@ class Window:
     def update_elapsed(self):
         if self.run_started is None:
             return
-        now = time.monotonic()
+        now = self.pause_started if self.pause_started is not None else time.monotonic()
         self.elapsed_time.set('Vergangene Zeit: ' + PreviewWindow.time_text(max(0, now-self.run_started)))
         file_left, batch_left = self.remaining_time.remaining(now)
         def label(value):
@@ -1263,6 +1277,9 @@ class Window:
         if self.busy:
             return
         self.cancel.clear()
+        self.processing = track_time
+        self.pause.reset()
+        self.pause_started = None
         if track_time:
             self.run_started = time.monotonic()
             self.estimate_weights = []
@@ -1391,6 +1408,8 @@ class Window:
                         log.write(f"\nFehler: {job.source}\n{error}\n")
                     self.events.put(("job", (job.id, "failed", str(error), plan)))
                     self.events.put(("log", job.source.name + ": " + str(error)))
+                if index < len(ready):
+                    self.pause.wait(self.cancel, lambda paused, value: self.events.put(('pause', (paused, value, index, len(ready)))))
             summary = (f"{counts['completed']} erfolgreich · {counts['failed']} Fehler · {blocked} blockiert · "
                        f"{counts['cancelled']} abgebrochen. Log: {log_path or self.t('Kein Lauf gestartet')}")
             if journal_failures:
@@ -1425,6 +1444,17 @@ class Window:
         viewer.dialog.protocol("WM_DELETE_WINDOW", lambda: self.close_preview(
             viewer.dialog, viewer.time_entry, viewer.scale))
         viewer.dialog.after(50, viewer.request)
+
+    def update_start_button(self):
+        self.start_text.set(self.pause.caption if self.busy and self.processing else 'Start')
+        self.start_button.configure(state='normal' if not self.busy or self.processing else 'disabled')
+
+    def start_or_pause(self):
+        if self.busy and self.processing:
+            self.pause.toggle()
+            self.update_start_button()
+        elif not self.busy:
+            self.check(True)
 
     def close_preview(self, dialog, *widgets):
         self.controls = [(widget, state) for widget, state in self.controls if widget not in widgets]
@@ -1530,6 +1560,19 @@ class Window:
                     job = next((j for j in self.jobs if j.id == payload[0]), None)
                     if job:
                         job.result = payload[1]
+                elif kind == 'pause':
+                    paused, value, index, count = payload
+                    if paused:
+                        self.pause_started = value
+                        self.status.set('Stapel pausiert')
+                        self.progress.stop()
+                        self.progress.configure(mode='determinate')
+                        self.progress['value'] = index / count * 100
+                    else:
+                        if self.run_started is not None:
+                            self.run_started += value
+                        self.pause_started = None
+                    self.update_start_button()
                 elif kind in {"notice", "error"}:
                     self.status.set(payload)
                     if kind == "error":

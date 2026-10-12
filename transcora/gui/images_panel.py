@@ -17,6 +17,7 @@ from transcora.core.model import app_root, ROW_ORDERS
 from transcora.core.storage import write_json, new_run_log, validate_preset_name
 from transcora.core.toolchain import Toolchain
 from transcora.core.journal import Journal, Completion, request, restore, processing_text
+from transcora.core.batch_pause import BatchPause
 from .theme import checkbox, set_control_state, GOLD_LIGHT, MUTED, SECONDARY_BG, TEXT, APP_BG
 from .native import schedule_dark_titlebar
 from .localization import TextVar
@@ -31,6 +32,7 @@ class ImagePanel:
     def __init__(self, parent, owner):
         self.owner = owner; self.root = owner.root; self.t = owner.t; self.jobs = []; self.controls = []
         self.events = queue.Queue(); self.cancel = threading.Event(); self.busy = False; self.updating = False
+        self.processing = False; self.pause = BatchPause()
         self.defaults = ImageOptions(); self.presets = {}; self.input_folder = str(app_root())
         self.output = tk.StringVar(value=str(app_root()/'output')); self.recursive = tk.BooleanVar(value=False)
         try:
@@ -178,7 +180,9 @@ class ImagePanel:
         self.preview_button.pack(side='left', padx=6)
         self.preview_dialog = None
         self.abort_button = ttk.Button(actions, text='Abbrechen', command=self.abort, state='disabled', style='Danger.TButton'); self.abort_button.pack(side='right', padx=6)
-        self.button(actions, 'Start', lambda: self.run(True), style='Primary.TButton').pack(side='right',padx=5)
+        self.start_text = TextVar(owner.localizer, 'Start')
+        self.start_button = self.button(actions, 'Start', self.start_or_pause, style='Primary.TButton', textvariable=self.start_text)
+        self.start_button.pack(side='right',padx=5)
         self.button(actions, 'Testen', lambda: self.run(False), style='Primary.TButton').pack(side='right')
         self.button(actions, 'Log', owner.show_log).pack(side='left')
         self.button(actions, 'Details', self.show_details).pack(side='left', padx=6)
@@ -487,10 +491,22 @@ class ImagePanel:
         self.owner.notebook.tab(self.owner.video_tab, state='disabled' if value else 'normal')
         for widget, normal in self.controls: set_control_state(widget, 'disabled' if value else normal)
         self.abort_button.configure(state='normal' if value else 'disabled'); self.sensitivity()
+        if not value: self.processing = False
+        self.update_start_button()
         if not value:self.sorter.refresh()
 
     def abort(self):
         if self.busy: self.cancel.set(); self.status.set('Abbruch angefordert …'); self.abort_button.configure(state='disabled')
+
+    def update_start_button(self):
+        self.start_text.set(self.pause.caption if self.busy and self.processing else 'Start')
+        self.start_button.configure(state='normal' if not self.busy or self.processing else 'disabled')
+
+    def start_or_pause(self):
+        if self.busy and self.processing:
+            self.pause.toggle(); self.update_start_button()
+        elif not self.busy:
+            self.run(True)
 
     def run(self, convert):
         if self.busy or self.owner.busy or not self.jobs: return
@@ -502,7 +518,8 @@ class ImagePanel:
         if not snapshot: self.status.set('Alle Bilder sind bereits fertig.'); return
         output = Path(self.output.get()).expanduser().resolve()
         if not self.output.get().strip(): messagebox.showerror(self.t('Bilder'), self.t('Ausgabeordner auswählen.'), parent=self.root); return
-        self.cancel.clear(); self.set_busy(True); self.progress['value'] = 0; self.status.set('Bildstapel prüfen …')
+        self.cancel.clear(); self.processing = convert; self.pause.reset()
+        self.set_busy(True); self.progress['value'] = 0; self.status.set('Bildstapel prüfen …')
         def worker():
             try:
                 prepared = []; reserved = set(); receipts = {}; blocked = failed = completed = journal_failures = 0
@@ -557,6 +574,8 @@ class ImagePanel:
                             self.events.put(('result', (plan.sources, completion)))
                             completed += 1
                             self.events.put(('job', (plan.sources, 'completed', plan.summary)))
+                        if number < len(prepared):
+                            started += self.pause.wait(self.cancel, lambda paused, value: self.events.put(('pause', (paused, value, number, len(prepared)))))
                         left = (time.monotonic()-started)/number*(len(prepared)-number)
                         self.events.put(('progress', (number/len(prepared)*100, f'{number}/{len(prepared)} · Restzeit etwa {left:.0f} s')))
                     if completed: self.owner.events.put(('sound', None))
@@ -609,6 +628,11 @@ class ImagePanel:
                     for job in self.jobs:
                         if job.source.resolve() in sources:
                             job.result = completion
+                elif kind == 'pause':
+                    paused, _, index, count = data
+                    if paused:
+                        self.status.set('Stapel pausiert'); self.progress['value'] = index / count * 100
+                    self.update_start_button()
                 elif kind == 'error':
                     status, detail = data; self.status.set(detail); self.owner.log_lines.append(detail)
                     for job in self.jobs:

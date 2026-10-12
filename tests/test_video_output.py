@@ -16,6 +16,31 @@ from transcora.core.bd3d import encoder_args
 
 
 class VideoOutputTests(unittest.TestCase):
+    def test_mono_exports_the_selected_half_image_and_respects_swap(self):
+        import io
+        from PIL import Image
+        tools = Toolchain.find()
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp).resolve()
+            image = Image.new('RGB', (128, 32), 'red'); image.paste('blue', (64, 0, 128, 32))
+            picture = folder / 'source.png'; image.save(picture)
+            source = folder / 'source_full_sbs.mkv'
+            capture([str(tools.ffmpeg), '-v', 'error', '-i', str(picture), '-frames:v', '1',
+                     '-c:v', 'ffv1', '-pix_fmt', 'gbrp', '-colorspace', 'rgb', '-color_primaries', 'bt709',
+                     '-color_trc', 'iec61966-2-1', '-color_range', 'pc', str(source)])
+            for side, swap, blue in [('left', False, False), ('right', False, True), ('right', True, False)]:
+                options = Options(target='mono', mono_eye=side, swap=swap, video_size='original', container='mkv')
+                plan = plan_job(tools, Job(source, options), folder / 'out', set())
+                execute(tools, plan, threading.Event(), lambda *args: None, folder / 'export.log')
+                self.assertIn('_mono_' + ('l' if side == 'left' else 'r'), plan.output.stem)
+                decoded = capture([str(tools.ffmpeg), '-v', 'error', '-i', str(plan.output), '-frames:v', '1',
+                                   '-c:v', 'png', '-f', 'image2pipe', '-'])
+                with Image.open(io.BytesIO(decoded)) as output:
+                    self.assertEqual(output.size, (64, 32))
+                    r, _, b = output.convert('RGB').getpixel((32, 16))
+                    self.assertGreater(b if blue else r, 200)
+                    self.assertLess(r if blue else b, 40)
+
     def test_cross_view_full_hd_keeps_circles_round_in_mp4_and_mkv(self):
         import io
         from PIL import Image, ImageDraw

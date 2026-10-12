@@ -102,9 +102,9 @@ Full-Ausgaben erhalten die rekonstruierte Auflösung je Halbbild. Half → Full
 skaliert die gestauchte Achse hoch und gewinnt keine verlorenen Bilddetails zurück.
 Die Videogröße ist als **Standard / Original / 1080p / 2160p / Benutzerdefiniert** wählbar.
 Standard behält die bisherigen Größen bei. Original verwendet die rekonstruierte
-Quellgröße je Auge. Benutzerdefinierte Maße gelten bei allen Videoausgaben für
-das Gesamtbild. Kreuzblick mit 1920 × 540 enthält zwei unverzerrte 960 × 540-Augenbilder. Half-SBS in UHD bedeutet
-3840 × 2160 gesamt, Full-SBS mit UHD je Auge 7680 × 2160 gesamt.
+Quellgröße je Halbbild. Benutzerdefinierte Maße gelten bei allen Videoausgaben für
+das Gesamtbild. Kreuzblick mit 1920 × 540 enthält zwei unverzerrte 960 × 540-Halbbilder. Half-SBS in UHD bedeutet
+3840 × 2160 gesamt, Full-SBS mit UHD je Halbbild 7680 × 2160 gesamt.
 Eine größere Ausgabe stellt keine verlorenen Quelldetails wieder her.
 
 Full-/Half-SBS und Full-/Half-OU sind mögliche Quellen. Zusätzlich werden progressive
@@ -187,7 +187,7 @@ H.264 verwendet zusätzlich Frame-Packing-SEI (3 für SBS, 4 für OU). Ein verlu
 MKV→MP4-Verpackungsschritt überträgt die Container-Kennzeichnung; das Video wird
 nur einmal kodiert. Die fertige Ausgabe wird auf diese Kennzeichnungen geprüft.
 Bei **Layout beibehalten** mit umgekehrter Halbbildreihenfolge speichert MKV die
-passende Augenreihenfolge. MP4 bleibt wählbar und erhält keine irreführenden L/R-Flags,
+passende Halbbildreihenfolge. MP4 bleibt wählbar und erhält keine irreführenden L/R-Flags,
 weil st3d die Umkehrung nicht ausdrücken kann. Anaglyph-/Mono-Ausgaben erhalten keine SBS/OU-Flags.
 **Testen** zeigt die Layout-Erkennung und die geplanten Kennzeichnungen.
 
@@ -400,7 +400,7 @@ Größenoptionen frei wählbar; voreingestellt sind 1920 × 1080. Die erste Zeil
 dem linken oder rechten Auge zugeordnet werden. L/R tauschen bleibt die getrennte
 Quellinterpretation. Jedes Auge wird vor der Verschachtelung mit Lanczos auf sein
 Zielraster eingepasst; passende Half-OU/abq-Quellen werden nur zeilenweise umgeordnet.
-Ein 1920 × 1080 großes abq-Bild liefert dabei unverändert 1920 × 540 Zeilen je Auge.
+Ein 1920 × 1080 großes abq-Bild liefert dabei unverändert 1920 × 540 Zeilen je Halbbild.
 Bei abweichendem Seitenverhältnis bleiben schwarze Ränder innerhalb der exakten
 Bildschirmmaße. Die fertigen Zeilen werden nicht nachträglich skaliert.
 
@@ -415,12 +415,12 @@ SBS/OU-Containerkennzeichnung ausgegeben. Dateizusätze sind `_rows_lr` oder `_r
 Zur direkten Wiedergabe müssen Bildschirmauflösung und Ausgabemaße übereinstimmen.
 Vollbild und Pixelzuordnung 1:1 verwenden; Skalierung, Overscan und eine erneute
 3D-Umwandlung im Player/Monitor vermeiden. Das ist ein Bildschirmformat, keine
-zeitliche 1080i-Ausgabe. Die Datei bleibt zeitlich progressiv. Native Augenreihenfolge
+zeitliche 1080i-Ausgabe. Die Datei bleibt zeitlich progressiv. Native Halbbildreihenfolge
 und Sitzposition müssen am tatsächlichen Monitor geprüft werden.
 
 ## Interlaced-Eingaben und Dateiliste
 
-Zeitlich interlaced SBS/OU wird je Auge mit BWDIF und einem progressiven Bild pro
+Zeitlich interlaced SBS/OU wird je Halbbild mit BWDIF und einem progressiven Bild pro
 Halbbildzeit aufbereitet. Beispielsweise werden 25 interlaced Bilder mit 50
 Halbbildzeitpunkten zu 50 progressiven Bildern pro Sekunde. Eine ausdrücklich
 gewählte Zielbildrate beziehungsweise BD-3D passt die gemeinsame Bildfolge danach
