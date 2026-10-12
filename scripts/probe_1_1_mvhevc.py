@@ -6,8 +6,10 @@ from pathlib import Path
 import subprocess
 
 
-def run(args):
+def run(args, log=None):
     result = subprocess.run(list(map(str, args)), capture_output=True, timeout=120)
+    if log is not None:
+        log.write_bytes(result.stderr)
     if result.returncode:
         raise RuntimeError(result.stderr.decode('utf-8', 'replace')[-5000:])
     return result.stdout
@@ -37,7 +39,7 @@ def main():
         run([x265, '--multiview-config', config, '--input-res', '128x64', '--fps', '25', '--frames', '12',
              '--input-csp', 'i420', '--input-depth', '8', '--preset', 'ultrafast', '--lossless',
              '--bframes', '0', '--keyint', '12', '--repeat-headers', '--pools', 'none',
-             '--frame-threads', '1', '--output', raw])
+             '--frame-threads', '1', '--output', raw], folder/'encoder.log')
         report['encoder'] = 'passed'
         audio = folder/'audio.wav'
         run([ffmpeg, '-v', 'error', '-f', 'lavfi', '-i', 'sine=frequency=700:sample_rate=48000',
@@ -58,9 +60,14 @@ def main():
                 video = next(stream for stream in streams if stream['codec_type'] == 'video')
                 check['views'] = {key: video.get(key) for key in ('view_ids_available', 'view_pos_available')}
                 decoded = []
+                check['decoded_views'] = []
                 for index in range(2):
                     pixels = run([ffmpeg, '-v', 'error', '-i', path, '-map', f'0:v:0:vidx:{index}',
-                                  '-pix_fmt', 'yuv420p', '-f', 'rawvideo', '-'])
+                                  '-fps_mode', 'passthrough', '-pix_fmt', 'yuv420p', '-f', 'rawvideo', '-'])
+                    check['decoded_views'].append({'index': index, 'bytes': len(pixels),
+                        'expected_bytes': len(originals[index]), 'first_samples': list(pixels[:4]),
+                        'sha256': hashlib.sha256(pixels).hexdigest(),
+                        'expected_sha256': hashlib.sha256(originals[index]).hexdigest()})
                     assert pixels == originals[index], f'View {index}: frames, pixels or ordering differ'
                     decoded.append(hashlib.sha256(pixels).hexdigest())
                 check['both_views_pixel_exact'] = decoded
@@ -68,7 +75,7 @@ def main():
                 # explicit left/right decoder path or Apple interoperability.
                 for index, side in enumerate(('left', 'right')):
                     pixels = run([ffmpeg, '-v', 'error', '-i', path, '-map', f'0:v:0:vpos:{side}',
-                                  '-pix_fmt', 'yuv420p', '-f', 'rawvideo', '-'])
+                                  '-fps_mode', 'passthrough', '-pix_fmt', 'yuv420p', '-f', 'rawvideo', '-'])
                     assert pixels == originals[index], f'Explicit {side} view is missing or differs'
                 if path.suffix == '.mp4':
                     timestamps = json.loads(run([ffprobe, '-v', 'error', '-select_streams', 'v:0',

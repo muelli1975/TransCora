@@ -54,5 +54,8 @@ jobs:
           path: |
             work/heif-probe/report.json
             work/mvhevc-probe/report.json
+            work/mvhevc-probe/encoder.log
+            work/mvhevc-probe/stereo.hevc
+            work/mvhevc-probe/*.mp4
           if-no-files-found: warn
           retention-days: 30
