@@ -10,6 +10,34 @@
         "view_ids_available": "0,1",
         "view_pos_available": ""
       },
+      "decoded_views": [
+        {
+          "index": 0,
+          "bytes": 147456,
+          "expected_bytes": 147456,
+          "first_samples": [
+            65,
+            65,
+            65,
+            65
+          ],
+          "sha256": "e835686d35ee148da524920c3a2b2341e45194a0cd4cf7521a9307bbfd60ac57",
+          "expected_sha256": "e835686d35ee148da524920c3a2b2341e45194a0cd4cf7521a9307bbfd60ac57"
+        },
+        {
+          "index": 1,
+          "bytes": 135168,
+          "expected_bytes": 147456,
+          "first_samples": [
+            132,
+            132,
+            132,
+            132
+          ],
+          "sha256": "02c0188b950a870d82570356f45647d59a9b3c2ec99f4c5b29141e80ead82c63",
+          "expected_sha256": "f2e650983c48bd24ac3347bc143eabf65705d2259de2ea319f41f9cd60407018"
+        }
+      ],
       "reason": "View 1: frames, pixels or ordering differ"
     },
     {
@@ -19,6 +47,34 @@
         "view_ids_available": "0,1",
         "view_pos_available": ""
       },
+      "decoded_views": [
+        {
+          "index": 0,
+          "bytes": 147456,
+          "expected_bytes": 147456,
+          "first_samples": [
+            65,
+            65,
+            65,
+            65
+          ],
+          "sha256": "e835686d35ee148da524920c3a2b2341e45194a0cd4cf7521a9307bbfd60ac57",
+          "expected_sha256": "e835686d35ee148da524920c3a2b2341e45194a0cd4cf7521a9307bbfd60ac57"
+        },
+        {
+          "index": 1,
+          "bytes": 135168,
+          "expected_bytes": 147456,
+          "first_samples": [
+            132,
+            132,
+            132,
+            132
+          ],
+          "sha256": "02c0188b950a870d82570356f45647d59a9b3c2ec99f4c5b29141e80ead82c63",
+          "expected_sha256": "f2e650983c48bd24ac3347bc143eabf65705d2259de2ea319f41f9cd60407018"
+        }
+      ],
       "reason": "View 1: frames, pixels or ordering differ"
     },
     {
@@ -28,6 +84,34 @@
         "view_ids_available": "0,1",
         "view_pos_available": ""
       },
+      "decoded_views": [
+        {
+          "index": 0,
+          "bytes": 147456,
+          "expected_bytes": 147456,
+          "first_samples": [
+            65,
+            65,
+            65,
+            65
+          ],
+          "sha256": "e835686d35ee148da524920c3a2b2341e45194a0cd4cf7521a9307bbfd60ac57",
+          "expected_sha256": "e835686d35ee148da524920c3a2b2341e45194a0cd4cf7521a9307bbfd60ac57"
+        },
+        {
+          "index": 1,
+          "bytes": 135168,
+          "expected_bytes": 147456,
+          "first_samples": [
+            132,
+            132,
+            132,
+            132
+          ],
+          "sha256": "02c0188b950a870d82570356f45647d59a9b3c2ec99f4c5b29141e80ead82c63",
+          "expected_sha256": "f2e650983c48bd24ac3347bc143eabf65705d2259de2ea319f41f9cd60407018"
+        }
+      ],
       "reason": "View 1: frames, pixels or ordering differ"
     }
   ],
@@ -36,6 +120,6 @@
     "production integration"
   ],
   "encoder": "passed",
-  "workflow_run": "https://github.com/muelli1975/TransCora/actions/runs/38281236340",
-  "source_commit": "7b82b3d6af252ecc10f2af8a4fec8d31ed1e87bc"
+  "workflow_run": "https://github.com/muelli1975/TransCora/actions/runs/38283082949",
+  "source_commit": "775a6b6a5fbdd9a794edc9e67dd52dc63a1207c9"
 }

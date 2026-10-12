@@ -54,6 +54,14 @@ selbst war erfolgreich und hat diese Einschränkungen gemeldet. Es wird kein
 MV-HEVC-Ausgabeziel freigegeben. Vollständiger Bericht:
 [1.1-mvhevc-probe.json](verification/1.1-mvhevc-probe.json).
 
+Gezielte Wiederholung mit `-fps_mode passthrough` (keine vom Test hinzugefügten
+Bilder) bestätigt die Einschränkung: View 0 liefert 12 pixelgleiche Bilder,
+View 1 nur 11 statt 12 und abweichende Pixel. Dies betrifft rohes HEVC und beide
+MP4-Varianten mit x265 4.3 und dem festgelegten FFmpeg 7.1.1. Die Zuordnung zum
+Encoder oder Decoder ist damit noch nicht geklärt. Encoderlog und synthetische
+Ausgaben sind im gesonderten Codec-Artefakt gesichert. Kein neues Ausgabeziel
+und keine zusätzliche Produkt-Sperrprüfung werden daraus abgeleitet.
+
 AVIF bleibt optional und ist für diesen Stand nicht aktiviert: Der Pillow-Leser
 liefert hier keine NCLX-/HDR-Transferkennzeichnung an die vorhandene Bildpipeline.
 Die Ausgabe darf nicht still eine HDR-Datei als gewöhnliches SDR behandeln.

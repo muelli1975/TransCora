@@ -193,6 +193,8 @@ Ausgabeziel oder eine Versionsfreigabe erfolgt.
 Ergebnis der ersten vollständigen Probe vom 12. Oktober: Der festgelegte x265-
 Encoder baut und kodiert zwei Views. Die Dekodierungsprüfung meldet jedoch eine
 Abweichung des zweiten Halbbilds; außerdem fehlt die eindeutige L/R-Kennzeichnung.
+Die Wiederholung ohne automatische Bildergänzung liefert für View 1 nur 11 statt
+12 Bilder; der Encoder-/Decoderweg ist damit noch nicht brauchbar nachgewiesen.
 Der Bericht ist `verification/1.1-mvhevc-probe.json`. Dieser Weg ist noch nicht
 freigegeben und wird nicht als vorhandene MV-HEVC-Ausgabe angeboten. Die technische
 Ursache muss vor einer Integration geklärt werden.
