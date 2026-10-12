@@ -301,11 +301,9 @@ statt die Laufzeit auf die Anzahl der Quellbilder zu verkürzen. Bei variablen
 Quellbildzeiten bleiben Laufzeit und Ton erhalten; ein als 24 fps eingestufter
 Stream verwendet weiterhin die oben beschriebene 0,1-%-Verlangsamung.
 Bewegungen können bei einer Framerateänderung ungleichmäßiger werden; **Testen**
-zeigt die konkrete Anpassung. Keine Bewegungsinterpolation. Fehlende, ungültige
-oder nicht aufsteigende Zeitstempel bleiben blockiert, weil daraus keine verlässliche Quellzeitachse bestimmt werden kann. Gültige variable Bildzeiten und Interlaced-Eingaben sind zulässig.
-Die Quellzeitstempel werden während der Kodierung geprüft, ohne zusätzliche
-vollständige Dekodierung. Die strenge Ausgabebildrate sowie beide fertig
-verpackten MVC-Halbbilder werden weiterhin geprüft.
+zeigt die konkrete Anpassung. Keine Bewegungsinterpolation. Verarbeitungsfehler werden mit den Meldungen der eingesetzten Werkzeuge angezeigt. Gültige variable Bildzeiten und Interlaced-Eingaben sind zulässig.
+TransCora verwendet FFmpegs Zeitstempel-/Bildratenanpassung während der einzigen Kodierung.
+Zusätzliche eigene Quellzeitstempel- und Ausgabekadenzprüfungen sperren den normalen Export nicht.
 
 FRIM 1.31 verwendet das mitgelieferte Software-SDK; Intel-Grafik, Treiberinstallation,
 AVISynth oder Netzwerkzugang werden für diesen FFmpeg-Eingabepfad nicht benötigt.
@@ -316,19 +314,19 @@ Profil fest; das 4:4:4-Anaglyphenprofil ist davon unabhängig.
 
 Die gewählten Audiospuren mit bekannter Mono-, Stereo-, 5.1- oder 7.1-Belegung werden
 als 24-Bit-LPCM mit 48 kHz gespeichert. Alle Spuren und Originalkanäle sind Standard.
-Stereo-Downmix und kein Ton sind ausdrückliche Optionen unter **Erweitert**.
+Stereo-Downmix und kein Ton sind ausdrückliche Optionen unter **Tonoptionen**.
 Wave64 ersetzt das auf 4 GB begrenzte WAV-Zwischenformat, ohne zusätzliche
 verlustbehaftete Tonkodierung. Untertitel werden noch nicht übernommen.
 
-Bildzeiten werden vollständig geprüft. Rohbilder gehen direkt durch Pipes, nicht in
-riesige Zwischenvideodateien. Kodierte Bilddaten und Parameter werden vor und nach dem Multiplexen
-bitgenau verglichen. Die tatsächliche fertige Ausgabe wird einmal vollständig in
-beide Halbbilder dekodiert und auf die erwartete Bildanzahl geprüft. Ein zweiter
-vollständiger Dekodierdurchlauf ist dafür nicht erforderlich. Bei ISO wird der tatsächliche SSIF
-über einen begrenzten UDF-Leser geprüft; bei M2TS die tatsächliche Datei. Komprimierte
-Prüfdaten werden im Ausgabeordner temporär angelegt und bei Erfolg/Abbruch entfernt.
-Es wird ausreichend freier Platz geprüft; es gibt keine automatische Disc-Aufteilung.
-Die technische Prüfung ersetzt keine formale Blu-ray-Zertifizierung.
+Rohbilder gehen direkt durch Pipes, nicht in riesige Zwischenvideodateien.
+FFmpeg, FRIM und tsMuxeR melden tatsächliche Verarbeitungsfehler. Eine fehlende oder leere
+Ausgabe wird nicht veröffentlicht; Originale und vorhandene Dateien werden nicht überschrieben.
+Im normalen Export gibt es keinen Bilddatenvergleich, keine zusätzliche vollständige
+Nachdekodierung und keine Sperre anhand einer eigenen Audio-/Videostarttoleranz.
+Diese strukturellen und vollständigen Dekodierkontrollen laufen in den Entwicklungstests.
+Temporäre Arbeitsdaten werden bei Erfolg/Abbruch entfernt. Knapp geschätzter Speicherplatz
+führt zu einem Hinweis; es gibt keine automatische Disc-Aufteilung.
+
 
 
 ## MVC und MV-HEVC als Quelle
@@ -342,7 +340,7 @@ anhand der beiden vom Decoder gemeldeten Ansichten. Manuelle Einträge
   FRIM wird bei unterstützbaren Decoder-Lücken als geprüfter Windows-Fallback verwendet.
   Bei Blu-ray-ISO bestimmt die Playlist die linke/rechte Basis-Halbbild. Ohne diese
   Angabe wird links angenommen und ausdrücklich angezeigt; **L/R tauschen**
-  bleibt für die Korrektur verfügbar. Ursprüngliche CFR-Paketbildzeiten werden vollständig geprüft.
+  bleibt für die Korrektur verfügbar. Zusätzliche eigene CFR-Paketzeit- und Paketanzahlprüfungen entfallen.
 - Blu-ray-3D-ISO: Unverschlüsselte UDF-2.50-Discs mit einer vollständigen
   einzelnen SSIF-Filmdatei. Die längste Film-Playlist wird gewählt und genannt.
   Seamless Branching, alternative Blickwinkel und Clip-Ausschnitte bleiben blockiert.

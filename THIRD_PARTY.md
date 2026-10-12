@@ -81,8 +81,8 @@ Its original release notes are included. Keep third-party notices with the porta
 
 The portable MVC input bridge statically links the BSD-licensed decoder and
 shared source core. Exact source commits are pinned in `scripts/build_mvc_decoder.py`.
-TransCora's adaptations preserve UTF-8/Unicode Windows paths and propagate
-concealment flags so missing/damaged views cannot be silently replaced.
+TransCora's adaptations preserve UTF-8/Unicode Windows paths and retain
+actual decoder errors without adding a concealment-based approval gate.
 Original license notices and a source/binary manifest are bundled in `tools/mvc`.
 
 - Decoder source: https://github.com/jens-duttke/edge264-mvc

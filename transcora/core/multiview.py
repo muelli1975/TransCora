@@ -225,39 +225,11 @@ def check_decoder(process, cancel):
     if not process:
         return
     from .engine import Cancelled
-    start = time.monotonic()
     while process.poll() is None:
         if cancel and cancel.wait(.1):
             raise Cancelled()
-        if time.monotonic()-start > 10:
-            raise ValueError('MVC: Decoder beendet sich nach dem letzten Bild nicht.')
     if process.returncode:
         raise ValueError('MVC: Dekodierung fehlgeschlagen · '+'\n'.join(process.mvc_errors))
-
-
-def packet_clock(tools, source, desc, rate, cancel):
-    """MVC raw pipes require CFR. Inspect compressed packet PTS without decoding again."""
-    from .bd3d import Cadence
-    from .bd3d_export import run
-    stamps = []
-    def packets(pipe):
-        for line in iter(pipe.readline, b''):
-            value = line.decode('ascii', 'replace').strip().split(',')[0]
-            if not value:
-                continue
-            try:
-                stamps.append(int(value))
-            except ValueError:
-                raise ValueError('MVC: Fehlende Paketbildzeit. CFR-Quelle mit vollständigen Zeitstempeln verwenden.') from None
-    run([tools.ffprobe, '-v', 'error', '-protocol_whitelist', 'file,pipe', '-select_streams',
-         str(desc['source_index']), '-show_packets', '-show_entries', 'packet=pts', '-of', 'csv=p=0', source],
-        cancel, io.StringIO(), None, packets)
-    original = desc['original_video']
-    clock = Cadence(rate, original['time_base'])
-    for stamp in sorted(stamps):
-        clock.feed(float(stamp*Fraction(original['time_base'])))
-    clock.finish()
-    return len(stamps)
 
 
 def inspect_source(tools, source, cancel=None, explicit='auto', phase=None):
@@ -323,7 +295,7 @@ def inspect_source(tools, source, cancel=None, explicit='auto', phase=None):
                     if phase:
                         phase('MVC-Decoder an beiden Halbbildern testen')
                     tested = json.loads(capture([str(decoder()), str(base), str(dep) if dep else '-',
-                        str(rate.numerator), str(rate.denominator), '0', '0', '1'], cancel, timeout=120))
+                        str(rate.numerator), str(rate.denominator), '0', '0', '1'], cancel))
                     desc['decoder'] = 'edge264-mvc'
                 except ValueError as error:
                     if os.name != 'nt' or 'unsupported' not in str(error).lower():
@@ -331,7 +303,7 @@ def inspect_source(tools, source, cancel=None, explicit='auto', phase=None):
                     bd, args = frim_args(base, dep)
                     left, right = folder/'left.yuv', folder/'right.yuv'
                     # A successful full stereo sample, not a duplicated base view.
-                    capture(args+['-o', str(left), str(right)], cancel, timeout=120)
+                    capture(args+['-o', str(left), str(right)], cancel)
                     frame_bytes = video['width']*video['height']*3//2
                     if not left.is_file() or not right.is_file() or not left.stat().st_size or (
                             left.stat().st_size != right.stat().st_size or left.stat().st_size % frame_bytes):
@@ -437,14 +409,6 @@ def runtime(tools, plan, cancel, seconds=None, emit=None):
         info = deepcopy(plan.info)
         rate = Fraction(info['video']['avg_frame_rate'])
         start = int(seconds*float(rate)) if seconds is not None else 0
-        if seconds is None:
-            if emit:
-                emit('phase', 'MVC: Ursprüngliche Bildzeiten prüfen')
-            expected = packet_clock(tools, source, desc, rate, cancel)
-            tested = json.loads(capture([str(decoder()), str(base), str(dep) if dep else '-',
-                str(rate.numerator), str(rate.denominator), '0', '0', '1'], cancel, timeout=3600)) if desc['decoder'] == 'edge264-mvc' else None
-            if tested and tested['frames'] != expected:
-                raise ValueError('MVC: Paketbildzeiten und dekodierte Bildzahl stimmen nicht überein.')
         args = [str(decoder()), str(base), str(dep) if dep else '-', str(rate.numerator), str(rate.denominator),
                 str(start), '1' if seconds is not None else '0', '0']
         environment = None

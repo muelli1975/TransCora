@@ -190,7 +190,7 @@ class GuiTests(unittest.TestCase):
         self.root.update()
         self.assertFalse(self.window.advanced.winfo_ismapped())
         self.assertTrue(self.window.video_dimensions.winfo_ismapped())
-        self.assertEqual(self.window.video_size_caption.get(), 'Größe des Gesamtbildes')
+        self.assertEqual(self.window.video_size_caption.get(), 'Ausgabegröße')
         self.window.variables['video_width'].set('1920'); self.window.option_changed('video_width')
         self.window.variables['video_height'].set('540'); self.window.option_changed('video_height')
         self.assertEqual((self.window.defaults.video_width, self.window.defaults.video_height), (1920,540))
@@ -257,7 +257,7 @@ class GuiTests(unittest.TestCase):
         self.assertEqual(self.window.variables['video_width'].get(), '2559')
         self.assertEqual(self.window.defaults.video_width, 2560)
         self.window.variables['video_width'].set('2560')
-        self.window.variables['video_size'].set(self.window.t('Standard'))
+        self.window.variables['video_size'].set(self.window.t('Automatisch'))
         self.window.option_changed('video_size')
         self.assertEqual(self.window.variables['video_width'].get(), '1920')
         self.assertEqual(str(self.window.combos['video_width'].cget('state')), 'disabled')
@@ -354,6 +354,54 @@ class GuiTests(unittest.TestCase):
             self.assertIsNotNone(panel.preview_dialog, panel.status.get())
             panel.preview_dialog.destroy()
 
+    def test_settings_viewport_and_current_file_preserve_footer_in_small_windows(self):
+        from tkinter import font
+        for tab,panel in [(self.window.video_tab,self.window),(self.window.image_tab,self.window.images)]:
+            self.window.notebook.select(tab)
+            for geometry in ('780x680','1100x850'):
+                self.root.geometry(geometry); self.root.update()
+                self.assertTrue(panel.combos['layout'].winfo_ismapped())
+                height=panel.tree.winfo_height(); detail=panel.detail_text.winfo_height()
+                panel.toggle_advanced(); self.root.update()
+                self.assertGreaterEqual(panel.tree.winfo_height(),135)
+                self.assertEqual(panel.tree.winfo_height(),height)
+                self.assertEqual(panel.detail_text.winfo_height(),detail)
+                self.assertTrue(panel.reset_button.winfo_ismapped())
+                panel.current_file.set('Beginning_'+'long_filename_'*70+'ending.mp4',7,20)
+                self.root.update()
+                text=panel.current_file.label.cget('text')
+                self.assertIn('…',text); self.assertTrue(text.endswith('ending.mp4'))
+                self.assertIn('7/20',text)
+                face=font.Font(root=self.root,font=ttk.Style().lookup('TLabel','font') or 'TkDefaultFont')
+                self.assertLessEqual(face.measure(text),panel.current_file.label.winfo_width())
+                self.assertLess(panel.current_file.label.winfo_rooty(),panel.progress.winfo_rooty())
+                panel.toggle_advanced();self.root.update()
+        job_path=Path('/one/current_full_sbs.mp4');self.window.add_paths([job_path])
+        job=self.window.jobs[-1]
+        self.window.events.put(('current',(job_path.name,1,20)))
+        self.window.events.put(('phase',(job.id,1,20,'BD-3D: M2TS erstellen')))
+        self.window.poll()
+        self.assertEqual(self.window.current_file.name,job_path.name)
+
+    def test_shared_output_buttons_and_photo_dimensions(self):
+        from PIL import Image
+        from transcora.core.images import ImageOptions
+        panel=self.window.images
+        self.window.notebook.select(self.window.image_tab)
+        with tempfile.TemporaryDirectory() as tmp:
+            source=Path(tmp)/'sample_full_sbs.png'
+            Image.new('RGB',(400,150)).save(source)
+            panel.add_paths([source]); job=panel.jobs[-1]
+            job.options=ImageOptions(layout='full_sbs',target='anaglyph',metadata=False)
+            panel.tree.selection_set(job.id);panel.selection_changed();self.root.update()
+            self.assertEqual([v.get() for v in panel.dimension_values],['200','150'])
+            panel.reset_defaults()
+            self.assertEqual(job.options.target,'anaglyph')
+            self.assertEqual(panel.defaults.target,'keep')
+        for panel in (self.window,panel):
+            buttons=[widget for widget,_ in panel.controls if isinstance(widget,ttk.Button) and widget.cget('text')=='Auswählen']
+            self.assertEqual(len(buttons),1)
+
     def setUp(self):
         try:
             self.root = tk.Tk()
@@ -367,15 +415,8 @@ class GuiTests(unittest.TestCase):
 
     def tearDown(self):
         if hasattr(self, 'root'):
-            def descendants(widget):
-                yield widget
-                for child in widget.winfo_children():
-                    yield from descendants(child)
-            widgets = list(descendants(self.root))
             for callback in self.root.tk.call('after', 'info'):
-                script = self.root.tk.splitlist(self.root.tk.call('after', 'info', callback))[0]
-                owner = next((w for w in widgets if script in (w._tclCommands or [])), self.root)
-                owner.after_cancel(callback)
+                self.root.tk.call('after', 'cancel', callback)
             self.root.destroy()
 
     def test_file_list_selection_and_option_scope(self):
@@ -393,7 +434,9 @@ class GuiTests(unittest.TestCase):
         self.assertEqual(self.window.variables['suffix'].get(), '_dubois_lcd')
         self.window.tree.selection_remove(first.id)
         self.window.selection_changed()
-        self.assertEqual(self.window.variables['target'].get(), 'Anaglyph')
+        self.assertEqual(self.window.variables['target'].get(), 'Half-SBS')
+        self.window.add_paths([Path('/three/C.mp4')])
+        self.assertEqual(self.window.jobs[-1].options.target, 'half_sbs')
         self.window.set_busy(True)
         self.assertEqual(str(self.window.start_button.cget('state')), 'disabled')
         self.window.set_busy(False)

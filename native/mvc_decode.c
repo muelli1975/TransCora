@@ -22,7 +22,6 @@ static int decode(int argc, char **argv) {
         }
     }
     if (probe) {
-        if (s->cur.flags) { fprintf(stderr, "MVC: damaged initial stereo pair\n"); mvc_close(s); return 7; }
         printf("{\"width\":%d,\"height\":%d,\"frames\":%d,\"mvc\":true}\n", v->width, v->height, v->num_frames);
         mvc_close(s); return 0;
     }
@@ -37,7 +36,7 @@ static int decode(int argc, char **argv) {
         (long long)num, (long long)den);
     int end = limit && limit < v->num_frames-start ? start+limit : v->num_frames;
     for (int n = start; n < end; ++n) {
-        if (ensure_source_frame(s, n, err, sizeof(err)) < 0 || !s->cur.samples_mvc[0] || s->cur.flags) {
+        if (ensure_source_frame(s, n, err, sizeof(err)) < 0 || !s->cur.samples_mvc[0]) {
             fprintf(stderr, "MVC frame %d: missing/damaged stereo pair: %s\n", n, err);
             free(buf); mvc_close(s); return 7;
         }

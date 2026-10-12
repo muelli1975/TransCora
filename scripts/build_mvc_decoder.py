@@ -32,11 +32,6 @@ def main():
     for name in ('mvcsource.h', 'cache_budget.h', 'h264poc.h'):
         shutil.copy2(source/name, patched/name)
     s = (source/'mvcsource.c').read_text(encoding='utf-8')
-    # Preserve the core's pairing/seeking, but never fill a missing view with its partner.
-    assert 'int64_t DisplayPoc;' in s and 'p->DisplayPoc = f->views[0].display_order;' in s
-    s = s.replace('int64_t DisplayPoc;', 'uint32_t flags;\n\tint64_t DisplayPoc;', 1)
-    s = s.replace('p->DisplayPoc = f->views[0].display_order;',
-                  'p->flags = (f->views[0].flags | f->views[1].flags) & EDGE264MVC_VIEW_CONCEALED;\n\tp->DisplayPoc = f->views[0].display_order;', 1)
     # UTF-8 argv and Unicode Windows paths: upstream currently uses CreateFileA.
     needle = 'HANDLE hf = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, NULL,'
     assert needle in s

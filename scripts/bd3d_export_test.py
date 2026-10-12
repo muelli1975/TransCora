@@ -68,8 +68,8 @@ def main():
             if not any(k == 'progress' and 5 < v['percent'] < 70 for k, v in events):
                 raise ValueError('MVC encoding did not report intermediate frame progress for the ETA')
             log_text = (OUT/f'{case}.log').read_text(encoding='utf-8')
-            if log_text.count('-i:mvc') != 1:
-                raise ValueError('Production export must perform exactly one full MVC decode')
+            if log_text.count('-i:mvc') != 0:
+                raise ValueError('Production export must leave full MVC decoding to development tests')
             packed = plan.output
             if container == 'iso':
                 # Cross-check the runtime reader against an independent UDF tool.

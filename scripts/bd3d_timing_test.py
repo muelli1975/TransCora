@@ -9,7 +9,8 @@ import threading
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from transcora.core.bd3d import BD_RATE
-from transcora.core.bd3d_export import BdTools
+from transcora.core.bd3d_export import BdTools, verify_mux
+from transcora.core.mvc import coded_fingerprint
 from transcora.core.engine import capture, execute, plan_job
 from transcora.core.model import Job, Options
 from transcora.core.toolchain import Toolchain
@@ -48,10 +49,8 @@ def main():
             with Disc(plan.output) as disc:
                 disc.extract('BDMV/STREAM/SSIF/00000.ssif', packed)
         log_text = log.read_text(encoding='utf-8')
-        assert 'SOURCE TIMING constant=False' in log_text
-        assert log_text.count('-i:mvc') == 1  # one full final decode
-        assert any('Variable Bildzeiten' in str(v) for k, v in events if k == 'phase')
-        frame_count = int(re.search(r'VERIFIED BD3D frames=(\d+)', log_text)[1])
+        assert log_text.count('-i:mvc') == 0  # no mandatory decode in user exports
+        frame_count = int(re.search(r'COMPLETED BD3D frames=(\d+)', log_text)[1])
         actual_duration = frame_count/float(BD_RATE)
         # Independent source timeline, not the generated preparation graph.
         times = json.loads(capture([str(tools.ffprobe), '-v', 'error', '-select_streams', 'v:0',
@@ -61,6 +60,19 @@ def main():
         end = float(times[-1]['best_effort_timestamp_time']) + float(
             times[-1].get('duration_time') or times[-1].get('pkt_duration_time') or .04)
         assert abs(actual_duration-(end-origin)) <= 1/float(BD_RATE), (actual_duration, end-origin)
+        # Full structural/decoded validation belongs to this development test.
+        import tempfile
+        with tempfile.TemporaryDirectory(dir=out) as tmp:
+            folder=Path(tmp); demux=folder/'tracks'; demux.mkdir()
+            meta=folder/'tracks.meta'
+            meta.write_text(f'MUXOPT --demux\nV_MPEG4/ISO/AVC, "{packed}", track=4113\nV_MPEG4/ISO/MVC, "{packed}", track=4114\n')
+            capture([str(bd.muxer),str(meta),str(demux)],timeout=120)
+            base=next(demux.glob('*.264')); dep=next(demux.glob('*.mvc'))
+            from transcora.core.audio import selected
+            with (out/(name+'-validation.log')).open('w') as validation:
+                verify_mux(tools,bd,plan,packed,base,dep,frame_count,
+                           [coded_fingerprint(base),coded_fingerprint(dep)],
+                           selected(plan.info,plan.options),threading.Event(),validation,folder)
         # Preserve the original A/V start offset and every decoded audio sample.
         samples = round(actual_duration*48000)
         expected = capture([str(tools.ffmpeg), '-v', 'error', '-copyts', '-i', str(source), '-map', '0:a:0',

@@ -8,13 +8,19 @@ Everything runs locally, without an account, cloud or tracking. The interface ca
 
 ## Quick start
 
-1. Open **Videos** or **Images** and add files or a folder. Enable **Subfolders** if needed.
+1. Open **Videos** or **Images** and add files or a folder. Enable **Process subfolders** if needed.
 2. Select the files you want to process. Changes apply to the selected entries; without a selection, they set the defaults for new files.
 3. Choose the source layout and output. Use **Swap L/R** if the eyes are reversed.
 4. Choose the size and output folder. Use **Preview** to check the result before encoding; the preview has a fit view and a scrollable 1:1 pixel view.
 5. Use **Test** to check the batch or **Start** to process it. Progress, duration and source frame rate are shown in the window.
 
 The default output folder is `output` beside the program. Folder batches preserve relative subfolders. Existing files receive a numbered alternative name. A failed entry does not stop the remaining valid entries. **Cancel** stops the current operation; completed files remain available.
+
+Videos and images share **Source**, **Output**, **Format** and **Save** sections. **Output size** shows dimensions beside the size menu. Video dimensions describe the complete output picture; BD-3D shows dimensions per eye image. Images can be scaled proportionally by their long or short edge.
+
+**Advanced** expands additional settings inside the window. **Default settings** restores defaults for new files; existing entries keep their settings. In smaller windows, settings scroll while the file list, information area and processing buttons retain their space. Use **Choose** to select the output folder.
+
+The current file remains visible beside progress information when the processing phase changes. Long filenames are shortened in the middle to fit the window.
 
 ## Video output
 

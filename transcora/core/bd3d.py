@@ -122,7 +122,7 @@ def check_cadence(timestamps: list[float], rate: Fraction, time_base: str) -> No
 
 
 class Cadence:
-    """Check the original decoded clock while the encoder consumes the same frames."""
+    """Development-only clock measurement; production exports use FFmpeg timing."""
     def __init__(self, rate, time_base, name='bd_clock'):
         self.rate = rate
         self.name = name

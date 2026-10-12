@@ -15,6 +15,7 @@ from tkinter import filedialog, messagebox, ttk
 from transcora import __version__
 from transcora.i18n import LANGUAGES
 from transcora.gui.localization import Localizer, TextVar
+from transcora.gui.settings_area import SettingsArea, section, CurrentFile
 from transcora.core.engine import Cancelled, execute, methods, plan_job, preview
 from transcora.core.model import Job, LAYOUTS, PROFILES, TARGETS, Options, VIDEO_EXTENSIONS, app_root, FPS_CHOICES, FPS_MODES, COMPATIBILITY_NOTE, AUDIO_FORMATS, AUDIO_TRACKS, AUDIO_CHANNELS, VIDEO_SIZES, BD_BITRATES, ROW_ORDERS
 from transcora.core.naming import effective_suffix, suffix_choices, reserve_output, filename_layout, fps_suffix, default_disc_title
@@ -66,6 +67,8 @@ class Window:
         self._style()
         self._build()
         self.apply_language()
+        root.after_idle(self.settings_area.layout)
+        root.after_idle(self.images.settings_area.layout)
         schedule_dark_titlebar(root)
         root.protocol("WM_DELETE_WINDOW", self.close)
         root.after(100, self.poll)
@@ -145,6 +148,7 @@ class Window:
 
     def _build(self):
         self.notebook = ttk.Notebook(self.root)
+        self.notebook.bind('<<NotebookTabChanged>>',self.tab_changed)
         self.notebook.pack(fill='both', expand=True)
         self.video_tab = ttk.Frame(self.notebook)
         self.image_tab = ttk.Frame(self.notebook)
@@ -177,10 +181,10 @@ class Window:
         holder.columnconfigure(0, weight=1)
         holder.rowconfigure(0, weight=1)
         self.tree = ttk.Treeview(holder, columns=("file", "layout", "fps", "duration", "target", "status"), show="headings", height=6, selectmode="extended")
-        for key, label, width in (("file", "Datei", 245), ("layout", "Quelle", 100), ("fps", "fps", 65),
-                                  ("duration", "Dauer", 85), ("target", "Ziel", 145), ("status", "Status", 95)):
+        for key, label, width in (("file", "Datei", 245), ("layout", "Quelle", 110), ("fps", "fps", 60),
+                                  ("duration", "Dauer", 75), ("target", "Ziel", 200), ("status", "Status", 95)):
             self.tree.heading(key, text=label)
-            self.tree.column(key, width=width, minwidth=55 if key == "fps" else 70, stretch=key == "file")
+            self.tree.column(key, width=width, minwidth=120 if key == "file" else width, stretch=key == "file")
         self.tree.grid(row=0, column=0, sticky="nsew")
         scrollbar = ttk.Scrollbar(holder, orient="vertical", command=self.tree.yview)
         scrollbar.grid(row=0, column=1, sticky="ns")
@@ -191,25 +195,38 @@ class Window:
         if self.root.tk.call('tk', 'windowingsystem') == 'aqua':
             self.tree.bind('<Command-a>', self.select_all)
             self.tree.bind('<Command-A>', self.select_all)
-        self.selection_text = TextVar(self.localizer, value="Einstellungen gelten für neu hinzugefügte Dateien.")
-        ttk.Label(outer, textvariable=self.selection_text, foreground=MUTED).grid(row=3, column=0, sticky="w", pady=(5, 3))
-        fields = ttk.Frame(outer)
-        fields.grid(row=4, column=0, sticky="ew")
-        for col in (0, 1, 2):
-            fields.columnconfigure(col, weight=1, uniform="fields")
+        self.selection_text = TextVar(self.localizer, value="Vorgaben für neue Dateien")
+        scope = ttk.Frame(outer)
+        scope.grid(row=3,column=0,sticky='ew',pady=(6,4))
+        ttk.Label(scope,textvariable=self.selection_text,foreground=MUTED).pack(side='left')
+        self.reset_button = self.button(scope,'Standardeinstellungen',self.reset_defaults)
+        self.reset_button.pack(side='right')
+        self.settings_area = SettingsArea(outer)
+        fields = self.settings_area.body
+        _, source_fields = section(fields,0,'Quelle')
+        _, output_fields = section(fields,1,'Ausgabe')
+        _, format_fields = section(fields,2,'Format')
+        self.advanced_dialog, self.advanced = section(fields,3,'Erweitert')
+        self.advanced_dialog.grid_remove()
+        _, save_fields = section(fields,4,'Speichern')
         self.variables = {}
         self.mappings = {"layout": LAYOUTS, "target": TARGETS, "profile": PROFILES,
                          "method": {k: m["label"] for k, m in self.catalog.items()},
                          "container": {"mkv": "MKV", "mp4": "MP4", "iso": "Blu-ray-ISO", "m2ts": "M2TS (AVC/MVC)"},
                          "codec": {"h264": "H.264", "h265": "H.265 / HEVC"},
                          "rate_mode": {"crf": "Qualität (CRF)", "abr": "Zielbitrate (Durchschnitt)"},
-                         'video_size': VIDEO_SIZES, 'bd_bitrate_mbps': {n: str(n)+' Mbit/s' for n in BD_BITRATES},
+                         'video_size': dict(VIDEO_SIZES, default='Automatisch'), 'bd_bitrate_mbps': {n: str(n)+' Mbit/s' for n in BD_BITRATES},
                          'row_first': ROW_ORDERS,
                          'fps_mode': FPS_MODES,
                          'audio_format': AUDIO_FORMATS, 'audio_tracks': AUDIO_TRACKS, 'audio_channels': AUDIO_CHANNELS}
         self.combos = {}
         self.option_frames = {}
         def combo(parent, row, col, key, label):
+            routes = {'layout':(source_fields,0,0),'target':(output_fields,0,0),
+                      'video_size':(output_fields,0,1),'method':(output_fields,1,0),
+                      'profile':(output_fields,1,1),'row_first':(output_fields,1,0),
+                      'container':(format_fields,0,0)}
+            parent,row,col = routes.get(key,(parent,row,col))
             frame = ttk.Frame(parent)
             self.option_frames[key] = frame
             frame.grid(row=row, column=col, sticky="ew", padx=(0, 8), pady=3)
@@ -230,7 +247,7 @@ class Window:
             self.combos[key] = widget
         combo(fields, 0, 0, "layout", "Quelllayout")
         self.variables["swap"] = tk.BooleanVar(value=self.defaults.swap)
-        swap = checkbox(fields, text="L/R tauschen", variable=self.variables["swap"], command=lambda: self.option_changed("swap"))
+        swap = checkbox(source_fields, text="L/R tauschen", variable=self.variables["swap"], command=lambda: self.option_changed("swap"))
         swap.grid(row=0, column=1, sticky="sw", padx=(0, 8), pady=5)
         self.swap_control = swap
         self.controls.append((swap, "normal"))
@@ -238,8 +255,8 @@ class Window:
         combo(fields, 1, 0, "method", "Anaglyphenverfahren")
         combo(fields, 1, 1, "profile", "Anaglyph-Ausgabeprofil")
         combo(fields, 1, 2, "container", "Container")
-        suffix_frame = ttk.Frame(fields)
-        suffix_frame.grid(row=2, column=0, sticky="ew", padx=(0, 8), pady=3)
+        suffix_frame = ttk.Frame(save_fields)
+        suffix_frame.grid(row=1, column=0, sticky="ew", padx=(0, 8), pady=3)
         ttk.Label(suffix_frame, text="Dateinamenszusatz · frei editierbar").pack(anchor="w")
         self.variables["suffix"] = tk.StringVar()
         suffix = ttk.Combobox(suffix_frame, textvariable=self.variables["suffix"], state="normal", width=22)
@@ -248,8 +265,8 @@ class Window:
             suffix.bind(event, lambda e: self.option_changed("suffix"))
         self.combos["suffix"] = suffix
         self.controls.append((suffix, "normal"))
-        self.title_frame = ttk.Frame(fields)
-        self.title_frame.grid(row=2, column=1, sticky="ew", padx=(0, 8), pady=3)
+        self.title_frame = ttk.Frame(output_fields)
+        self.title_frame.grid(row=1, column=2, sticky="ew", padx=(0, 8), pady=3)
         ttk.Label(self.title_frame, text="Disc-Titel").pack(anchor="w")
         self.variables['disc_title'] = tk.StringVar()
         title_entry = ttk.Entry(self.title_frame, textvariable=self.variables['disc_title'])
@@ -257,8 +274,8 @@ class Window:
         for event in ('<FocusOut>', '<Return>'):
             title_entry.bind(event, lambda e: self.option_changed('disc_title'))
         self.controls.append((title_entry, 'normal'))
-        self.fps_frame = ttk.Frame(fields)
-        self.fps_frame.grid(row=2, column=2, sticky="ew", padx=(0, 8), pady=3)
+        self.fps_frame = ttk.Frame(format_fields)
+        self.fps_frame.grid(row=0, column=1, sticky="ew", padx=(0, 8), pady=3)
         ttk.Label(self.fps_frame, text="Bildrate (fps)").pack(anchor="w")
         fps_controls = ttk.Frame(self.fps_frame)
         fps_controls.pack(fill='x')
@@ -275,12 +292,12 @@ class Window:
             fps.bind(event, lambda e: self.option_changed("target_fps"))
         self.combos["target_fps"] = fps
         self.controls.append((fps, "normal"))
-        combo(fields, 2, 1, "video_size", "Größe")
+        combo(fields, 2, 1, "video_size", "Ausgabegröße")
         self.output_name = TextVar(self.localizer, )
-        ttk.Label(fields, textvariable=self.output_name, foreground=GOLD_LIGHT, wraplength=790).grid(
-            row=3, column=0, columnspan=3, sticky="ew", pady=(3, 0))
-        output = ttk.Frame(outer)
-        output.grid(row=5, column=0, sticky="ew", pady=(6, 0))
+        ttk.Label(save_fields, textvariable=self.output_name, foreground=GOLD_LIGHT, wraplength=790).grid(
+            row=1, column=1, columnspan=2, sticky="ew", pady=(3, 0))
+        output = ttk.Frame(save_fields)
+        output.grid(row=0, column=0, columnspan=3, sticky="ew", pady=(0, 8))
         output.columnconfigure(1, weight=1)
         ttk.Label(output, text="Ausgabeordner").grid(row=0, column=0, padx=(0, 8))
         self.output_var = tk.StringVar(value=self.output_folder)
@@ -288,7 +305,7 @@ class Window:
         entry.grid(row=0, column=1, sticky="ew")
         entry.bind("<FocusOut>", lambda event: self.invalidate_all())
         self.controls.append((entry, "normal"))
-        self.button(output, "Wählen", self.choose_output).grid(row=0, column=2, padx=(8, 0))
+        self.button(output, "Auswählen", self.choose_output).grid(row=0, column=2, padx=(8, 0))
         folder_checks = ttk.Frame(output)
         folder_checks.grid(row=0, column=3, sticky="w", padx=(10, 0))
         self.recursive = tk.BooleanVar(value=self.recursive_value)
@@ -322,22 +339,10 @@ class Window:
         show_details()
         actions = ttk.Frame(outer)
         actions.grid(row=13, column=0, sticky="ew", pady=(8, 0))
-        self.advanced_button = self.button(actions, "Erweitert …", self.toggle_advanced)
+        self.advanced_button = self.button(actions, "Erweitert ▸", self.toggle_advanced)
         self.advanced_button.pack(side="left")
         self.button(actions, "Kontrollbild", self.show_preview).pack(side="left", padx=5)
-        ttk.Button(actions, text="Log", command=self.show_log).pack(side="left")
-        self.advanced_dialog = tk.Toplevel(self.root, background=APP_BG)
-        self.advanced_dialog.withdraw()
-        self.advanced_dialog.title('Erweiterte Videoeinstellungen')
-        self.advanced_dialog.transient(self.root)
-        self.advanced_dialog.resizable(False, False)
-        self.advanced_dialog.protocol('WM_DELETE_WINDOW', self.close_advanced)
-        self.advanced_dialog.bind('<Escape>', lambda e: self.close_advanced())
-        schedule_dark_titlebar(self.advanced_dialog)
-        self.advanced = ttk.Frame(self.advanced_dialog, padding=12)
-        self.advanced.pack(fill='both', expand=True)
-        for col in (0, 1, 2):
-            self.advanced.columnconfigure(col, weight=1, uniform="advanced")
+        ttk.Button(actions, text="Protokoll", command=self.show_log).pack(side="left")
         combo(self.advanced, 0, 0, "codec", "Videocodec")
         combo(self.advanced, 0, 1, "rate_mode", "Qualitätssteuerung")
         numeric = ttk.Frame(self.advanced)
@@ -359,7 +364,7 @@ class Window:
             number.bind("<Return>", lambda event, k=key: self.option_changed(k))
             self.controls.append((number, "normal"))
             self.combos[key] = number
-        combo(numeric, 0, 0, "bd_bitrate_mbps", "BD-3D-Bitrate")
+        combo(output_fields, 1, 2, "bd_bitrate_mbps", "BD-3D-Bitrate")
         self.option_frames['bd_bitrate_mbps'].grid_configure(pady=0, padx=0)
         self.rate_fields["bd_bitrate_mbps"] = self.option_frames["bd_bitrate_mbps"]
         self.video_dimensions = ttk.Frame(self.option_frames['video_size'])
@@ -376,9 +381,8 @@ class Window:
             self.combos[key] = entry
             self.controls.append((entry, 'normal'))
         ttk.Label(self.video_dimensions, text='px').pack(side='left', padx=(4, 0))
-        self.screen_fields = ttk.Frame(fields)
-        self.screen_fields.grid(row=2, column=1, sticky='ew', padx=(0, 8), pady=3)
-        ttk.Label(self.screen_fields, text='Monitorauflösung (Pixel)').pack(anchor='w')
+        self.screen_fields = ttk.Frame(self.option_frames["video_size"])
+        self.screen_fields.pack(fill='x',pady=(4,0))
         screen_values = ttk.Frame(self.screen_fields)
         screen_values.pack(fill='x')
         for key in ('screen_width', 'screen_height'):
@@ -392,12 +396,8 @@ class Window:
             self.combos[key] = entry
             self.controls.append((entry, 'normal'))
         combo(fields, 1, 0, 'row_first', 'Erste Bildschirmzeile')
-        self.advanced_audio_button = self.button(actions, 'Tonoptionen …', self.show_audio_options)
-        self.advanced_audio_button.pack(side='left', padx=5)
-        self.reset_button = self.button(self.advanced, 'Standardeinstellungen', self.reset_defaults)
-        self.reset_button.grid(row=1, column=0, columnspan=2, sticky='w', pady=(12, 0))
-        ttk.Button(self.advanced, text='Schließen', command=self.close_advanced).grid(
-            row=1, column=2, sticky='e', pady=(12, 0))
+        self.advanced_audio_button = self.button(format_fields, 'Tonoptionen …', self.show_audio_options)
+        self.advanced_audio_button.grid(row=0,column=2,sticky='sw',padx=(0,8),pady=3)
         # Keep the main window usable at its minimum height. Audio controls live
         # in a reusable dialog so their values and state follow the same selection.
         self.audio_dialog = tk.Toplevel(self.root, background=APP_BG)
@@ -440,6 +440,7 @@ class Window:
         self.status_label.grid(row=0, column=0, sticky="w")
         self.elapsed = TextVar(self.localizer, value="")
         self.elapsed_time = TextVar(self.localizer, value="")
+        self.current_file = CurrentFile(outer,self.localizer,9)
         self.progress = ttk.Progressbar(outer, mode="determinate", maximum=100)
         self.progress.grid(row=11, column=0, sticky="ew")
         timing = ttk.Frame(outer)
@@ -469,6 +470,12 @@ class Window:
             self.root.tk.call('bind', str(self.root), '<Command-o>', self.root.bind('<Control-o>'))
         self.root.bind("<Escape>", lambda event: self.images.abort() if self.images.busy else self.abort() if self.busy else None)
         self.selection_changed()
+
+    def tab_changed(self,event=None):
+        if not hasattr(self,'images'):return
+        panel=self.images if self.notebook.select()==str(self.image_tab) else self
+        panel.settings_area.fit()
+        self.root.after(10,panel.settings_area.layout)
 
     def dark_menu(self, parent):
         return tk.Menu(parent, tearoff=False, background=SECONDARY_BG, foreground=TEXT,
@@ -617,7 +624,7 @@ class Window:
         selected = self.selected_jobs()
         if not selected:
             self.details.set("Dateien hinzufügen oder eine gespeicherte Liste laden.")
-            self.selection_text.set("Einstellungen gelten für neu hinzugefügte Dateien.")
+            self.selection_text.set("Vorgaben für neue Dateien")
             self.updating = True
             for key, var in self.variables.items():
                 value = getattr(self.defaults, key)
@@ -647,7 +654,7 @@ class Window:
         self.updating = False
         self.last_suffix_display = self.variables['suffix'].get()
         self.last_title_display = self.variables['disc_title'].get()
-        self.selection_text.set(f"Einstellungen für {len(selected)} ausgewählte Datei(en). Leere Auswahlfelder bedeuten gemischte Werte.")
+        self.selection_text.set(f"Für {len(selected)} ausgewählte Datei(en)")
         job = selected[0]
         self.details.set((job.plan.summary if job.plan else str(job.source)) + "\n" + job.detail)
         self.refresh_controls()
@@ -705,7 +712,7 @@ class Window:
                 return result
             candidates = self.selected_jobs()
             updates = [(job, changed(job.options, job.source)) for job in candidates]
-            if key != 'disc_title':
+            if key != 'disc_title' and not candidates:
                 self.defaults = changed(self.defaults, candidates[0].source if candidates else None)
             for job, options in updates:
                 job.options = options
@@ -735,14 +742,14 @@ class Window:
         framerate = options.target == "framerate"
         bd3d = options.target == 'bd3d'
         rows = options.target == 'row_interleaved'
-        self.screen_fields.grid() if rows else self.screen_fields.grid_remove()
+        self.screen_fields.pack(fill='x',pady=(4,0)) if rows else self.screen_fields.pack_forget()
         self.combos['row_first'].configure(state='readonly' if rows else 'disabled')
         for key in ('screen_width', 'screen_height'):
             self.combos[key].configure(state='normal' if rows else 'disabled')
         self.title_frame.grid() if bd3d and selected else self.title_frame.grid_remove()
-        self.option_frames['method'].grid_remove() if rows else self.option_frames['method'].grid()
+        self.option_frames['method'].grid() if anaglyph else self.option_frames['method'].grid_remove()
         self.option_frames['row_first'].grid() if rows else self.option_frames['row_first'].grid_remove()
-        self.option_frames['profile'].grid_remove() if rows else self.option_frames['profile'].grid()
+        self.option_frames['profile'].grid() if anaglyph else self.option_frames['profile'].grid_remove()
         self.combos['container'].configure(values=[self.t(self.mappings['container'][k]) for k in
             (('iso', 'm2ts') if bd3d else ('mp4', 'mkv'))])
         self.advanced_button.configure(state='normal')
@@ -750,9 +757,13 @@ class Window:
         self.fps_frame.grid_remove() if bd3d else self.fps_frame.grid()
         self.combos['fps_mode'].configure(state='disabled' if bd3d else 'readonly')
         self.combos['target_fps'].configure(state='normal' if not bd3d and options.fps_mode == 'custom' else 'disabled')
-        self.option_frames["video_size"].grid_remove() if bd3d or framerate or rows else self.option_frames["video_size"].grid()
+        self.option_frames['video_size'].grid()
+        self.combos['video_size'].configure(state='disabled' if bd3d or framerate or rows else 'readonly')
+        if bd3d or framerate or rows:
+            self.variables['video_size'].set(self.t('1080p · je Halbbild' if bd3d else 'Monitorauflösung' if rows else 'Original'))
+        self.video_dimensions.pack_forget() if rows else self.video_dimensions.pack(fill='x',pady=(4,0))
         custom_size = not bd3d and not framerate and not rows and options.video_size == "custom"
-        self.video_size_caption.set('Größe des Gesamtbildes')
+        self.video_size_caption.set('Ausgabegröße je Halbbild' if bd3d else 'Ausgabegröße')
         for key in ('video_width', 'video_height'):
             self.combos[key].configure(state='normal' if custom_size else 'disabled')
         self.refresh_dimensions()
@@ -804,6 +815,7 @@ class Window:
             text += " Zielbitrate = Videodurchschnitt, kein festes Dateigrößenlimit."
         self.warning.set(text)
         self.update_output_name()
+        self.settings_area.layout()
 
     def display_suffix(self, job):
         options = job.options
@@ -991,17 +1003,16 @@ class Window:
         if not self.commit_entries():
             return
         self.refresh_controls()
-        self.advanced_dialog.geometry(f'+{self.root.winfo_rootx()+30}+{self.root.winfo_rooty()+100}')
-        self.advanced_dialog.deiconify()
-        self.advanced_dialog.lift()
-        self.advanced_dialog.grab_set()
-        self.combos['bd_bitrate_mbps' if self.selected_options().target == 'bd3d' else 'codec'].focus_set()
+        self.advanced_dialog.grid()
+        self.advanced_button.configure(text='Erweitert ▾')
+        self.settings_area.show_end(self.advanced)
 
     def close_advanced(self):
         if not self.commit_entries(('crf', 'bitrate_mbps')):
             return
-        self.advanced_dialog.grab_release()
-        self.advanced_dialog.withdraw()
+        self.advanced_dialog.grid_remove()
+        self.advanced_button.configure(text='Erweitert ▸')
+        self.settings_area.canvas.yview_moveto(0)
 
     def selected_options(self):
         selected = self.selected_jobs()
@@ -1030,11 +1041,13 @@ class Window:
         selected = self.selected_jobs()
         # Selection changes already populate custom values. Do not overwrite
         # a second dimension still being edited when the first loses focus.
-        if all(o.video_size == 'custom' for o in ([j.options for j in selected] or [self.defaults])):
+        if all(o.video_size == 'custom' and o.target not in {'bd3d','row_interleaved','framerate'} for o in ([j.options for j in selected] or [self.defaults])):
             return
         values = []
         for job in selected or [None]:
             opts = job.options if job else self.defaults
+            if opts.target == 'bd3d':
+                values.append((1920,1080)); continue
             if opts.video_size == 'custom':
                 size = opts.video_width, opts.video_height
             elif opts.video_size in {'1080p', '2160p'} or (opts.video_size == 'default' and opts.target.startswith('half_')):
@@ -1192,6 +1205,7 @@ class Window:
             for index, job in enumerate(candidates, 1):
                 if self.cancel.is_set():
                     raise Cancelled()
+                self.events.put(("current", (job.source.name,index,len(candidates))))
                 self.events.put(("job", (job.id, "checking", "Technische Prüfung", None)))
                 self.events.put(("notice", f"Testen: Datei {index} von {len(candidates)} · {job.source.name}"))
                 try:
@@ -1221,6 +1235,7 @@ class Window:
                         self.events.put(("job", (remaining.id, "cancelled", "Nicht mehr gestartet", None)))
                         counts["cancelled"] += 1
                     break
+                self.events.put(("current", (job.source.name,index,len(ready))))
                 self.events.put(("job", (job.id, "running", "Verarbeitung", plan)))
                 self.events.put(("notice", f"Datei {index} von {len(ready)} · {job.source.name}"))
                 def emit(kind, payload):
@@ -1228,7 +1243,7 @@ class Window:
                 try:
                     execute(tools, plan, self.cancel, emit, log_path)
                     counts["completed"] += 1
-                    self.events.put(("job", (job.id, "completed", "Ausgabe geprüft · " + plan.stereo_summary + "\nGespeichert: " + str(plan.output), plan)))
+                    self.events.put(("job", (job.id, "completed", "Gespeichert · " + plan.stereo_summary + "\nGespeichert: " + str(plan.output), plan)))
                 except Cancelled:
                     counts["cancelled"] += 1
                     self.events.put(("job", (job.id, "cancelled", "Begonnene Ausgabe verworfen", plan)))
@@ -1326,7 +1341,9 @@ class Window:
         try:
             while True:
                 kind, payload = self.events.get_nowait()
-                if kind == "job":
+                if kind == "current":
+                    self.current_file.set(*payload)
+                elif kind == "job":
                     id_, status, detail, plan = payload
                     job = next((job for job in self.jobs if job.id == id_), None)
                     if job:
@@ -1415,6 +1432,8 @@ class Window:
         except queue.Empty:
             pass
         self.localizer.apply()
+        self.current_file.render()
+        self.images.current_file.render()
         self.root.after(100, self.poll)
 
     def close(self):

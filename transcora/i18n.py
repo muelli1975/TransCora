@@ -1038,6 +1038,21 @@ EN.update({'Unterordner': 'Subfolders',
 EN.update({'Größe je Auge': 'Size per eye', 'Größe des Gesamtbildes': 'Output frame size'})
 
 # Long messages win over prefix fragments. Captures retain filenames and values.
+EN.update({
+    'Auswählen':'Choose', 'Quelle':'Source', 'Ausgabe':'Output', 'Format':'Format', 'Speichern':'Save',
+    'Ausgabegröße':'Output size', 'Ausgabegröße je Halbbild':'Output size per eye image',
+    'Automatisch':'Automatic', 'Monitorauflösung':'Display resolution', '1080p · je Halbbild':'1080p · per eye image',
+    'Vorgaben für neue Dateien':'Defaults for new files',
+    'Erweitert ▸':'Advanced ▸', 'Erweitert ▾':'Advanced ▾',
+    'Dateinamenszusatz folgt dem gewählten Ziel.':'Filename suffix follows the selected target.',
+    'BD-3D: FFmpeg bereitet die Quelle vor, FRIM kodiert AVC/MVC und tsMuxeR erstellt die Ausgabe. Gewählter Ton wird als LPCM gespeichert.':
+    'BD-3D: FFmpeg prepares the source, FRIM encodes AVC/MVC and tsMuxeR creates the output. Selected audio is saved as LPCM.',
+    'BD-3D: Der Encoder hat keine vollständige Ausgabe erstellt.':'BD-3D: The encoder did not create a complete output.',
+    'BD-3D: Der Multiplexer hat keine Ausgabe erstellt.':'BD-3D: The muxer did not create an output.',
+    'Für {0} ausgewählte Datei(en)':'For {0} selected file(s)',
+    'Gespeichert':'Saved',
+})
+
 PATTERNS = []
 for source, target in EN.items():
     parts = re.split(r"(\{\d+\})", source)

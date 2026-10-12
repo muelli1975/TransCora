@@ -8,13 +8,19 @@ Alles läuft lokal, ohne Account, Cloud oder Tracking. Die Oberfläche lässt si
 
 ## Schnellstart
 
-1. Öffne **Videos** oder **Bilder** und füge Dateien oder einen Ordner hinzu. Aktiviere bei Bedarf **Unterordner**.
+1. Öffne **Videos** oder **Bilder** und füge Dateien oder einen Ordner hinzu. Aktiviere bei Bedarf **Unterordner mitverarbeiten**.
 2. Markiere die gewünschten Dateien. Änderungen gelten für die markierten Einträge; ohne Auswahl bilden sie die Vorgabe für neue Dateien.
 3. Wähle Quelllayout und Ziel. Mit **L/R tauschen** korrigierst du eine vertauschte Augenreihenfolge.
 4. Wähle Größe und Ausgabeordner. **Kontrollbild** zeigt das Ergebnis vor der Kodierung, wahlweise ans Fenster angepasst oder in einer verschiebbaren 1:1-Pixelansicht.
 5. **Testen** prüft den Stapel; **Start** verarbeitet ihn. Fortschritt, Dauer und Quellbildrate erscheinen im Fenster.
 
 Standardmäßig landen Ergebnisse im Ordner `output` neben dem Programm. Bei Ordnerstapeln bleiben relative Unterordner erhalten. Vorhandene Dateien erhalten einen nummerierten Alternativnamen. Ein fehlerhafter Eintrag hält die übrigen gültigen Dateien nicht auf. **Abbrechen** beendet die aktuelle Verarbeitung; bereits fertige Dateien bleiben erhalten.
+
+Fotos und Videos verwenden dieselben Bereiche **Quelle**, **Ausgabe**, **Format** und **Speichern**. Unter **Ausgabegröße** stehen die Maße direkt beim Größenmenü. Videomaße beziehen sich auf das gesamte Ausgabebild; BD-3D zeigt die Maße je Halbbild. Bilder lassen sich proportional nach langer oder kurzer Seite skalieren.
+
+**Erweitert** klappt zusätzliche Einstellungen im Fenster auf. **Standardeinstellungen** stellt die Vorgaben für neue Dateien wieder her; bestehende Einträge behalten ihre Einstellungen. Bei kleinen Fenstern scrollen die Einstellungen, während Dateiliste, Informationsfeld und Verarbeitungsschaltflächen Platz behalten. Wähle den Ausgabeordner mit **Auswählen**.
+
+Die aktuelle Datei bleibt beim Fortschritt sichtbar, auch wenn der Verarbeitungsschritt wechselt. Lange Dateinamen werden passend zur Fensterbreite in der Mitte gekürzt.
 
 ## Videoausgaben
 
@@ -33,7 +39,7 @@ Standardmäßig landen Ergebnisse im Ordner `output` neben dem Programm. Bei Ord
 
 ### Auflösung und Kreuzblick
 
-Wähle **Original**, **1080p**, **2160p** oder **Benutzerdefiniert**. Standard erhält bei vollständigen Layouts die rekonstruierte Quellgröße und verwendet bei Half-Layouts 1080p. Frei eingegebene Breite und Höhe bezeichnen immer das **gesamte Ausgabebild**. Das Seitenverhältnis bleibt erhalten; falls nötig entstehen Ränder.
+Wähle **Original**, **1080p**, **2160p** oder **Benutzerdefiniert**. Automatisch erhält bei vollständigen Layouts die rekonstruierte Quellgröße und verwendet bei Half-Layouts 1080p. Frei eingegebene Breite und Höhe bezeichnen immer das **gesamte Ausgabebild**. Das Seitenverhältnis bleibt erhalten; falls nötig entstehen Ränder.
 
 | Beispiel | Gesamtes Bild | Gespeicherte Pixel je Auge |
 | --- | --- | --- |

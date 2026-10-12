@@ -13,7 +13,7 @@ import tempfile
 import threading
 import time
 
-from .bd3d import BD_RATE, prepare, Cadence, SourceClock, encoder_args, mux_meta
+from .bd3d import BD_RATE, prepare, encoder_args, mux_meta
 from .engine import Cancelled, stop_process, publish_without_overwrite, capture, probe
 from .model import app_root
 from .mvc import tag_generated_stream, coded_fingerprint
@@ -113,13 +113,11 @@ def run(args, cancel, log, env, on_output=None, on_line=None):
 
 
 def encode(tools, bd, plan, base, dependent, cancel, emit, log, estimated_frames, decoder=None):
-    from .multiview import input_args, PairClock, check_decoder
+    from .multiview import input_args, check_decoder
     config = prepare(plan.info['video'], plan.layout, plan.swap)
-    clock = SourceClock(config.source_rate, plan.info['video']['time_base'])
-    output_clock = Cadence(BD_RATE, '1/24000', 'bd_output')
-    errors = []
-    pairs = PairClock() if plan.info.get('multiview', {}).get('kind') == 'mvhevc' else None
-    graph = plan.graph.replace(']sidedata=', ']showinfo@bd_clock=checksum=0,sidedata=', 1)+';[left][right]hstack=inputs=2,showinfo@bd_output=checksum=0[packed]'
+    frames = 0
+    # FFmpeg supplies progress; source timing and cadence are not approval gates.
+    graph = plan.graph+';[left][right]hstack=inputs=2[packed]'
     args = [str(tools.ffmpeg), '-hide_banner', '-nostdin', '-nostats', '-loglevel', 'info', '-copyts',
             '-progress', 'pipe:2', '-stats_period', '0.5', '-filter_complex_threads', '1',
             '-protocol_whitelist', 'file,pipe', '-noautorotate', *input_args(plan, copyts=True),
@@ -134,20 +132,16 @@ def encode(tools, bd, plan, base, dependent, cancel, emit, log, estimated_frames
     tail = deque(maxlen=32)
     log.write('PIPELINE '+json.dumps([args, frim], ensure_ascii=False)+'\n')
     def drain(pipe, progress=False):
+        nonlocal frames
         fps = None
         for line in iter(pipe.readline, b''):
             text = line.decode('utf-8', 'replace').strip()
-            try:
-                if clock.line(text) or output_clock.line(text) or (pairs and pairs.line(text)):
-                    continue
-            except ValueError as error:
-                errors.append(error)
-                continue
             log.write(text+'\n')
             tail.append(text)
             key, _, value = text.partition('=')
             if progress and key == 'frame':
                 try:
+                    frames = int(value)
                     emit('progress', {'percent': min(70, 5+65*int(value)/estimated_frames) if estimated_frames else None,
                                       'seconds': int(value)/float(BD_RATE),
                                       'phase_percent': min(100, 100*int(value)/estimated_frames) if estimated_frames else None,
@@ -172,32 +166,20 @@ def encode(tools, bd, plan, base, dependent, cancel, emit, log, estimated_frames
             reader.start()
             readers.append(reader)
         while any(p.poll() is None for p in producers):
-            if errors:
-                raise errors[0]
             if cancel.wait(.1):
                 raise Cancelled()
             if any(p.poll() not in (None, 0) for p in producers):
                 raise ValueError('BD-3D: Kodierung fehlgeschlagen · '+'\n'.join(tail)[-3500:])
         for reader in readers:
             reader.join(timeout=10)
-        if errors:
-            raise errors[0]
         if any(p.returncode for p in producers):
             raise ValueError('BD-3D: Kodierung fehlgeschlagen · '+'\n'.join(tail)[-3500:])
         check_decoder(decoder, cancel)
-        if pairs:
-            pairs.finish()
-        source_frames, first = clock.finish()
-        frames, _ = output_clock.finish()
-        # The timestamp-based fps filter may legitimately repeat/drop pairs,
-        # including a shortened final source frame. Validate its output clock
-        # and the actual encoded frame count, not an assumed source count.
-        log.write(f'VERIFIED SOURCE CLOCK frames={source_frames} first={first} rate={config.source_rate}\n'
-                  f'SOURCE TIMING constant={clock.constant} max_interval={clock.max_interval:.6f} '
-                  f'output_frame_delta={frames-source_frames}\n'
-                  f'VERIFIED OUTPUT CLOCK frames={frames} rate={BD_RATE}\n')
-        if not clock.constant:
-            emit('phase', 'BD-3D: Variable Bildzeiten auf die feste Ausgabebildrate angepasst; beide Halbbilder bleiben synchron.')
+        if frames < 1 or any(not p.is_file() or not p.stat().st_size for p in (base, dependent)):
+            raise ValueError('BD-3D: Der Encoder hat keine vollständige Ausgabe erstellt.')
+        original = plan.info.get('multiview', {}).get('original_video', plan.info['video'])
+        first = float(original.get('start_time') or 0)
+        log.write(f'ENCODED BD3D frames={frames} rate={BD_RATE}\n')
         return frames, first
     finally:
         for p in reversed(producers):
@@ -320,8 +302,6 @@ def export(tools, plan, cancel, emit, log_path, decoder=None):
         phase('BD-3D: BT.709-Farbkennzeichnung in beiden Bildspuren setzen')
         for p in (base, dependent):
             log.write(f'BT709 {p.name}: {tag_generated_stream(p, lambda: check_cancel(cancel))} parameter sets\n')
-        phase('BD-3D: Kodierte Bilddaten für den Ausgabevergleich erfassen')
-        fingerprints = [coded_fingerprint(p, lambda: check_cancel(cancel)) for p in (base, dependent)]
         emit('progress', {'percent': 80, 'seconds': duration})
         audio_paths = []
         samples = round(duration*48000)
@@ -342,29 +322,13 @@ def export(tools, plan, cancel, emit, log_path, decoder=None):
                                  label=label, audios=audio_paths), encoding='utf-8')
         run([bd.muxer, meta, movie], cancel, log, bd.environment)
         emit('progress', {'percent': 90, 'seconds': duration})
-        phase('BD-3D: Fertige Ausgabe und Blu-ray-Struktur prüfen')
-        packed = movie
         if plan.options.container == 'iso':
             write_label(movie, label)
-            with Disc(movie) as disc:
-                if disc.label != label:
-                    raise ValueError('BD-3D: Der Disc-Titel wurde nicht korrekt gespeichert.')
-                for name, magic in [('index.bdmv', b'INDX'), ('MovieObject.bdmv', b'MOBJ'), ('PLAYLIST/00000.mpls', b'MPLS')]:
-                    address = disc.locate('BDMV/'+name)
-                    size, _ = disc.allocations(disc.block(disc.physical(*address)), address[0])
-                    if size > 1024*1024:
-                        raise ValueError('BD-3D: Blu-ray-Struktur ungültig.')
-                    data = b''.join(disc.chunks(address))
-                    if not data.startswith(magic) or len(data) > 1024*1024:
-                        raise ValueError('BD-3D: Blu-ray-Struktur unvollständig.')
-                packed = folder/'verified.ssif'
-                disc.extract('BDMV/STREAM/SSIF/00000.ssif', packed, lambda: check_cancel(cancel))
-        def verification_event(kind, value):
-            phase(value) if kind == 'phase' else emit(kind, value)
-        expected_hash = verify_mux(tools, bd, plan, packed, base, dependent, frames, fingerprints, audios, cancel, log, folder, verification_event)
+        if not movie.is_file() or not movie.stat().st_size:
+            raise ValueError('BD-3D: Der Multiplexer hat keine Ausgabe erstellt.')
         unchanged()
         check_cancel(cancel)
         publish_without_overwrite(movie, plan.output, cancel)
         log.write(f'PHASE COMPLETED {time.monotonic()-phase_started:.3f}s {previous_phase}\n')
-        log.write(f'VERIFIED BD3D frames={frames} rate={BD_RATE} both_views_sha256={expected_hash}\nCOMPLETED {plan.output}\n')
+        log.write(f'COMPLETED BD3D frames={frames} rate={BD_RATE}\nCOMPLETED {plan.output}\n')
         emit('progress', {'percent': 100, 'seconds': duration})

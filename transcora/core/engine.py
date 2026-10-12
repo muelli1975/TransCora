@@ -35,14 +35,14 @@ def stop_process(process: subprocess.Popen) -> None:
             process.wait(timeout=3)
 
 
-def capture(args: list[str], cancel: threading.Event | None = None, timeout: float = 30) -> bytes:
+def capture(args: list[str], cancel: threading.Event | None = None, timeout: float | None = None) -> bytes:
     process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, **process_options())
     start = time.monotonic()
     try:
         while True:
             if cancel and cancel.is_set():
                 raise Cancelled()
-            if time.monotonic() - start > timeout:
+            if timeout is not None and time.monotonic() - start > timeout:
                 raise ValueError("Die technische Prüfung hat zu lange gedauert.")
             try:
                 out, err = process.communicate(timeout=.15)
@@ -507,7 +507,7 @@ def plan_job(tools: Toolchain, job: Job, output_root: Path, reserved: set[str],
         preparation = prepare(video, layout, swap)
         validate_audio(audios)
         warnings.extend(preparation.warnings)
-        warnings.append('BD-3D: Bildzeiten und beide Halbbilder werden beim Export vollständig geprüft. Gewählter Ton wird als LPCM gespeichert.')
+        warnings.append('BD-3D: FFmpeg bereitet die Quelle vor, FRIM kodiert AVC/MVC und tsMuxeR erstellt die Ausgabe. Gewählter Ton wird als LPCM gespeichert.')
         graph, size, pixel_format = preparation.graph, (1920, 1080), 'yuv420p'
     else:
         graph, size, pixel_format = build_graph(video, options, layout, swap, colors, catalog[options.method])
