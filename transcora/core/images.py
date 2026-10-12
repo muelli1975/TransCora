@@ -21,7 +21,7 @@ from .storage import write_json
 EXTENSIONS = {'.jpg', '.jpeg', '.jps', '.png', '.pns', '.tif', '.tiff', '.bmp', '.webp', '.mpo'}
 TASKS = {'convert': 'Bilder konvertieren', 'mpo': 'MPO verlustfrei teilen'}
 LAYOUTS = {'auto': 'Automatisch', 'mono': 'Mono / 2D', 'full_sbs': 'Full-SBS', 'half_sbs': 'Half-SBS',
-           'full_ou': 'Full-OU', 'half_ou': 'Half-OU'}
+           'full_ou': 'Full-OU', 'half_ou': 'Half-OU', 'row_interleaved': 'Zeilenverschachtelt'}
 TARGETS = {'keep': 'Layout beibehalten', 'full_sbs': 'Full-SBS', 'full_ou': 'Full-OU',
            'row_interleaved': 'Zeilenverschachtelt (Polfilter)',
            'half_sbs': 'Half-SBS', 'half_ou': 'Half-OU', 'anaglyph': 'Anaglyph',
@@ -263,6 +263,8 @@ def plans(jobs: list[ImageJob], output: Path, cancel: threading.Event, *, reserv
             raise ValueError('Bild lässt sich nicht in zwei gleich große Halbbilder teilen.')
         if layout.startswith('half_') and opts.target.startswith('full_'):
             warnings.append('Half → Full skaliert die gestauchte Achse; keine zusätzlichen Bilddetails.')
+        if layout == 'row_interleaved':
+            warnings.append('Zeilenquelle: Stereo-Zeilen werden vor Skalierung getrennt. Die halbe vertikale Detailauflösung je Halbbild bleibt erhalten.')
         folder = output.resolve()
         if job.source_root:
             folder /= source.parent.relative_to(job.source_root.resolve())
@@ -311,6 +313,19 @@ def resized_dimensions(size, options):
 
 def image_graph(plan):
     opts = plan.options; target = opts.target
+    if plan.layout == 'row_interleaved':
+        if target == 'keep' and resized_dimensions(plan.size, opts) == plan.size:
+            return '[0:v]null,format=rgba[v]', plan.size
+        if target == 'keep':
+            w, h = resized_dimensions(plan.size, opts)
+            opts = replace(opts, target='row_interleaved', size_mode='original', long_edge=0,
+                           screen_width=w, screen_height=max(2, 2*round(h/2)), row_first='left')
+        packed = replace(plan, layout='half_ou', options=opts, swap=False if target == 'keep' else plan.swap)
+        graph, size = image_graph(packed)
+        if graph is None:
+            return None, size
+        prefix = '[0:v]format=gbrp,stereo3d=irl:ab2l[stereopair];'
+        return prefix + graph.replace('[0:v]', '[stereopair]').replace('[0:0]', '[stereopair]'), size
     if target == 'keep':
         graph = '[0:v]null[composite]'; size = plan.size
     elif target == 'anaglyph':
@@ -421,7 +436,14 @@ def execute_image(tools, plan, cancel, emit, log_path):
                 # Temporary PNGs need lossless pixels, not costly compression.
                 if opts.target == 'anaglyph' and opts.method == 'cielab':
                     from .cielab import render
-                    rendered = render(image, plan, folder, cancel, emit)
+                    render_plan = plan
+                    if plan.layout == 'row_interleaved':
+                        packed = Image.new(image.mode, image.size)
+                        for y in range(image.height):
+                            packed.paste(image.crop((0, y, image.width, y+1)),
+                                         (0, y//2 + (image.height//2 if y % 2 else 0)))
+                        image, render_plan = packed, replace(plan, layout='half_ou')
+                    rendered = render(image, render_plan, folder, cancel, emit)
                 else:
                     input_file = folder/'normalized.png'; image.save(input_file, compress_level=0)
                     graph, _ = image_graph(plan)

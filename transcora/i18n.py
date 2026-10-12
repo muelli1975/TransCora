@@ -1111,6 +1111,18 @@ EN.update({'{0} → 23,976 fps: Ganze Stereobildpaare werden ausgelassen oder wi
 for key in list(EN):
     if '{0} '+chr(8594)+' {1} fps:' in key or 'Variable Bildzeiten '+chr(8594)+' {0} fps:' in key:
         del EN[key]
+EN.update({
+    'Zeilenverschachtelt': 'Row interleaved',
+    'Frame sequential': 'Frame sequential',
+    'Zeilenquelle benötigt eine gerade Zeilenzahl.': 'Row-interleaved input requires an even number of rows.',
+    'Frame sequential: Ausgabe-Layout wählen; die Zielbildrate gilt für vollständige Stereobildpaare.':
+        'Frame sequential: choose an output layout; the target frame rate applies to complete stereo pairs.',
+    'Frame sequential: Je zwei aufeinanderfolgende Halbbilder bilden ein Stereobildpaar. Die Paarbildrate ist die halbe Quellbildrate; ein ungepaartes Schlussbild wird ausgelassen.':
+        'Frame sequential: two consecutive half-images form one stereo pair. The pair frame rate is half the source frame rate; an unpaired final half-image is omitted.',
+    'Zeilenquelle: Stereo-Zeilen werden vor Skalierung getrennt. Die halbe vertikale Detailauflösung je Halbbild bleibt erhalten.':
+        'Row-interleaved input: stereo rows are separated before scaling. Each half-image retains half the vertical detail resolution.',
+})
+
 PATTERNS = []
 for source, target in EN.items():
     parts = re.split(r"(\{\d+\})", source)

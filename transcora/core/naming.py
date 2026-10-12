@@ -24,6 +24,12 @@ def filename_layout(stem: str) -> tuple[str, bool] | None:
         if hint and hint[0] != own[1].lower():
             raise ValueError("Widersprüchliche Stereo-Kürzel im Dateinamen.")
         hint = hint or (own[1].lower(), False)
+    rows = re.search(r"_rows_(lr|rl)$", stem, re.I)
+    if rows:
+        hint = ('row_interleaved', rows[1].lower() == 'rl')
+    sequential = re.search(r"_seq_(lr|rl)$", stem, re.I)
+    if sequential:
+        hint = ('frame_sequential', sequential[1].lower() == 'rl')
     kodi = re.search(r"(?:^|[-. _])3d[-. _]+(hsbs|htab|sbs|tab)(?=$|[-. _])", stem, re.I)
     if kodi:
         other = {"hsbs": "half_sbs", "htab": "half_ou", "sbs": "full_sbs", "tab": "full_ou"}[kodi[1].lower()]
@@ -37,7 +43,7 @@ def clean_stem(stem: str) -> str:
     # Remove recognized compound markers only; preserve ordinary words containing '3D'.
     stem = re.sub(r"(?:[-. _])3d[-. _]+h?(?:sbs|tab)(?=$|[-. _])", "", stem, flags=re.I)
     stem = re.sub(r"-(?:half-sbs|half-ou|hsbs|hou|sbs|lrh|rlh|lrq|rlq|tbh|bth|abq|baq|lr|rl|tb|bt|ab|ba|2d)$", "", stem, flags=re.I)
-    stem = re.sub(r"_(?:full_sbs|half_sbs|full_ou|half_ou|mono_[lr])$", "", stem, flags=re.I)
+    stem = re.sub(r"_(?:full_sbs|half_sbs|full_ou|half_ou|mono_[lr]|rows_[lr]{2}|seq_[lr]{2})$", "", stem, flags=re.I)
     stem = re.sub(r"_\d+(?:\.\d+)?(?:_\d+)?fps$", "", stem, flags=re.I)
     stem = re.sub(r"_fps\d+(?:\.\d+)?(?:_\d+)?$", "", stem, flags=re.I)
     stem = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", stem).strip(" ._-") or "Video"
@@ -63,7 +69,7 @@ def fps_suffix(value: str) -> str:
 def suffix_choices(options: Options, method_suffix: str, layout: str | None = None, swap: bool = False) -> list[str]:
     target = layout if options.target == "framerate" else options.target
     if target == "cross_sbs": return ["-rl", ".3D.SBS-rl", "Keiner"]
-    if target == "row_interleaved": return ['_rows_' + ('rl' if options.row_first == 'right' else 'lr'), 'Keiner']
+    if target == "row_interleaved": return ['_rows_' + ('rl' if (swap if options.target == 'framerate' else options.row_first == 'right') else 'lr'), 'Keiner']
     choices = {"half_sbs": ["_half_sbs", "-lrh", "-lrq", ".3D.HSBS", ".3D.HSBS-lrh"],
                "half_ou": ["_half_ou", "-tbh", "-abq", ".3D.HTAB", ".3D.HTAB-tbh"],
                "full_sbs": ["_full_sbs", "-lr"], "full_ou": ["_full_ou", "-tb", "-ab"],
@@ -88,7 +94,8 @@ def effective_suffix(options: Options, method_suffix: str, source: Path | None =
         marker = {("full_sbs", False): "-lr", ("half_sbs", False): "-lrh",
                   ("full_ou", False): "-tb", ("half_ou", False): "-tbh",
                   ("full_sbs", True): "-rl", ("half_sbs", True): "-rlh",
-                  ("full_ou", True): "-bt", ("half_ou", True): "-bth"}.get((layout, swap), "")
+                  ("full_ou", True): "-bt", ("half_ou", True): "-bth",
+                  ("row_interleaved", False): "_rows_lr", ("row_interleaved", True): "_rows_rl"}.get((layout, swap), "")
         return (fps_suffix(options.target_fps) if requested_rate(options) else "") + marker
     if options.target == "cross_sbs": return ".3D.SBS-rl" if options.naming == "players" else "-rl"
     if options.target == "row_interleaved": return '_rows_' + ('rl' if options.row_first == 'right' else 'lr')

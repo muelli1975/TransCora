@@ -1,0 +1,59 @@
+name: TransCora 1.1 codec feasibility
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/probe-1.1.yml'
+      - 'scripts/probe_1_1_heif.py'
+      - 'scripts/probe_1_1_mvhevc.py'
+      - 'native/heif/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  codec-probes:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: Multicorewareinc/x265
+          ref: e9b88125dc21393b3fd8d68e98083bdfb89778a8
+          path: work/x265-source
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install isolated development readers
+        run: python -m pip install Pillow==11.3.0 pillow-heif==1.8.1
+      - name: Prepare the pinned FFmpeg decoder
+        run: python scripts/fetch_ffmpeg.py
+      - name: Decode primary photos and tagged stereo half-images
+        run: python scripts/probe_1_1_heif.py --ffmpeg tools/ffmpeg/bin/ffmpeg.exe --folder work/heif-probe --report work/heif-probe/report.json
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: false
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
+      - name: Build an actual multiview x265 encoder
+        shell: msys2 {0}
+        run: |
+          cmake -S work/x265-source/source -B work/x265-build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DENABLE_MULTIVIEW=ON -DENABLE_ASSEMBLY=OFF -DENABLE_SHARED=OFF -DENABLE_LIBNUMA=OFF
+          cmake --build work/x265-build --parallel 2
+          cygpath -w /ucrt64/bin >> "$GITHUB_PATH"
+      - name: Probe both multiview layers, containers, timing and audio
+        run: python scripts/probe_1_1_mvhevc.py --x265 work/x265-build/x265.exe --ffmpeg tools/ffmpeg/bin/ffmpeg.exe --ffprobe tools/ffmpeg/bin/ffprobe.exe --folder work/mvhevc-probe
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: TransCora-1.1-codec-probes
+          path: |
+            work/heif-probe/report.json
+            work/mvhevc-probe/report.json
+          if-no-files-found: warn
+          retention-days: 30

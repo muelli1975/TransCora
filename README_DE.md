@@ -8,6 +8,12 @@ Alles läuft lokal, ohne Account, Cloud oder Tracking. Die Oberfläche lässt si
 
 ![Screenshot aus TransCora 1.0: Videostapel und Ausgabeeinstellungen](docs/TransCora-1.0.png)
 
+Zeilenverschachtelte Bild-/Videoeingaben und **Frame sequential** bei Videos lassen
+sich in die vorhandenen Stereo- und Mono-Ziele umwandeln. L/R tauschen bestimmt
+die Zuordnung des ersten Halbbilds. Frame sequential bildet vor der Bildratenwandlung
+vollständige Paare: 120 Einzelbilder/s entsprechen 60 Stereobildpaaren/s. Ein
+ungepaartes Schlussbild wird ausgelassen. Dafür ein Ausgabe-Layout wählen.
+
 ## Schnellstart
 
 1. Öffne **Videos** oder **Bilder** und füge Dateien oder einen Ordner hinzu. Aktiviere bei Bedarf **Unterordner mitverarbeiten**.

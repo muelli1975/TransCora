@@ -83,11 +83,12 @@ def metadata_layout(video: dict) -> tuple[str, bool] | None:
     tag = source_tags.get('stereo_mode', '')
     tags = {"left_right": ("sbs", False), "right_left": ("sbs", True),
             "top_bottom": ("ou", False), "bottom_top": ("ou", True),
-            "row_interleaved_lr": ("rows", False), "row_interleaved_rl": ("rows", True)}
+            "row_interleaved_lr": ("rows", False), "row_interleaved_rl": ("rows", True),
+            "block_lr": ("frames", False), "block_rl": ("frames", True)}
     if tag in tags:
         return tags[tag]
     numeric = {'1': ('sbs', False), '11': ('sbs', True), '3': ('ou', False), '2': ('ou', True),
-               '7': ('rows', False), '6': ('rows', True)}
+               '7': ('rows', False), '6': ('rows', True), '13': ('frames', False), '14': ('frames', True)}
     if tag in numeric:
         return numeric[tag]
     wmv = {'sidebysidelf': ('sbs', False), 'sidebysiderf': ('sbs', True),
@@ -96,7 +97,7 @@ def metadata_layout(video: dict) -> tuple[str, bool] | None:
         return wmv[source_tags['stereoscopiclayout']]
     for side in video.get("side_data_list", []):
         if side.get("side_data_type") == "Stereo 3D":
-            kind = {"side by side": "sbs", "top and bottom": "ou", "interleaved lines": "rows"}.get(side.get("type"))
+            kind = {"side by side": "sbs", "top and bottom": "ou", "interleaved lines": "rows", "frame alternate": "frames"}.get(side.get("type"))
             if kind:
                 return kind, bool(side.get("inverted", 0))
             if side.get("type") not in (None, "2D", "unspecified"):
@@ -104,13 +105,18 @@ def metadata_layout(video: dict) -> tuple[str, bool] | None:
     return None
 
 
+def layout_axis(layout):
+    return {'row_interleaved': 'rows', 'frame_sequential': 'frames'}.get(
+        layout, 'sbs' if layout.endswith('sbs') else 'ou')
+
+
 def metadata_full_half(video: dict) -> tuple[str, bool] | None:
     stereo = metadata_layout(video)
     if not stereo:
         return None
     axis, swap = stereo
-    if axis == 'rows':
-        return None
+    if axis in {'rows', 'frames'}:
+        return ('row_interleaved' if axis == 'rows' else 'frame_sequential', swap)
     tags = {k.lower().rsplit('/', 1)[-1]: str(v).lower() for k, v in video.get('tags', {}).items()}
     half = tags.get('stereoscopichalfwidth' if axis == 'sbs' else 'stereoscopichalfheight')
     if half in {'1', 'true', 'yes'}:
@@ -197,7 +203,7 @@ class Plan:
         # raster stays intact; omit misleading stereo tags rather than claim L/R.
         if layout == "cross_sbs": return ("sbs", True) if self.options.container == "mkv" else None
         if layout == "row_interleaved":
-            return ('rows', self.options.row_first == 'right') if self.options.container == 'mkv' else None
+            return ('rows', (self.swap if self.options.target == 'framerate' else self.options.row_first == 'right')) if self.options.container == 'mkv' else None
         if layout not in {"half_sbs", "full_sbs", "half_ou", "full_ou"}:
             return None
         if self.options.target == 'framerate' and self.swap and self.options.container == 'mp4':
@@ -220,8 +226,8 @@ class Plan:
         axis, inverted = self.stereo
         flags = "MKV-StereoMode" if self.options.container == "mkv" else "MP4-st3d"
         if self.options.codec == "h264" and not inverted:
-            flags += f" · H.264 Frame-Packing {'3' if axis == 'sbs' else '4'}"
-        return f"3D-Kennzeichnung: {flags} · {'SBS' if axis == 'sbs' else 'OU'} · " + ("R/L" if inverted else "L/R")
+            flags += f" · H.264 Frame-Packing {dict(sbs='3', ou='4', rows='2')[axis]}"
+        return f"3D-Kennzeichnung: {flags} · {dict(sbs='SBS', ou='OU', rows='Zeilenverschachtelt')[axis]} · " + ("R/L" if inverted else "L/R")
 
     @property
     def summary(self) -> str:
@@ -256,6 +262,13 @@ class Plan:
 def build_graph(video: dict, options: Options, layout: str, swap: bool, colors: dict,
                 method: dict) -> tuple[str, tuple[int, int], str]:
     from .video import deinterlace, interlaced, output_dimensions
+    from .stereo_input import unpack, attach
+    if layout in {'row_interleaved', 'frame_sequential'} and options.target != 'framerate':
+        working, packed, prefix = unpack(video, layout)
+        graph, size, pixel = build_graph(working, options, packed, swap, colors, method)
+        return attach(prefix, graph, video['index']), size, pixel
+    if layout == 'row_interleaved':
+        video = dict(video, field_order='progressive')
     width, height = video["width"], video["height"]
     if options.target == "framerate":
         pixel_format = video.get("pix_fmt", "")
@@ -435,8 +448,6 @@ def plan_job(tools: Toolchain, job: Job, output_root: Path, reserved: set[str],
         warnings.append(message)
         review_warnings.append(message)
     from .video import interlaced
-    if interlaced(video):
-        warnings.append("Interlaced: Ein progressives Bild je Halbbildzeit; die zeitliche Auflösung bleibt erhalten. BD-3D und die Zielbildrate passen die Bildfolge anschließend an.")
     try:
         metadata = None if multiview else metadata_layout(video)
         geometry_hint = None if multiview else metadata_full_half(video)
@@ -466,7 +477,7 @@ def plan_job(tools: Toolchain, job: Job, output_root: Path, reserved: set[str],
         if not hint:
             raise ValueError("Full/Half-Layout nicht eindeutig erkennbar. Quelllayout für diese Datei auswählen.")
         layout, swapped = hint
-        if metadata and metadata != ("sbs" if layout.endswith("sbs") else "ou", swapped):
+        if metadata and metadata != (layout_axis(layout), swapped):
             raise ValueError("Dateiname und Stereo-Metadaten widersprechen sich. Quelllayout bewusst auswählen.")
         swap = swapped ^ options.swap
     else:
@@ -475,8 +486,16 @@ def plan_job(tools: Toolchain, job: Job, output_root: Path, reserved: set[str],
         layout, swap = options.layout, options.swap
         if hint and hint != (layout, swap):
             review("Manuell gewähltes Layout/L/R weicht vom Dateinamen ab.")
-        if metadata and metadata != ("sbs" if layout.endswith("sbs") else "ou", swap):
+        if metadata and metadata != (layout_axis(layout), swap):
             review("Manuelle Quellinterpretation ersetzt abweichende Stereo-Metadaten.")
+    if interlaced(video) and layout not in {'row_interleaved', 'frame_sequential'}:
+        warnings.append("Interlaced: Ein progressives Bild je Halbbildzeit; die zeitliche Auflösung bleibt erhalten. BD-3D und die Zielbildrate passen die Bildfolge anschließend an.")
+    if layout == 'frame_sequential':
+        if options.target == 'framerate':
+            raise ValueError('Frame sequential: Ausgabe-Layout wählen; die Zielbildrate gilt für vollständige Stereobildpaare.')
+        warnings.append('Frame sequential: Je zwei aufeinanderfolgende Halbbilder bilden ein Stereobildpaar. Die Paarbildrate ist die halbe Quellbildrate; ein ungepaartes Schlussbild wird ausgelassen.')
+    elif layout == 'row_interleaved':
+        warnings.append('Zeilenquelle: Stereo-Zeilen werden vor Skalierung getrennt. Die halbe vertikale Detailauflösung je Halbbild bleibt erhalten.')
     if options.target != 'framerate' and sar not in {'1:1', '0:1', 'N/A', None}:
         if (layout, sar) in {('half_sbs', '2:1'), ('half_ou', '1:2')}:
             video['sample_aspect_ratio'] = '1:1'
@@ -488,7 +507,7 @@ def plan_job(tools: Toolchain, job: Job, output_root: Path, reserved: set[str],
     if options.target == "framerate":
         if options.swap:
             raise ValueError("Layout beibehalten erhält die Halbbildreihenfolge. L/R tauschen ausschalten.")
-        orientation = "sbs" if layout.endswith("sbs") else "ou"
+        orientation = layout_axis(layout)
         swap = metadata[1] if metadata and metadata[0] == orientation else hint[1] if hint and hint[0] == layout else False
         if layout == "mono":
             if metadata or hint:
@@ -499,7 +518,7 @@ def plan_job(tools: Toolchain, job: Job, output_root: Path, reserved: set[str],
     if requested_rate(options):
         warnings.append("Ganze Bilder werden ausgelassen/wiederholt; keine Überblendung oder Bewegungsinterpolation. "
                         "Video wird neu kodiert; Ton und Wiedergabegeschwindigkeit bleiben erhalten.")
-    if layout != "mono" and (width if layout.endswith("sbs") else height) % 2:
+    if layout not in {"mono", "frame_sequential"} and (width if layout.endswith("sbs") else height) % 2:
         raise ValueError("Das gepackte Raster lässt sich nicht in zwei gleich große Halbbilder teilen.")
     colors, color_warnings = color_spec(video, layout)
     warnings.extend(color_warnings)

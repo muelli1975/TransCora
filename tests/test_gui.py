@@ -18,6 +18,28 @@ from tkinter import ttk
 
 
 class GuiTests(unittest.TestCase):
+    def test_new_stereo_inputs_fit_the_list_and_show_neutral_notices(self):
+        from tkinter import font
+        from transcora.core.model import Job
+        from transcora.core.engine import plan_job
+        from test_stereo_inputs import fixture
+        window = self.window; tools = Toolchain.find()
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            source = fixture(tools, folder, 'frame_sequential', '120')
+            job = Job(source, Options(target='full_sbs', container='mkv', video_size='original'))
+            job.plan = plan_job(tools, job, folder/'out', set())
+            job.status = 'ready'; window.jobs.append(job); window.update_row(job)
+            window.tree.selection_set(job.id); window.show_job_details(job)
+            self.root.update()
+            for language in ('de', 'en'):
+                window.language = language; window.apply_language(); self.root.update()
+                self.assertIn('Frame sequential', window.mappings['layout'].values())
+                measured = font.Font(font=ttk.Style().lookup('Treeview', 'font')).measure('Frame sequential')
+                self.assertGreaterEqual(window.tree.column('layout', 'width'), measured+16)
+                self.assertEqual(window.attention.get(), '')
+                self.assertNotIn('⚠', window.file_notes.get())
+
     def test_video_pause_preserves_completed_export_and_freezes_elapsed(self):
         import threading
         import shutil

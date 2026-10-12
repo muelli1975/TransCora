@@ -193,7 +193,7 @@ class Window:
         holder.columnconfigure(0, weight=1)
         holder.rowconfigure(0, weight=1)
         self.tree = ttk.Treeview(holder, columns=("file", "layout", "fps", "duration", "target", "status", "processing"), show="headings", height=6, selectmode="extended")
-        for key, label, width in (("file", "Datei", 190), ("layout", "Quelle", 100), ("fps", "fps", 55),
+        for key, label, width in (("file", "Datei", 170), ("layout", "Quelle", 120), ("fps", "fps", 55),
                                   ("duration", "Dauer", 70), ("target", "Ziel", 185), ("status", "Status", 80),
                                   ("processing", "Bearbeitungszeit", 126)):
             self.tree.heading(key, text=label)
@@ -1203,9 +1203,9 @@ class Window:
             if source and opts.video_size != 'custom':
                 w, h, layout = source
                 layout = opts.layout if opts.layout in {'full_sbs', 'half_sbs', 'full_ou', 'half_ou'} else layout
-                ew, eh = (w//2, h) if layout.endswith('sbs') else (w, h//2)
+                ew, eh = (w, h) if layout == 'frame_sequential' else ((w//2, h) if layout.endswith('sbs') else (w, h//2))
                 ew *= 2 if layout == 'half_sbs' else 1
-                eh *= 2 if layout == 'half_ou' else 1
+                eh *= 2 if layout in {'half_ou', 'row_interleaved'} else 1
                 size = output_dimensions(opts, ew, eh)
                 if opts.target in {'full_sbs', 'cross_sbs'}: size = size[0]*2, size[1]
                 elif opts.target == 'full_ou': size = size[0], size[1]*2

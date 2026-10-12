@@ -28,6 +28,12 @@ class Preparation:
 
 
 def prepare(video: dict, layout: str, swap: bool = False, mode: str = "1080p") -> Preparation:
+    from .stereo_input import unpack, attach
+    if layout in {'row_interleaved', 'frame_sequential'}:
+        working, packed, prefix = unpack(video, layout)
+        result = prepare(working, packed, swap, mode)
+        from dataclasses import replace
+        return replace(result, graph=attach(prefix, result.graph, video['index']))
     outw, outh, output_rate = output_mode(mode)
     rate_label = {"1080p": "23,976", "720p50": "50", "720p5994": "59,94"}[mode]
     if layout not in {'full_sbs', 'half_sbs', 'full_ou', 'half_ou'}:

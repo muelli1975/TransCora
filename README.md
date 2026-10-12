@@ -8,6 +8,12 @@ Everything runs locally, without an account, cloud or tracking. The interface ca
 
 ![TransCora 1.0 video batch and output settings](docs/TransCora-1.0.png)
 
+Row-interleaved image/video inputs and **Frame sequential** video inputs can now
+be converted to the existing stereo or mono targets. L/R swap determines the first
+half-image. Frame sequential pairs consecutive half-images before frame-rate
+conversion; 120 individual frames/s represent 60 stereo pairs/s. An unpaired final
+half-image is omitted. Choose an output layout for frame-sequential input.
+
 ## Quick start
 
 1. Open **Videos** or **Images** and add files or a folder. Enable **Include subfolders** if needed.

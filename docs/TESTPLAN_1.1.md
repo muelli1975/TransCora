@@ -30,6 +30,36 @@ und Erfolgsstatus erhalten; die Abschlussmeldung weist auf fehlende Einträge hi
 Die plattformübergreifenden Pakettests für den erweiterten Stand mit Pause und
 Mono-Auswahl werden gesondert ausgeführt.
 
+## Neue Stereo-Eingaben und HEIF-Prototyp
+
+Zeilenverschachtelte Bilder/Videos und Frame sequential sind in den Import und die
+vorhandenen Ausgabeziele integriert. Tests mit unabhängig erzeugten Halbbildern
+prüfen L/R und R/L, richtige Geometrie, 48/50/59,94/120 Einzelbilder/s, vollständiges
+letztes Paar, ungepaartes Schlussbild, unveränderten Ton und variable Bildzeiten.
+Alle drei BD-Vorbereitungsgraphen wurden mit FFmpeg tatsächlich ausgeführt.
+Zusammen mit bestehenden GUI-/Kern-/Journal-Regressionen: **94 lokale Tests bestanden**. Die
+Liste bietet Platz für Frame sequential in DE/EN; normale Erklärungen bleiben neutral.
+
+Bei Frame sequential erfordert die Ausgabe derzeit ein gewähltes Stereo-/Mono-
+Layout. Ein alternierender Export über FFmpegs `stereo3d=sbsl:al` verlor in der
+Vorbereitung das letzte Paar; dieser Weg wird nicht als Layout-beibehalten angeboten.
+Die Zielbildrate gilt nach der Paarbildung für vollständige Stereobildpaare.
+
+Der separate HEIF-Leserprototyp bestand vier lokale Proben mit pillow-heif 1.8.1:
+Stereo-Paar, vertauschte Item-Reihenfolge, upstream Spatial Photo (beide 2560×2560-
+Halbbilder einschließlich ICC) und gedrehtes Hauptfoto. Quellen, SHA-256, gewählte
+Item-IDs und Pixelprüfsummen stehen in `verification/1.1-heif-probe.json`. Zusätzliche
+Tests verhindern, dass Tiefenkarten/Gainmaps/andere Bilder als zweites Halbbild
+gewählt werden. HDR wird anhand PQ/HLG erkannt, nicht allein an Lichtpegel-Metadaten.
+
+**HEIF ist noch nicht im Paket oder Bildimport freigegeben.** Separate Paketierung,
+zugehörige Quellen/Lizenzen und Prüfung aller drei Systeme stehen aus. Die öffentliche
+Upstream-Fixture wurde zur Prüfung heruntergeladen; Fotos werden nicht ins Repository
+kopiert. Der MV-HEVC-Prototyp baut x265 mit echtem ENABLE_MULTIVIEW und prüft beide
+expliziten Views, MP4-Container, Zeitstempel und Ton in einem getrennten CI-Lauf.
+Ein erfolgreich ausgeführter Probelauf bedeutet nicht automatisch einen brauchbaren
+Codec: dessen JSON-Ergebnis kann `blocked` oder `candidate` sein.
+
 ## Bereits geprüft bei der Vorbereitung
 
 - 1.0-Basis: veröffentlichter Build `c3f2315`, aktueller Dokumentationsstand `7ef801f`.

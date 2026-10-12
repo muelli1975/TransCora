@@ -11,7 +11,8 @@ import uuid
 VIDEO_EXTENSIONS = {".mp4", ".mkv", ".mk3d", ".mkv3d", ".mov", ".m2ts", ".mts", ".ts", ".ssif", ".iso", ".avi", ".wmv"}
 LAYOUTS = {"auto": "Automatisch", "full_sbs": "Full-SBS", "half_sbs": "Half-SBS",
            "full_ou": "Full-OU", "half_ou": "Half-OU", "mono": "Mono / 2D",
-           "mvc": "MVC / Blu-ray 3D", "mvhevc": "MV-HEVC"}
+           "mvc": "MVC / Blu-ray 3D", "mvhevc": "MV-HEVC",
+           "row_interleaved": "Zeilenverschachtelt", "frame_sequential": "Frame sequential"}
 TARGETS = {"half_sbs": "Half-SBS", "half_ou": "Half-OU",
            "row_interleaved": "Zeilenverschachtelt (Polfilter)",
            "cross_sbs": "Kreuzblick · Full-SBS R/L", "full_sbs": "Full-SBS", "full_ou": "Full-OU",

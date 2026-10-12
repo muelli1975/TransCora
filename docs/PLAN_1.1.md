@@ -5,7 +5,8 @@ Stand: 12. Oktober 2026. Entwicklungszweig: `prepare/v1.1`.
 Diese Datei beschreibt den vereinbarten Umfang. Journal, Bearbeitungszeit,
 Listenaktionen und die Bereinigung doppelter Hinweise sind als erster
 Entwicklungsstand implementiert. Pausensteuerung und Mono-Halbbildwahl sind
-ebenfalls umgesetzt und lokal geprüft; neue Eingaben und neue Ausgabeziele folgen.
+ebenfalls umgesetzt. Zeilenverschachtelte und Frame-sequential-Eingaben sind
+integriert; HEIF-Leser und MV-HEVC-Encoding werden separat erprobt.
 Die Abnahme ist im Testplan dokumentiert. Grundlage ist `main` bei
 `7ef801f8aff9697ecd40882a763fdac0cdd2d3fe`; die veröffentlichte 1.0 wurde aus
 `c3f23155db3c56da8377bc7e4dd7bf9bc1eb35e8` gebaut. Die Vorbereitung ändert
