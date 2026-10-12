@@ -1,4 +1,4 @@
-"""Fixed, tested 1080p23.976 MVC preparation."""
+"""Blu-ray 3D MVC preparation for 1080p23.976 and 720p50/59.94."""
 from dataclasses import dataclass
 from fractions import Fraction
 from pathlib import Path
@@ -10,6 +10,12 @@ from .engine import color_spec
 BD_RATE = Fraction(24000, 1001)
 
 
+def output_mode(mode="1080p"):
+    return {"1080p": (1920, 1080, BD_RATE),
+            "720p50": (1280, 720, Fraction(50)),
+            "720p5994": (1280, 720, Fraction(60000, 1001))}[mode]
+
+
 @dataclass(frozen=True)
 class Preparation:
     graph: str
@@ -17,9 +23,13 @@ class Preparation:
     speed: Fraction
     audio_filter: str
     warnings: tuple[str, ...]
+    size: tuple[int, int]
+    rate: Fraction
 
 
-def prepare(video: dict, layout: str, swap: bool = False) -> Preparation:
+def prepare(video: dict, layout: str, swap: bool = False, mode: str = "1080p") -> Preparation:
+    outw, outh, output_rate = output_mode(mode)
+    rate_label = {"1080p": "23,976", "720p50": "50", "720p5994": "59,94"}[mode]
     if layout not in {'full_sbs', 'half_sbs', 'full_ou', 'half_ou'}:
         raise ValueError('BD-3D: Eindeutige SBS/OU-Quelle erforderlich.')
     from .video import interlaced, deinterlace
@@ -66,16 +76,17 @@ def prepare(video: dict, layout: str, swap: bool = False) -> Preparation:
         aspect /= 2
     # Fit each reconstructed half-image without cropping or stretching.
     if aspect >= Fraction(16, 9):
-        fitw, fith = 1920, max(2, 2*int(Fraction(1920, 2)/aspect))
+        fitw, fith = outw, max(2, 2*int(Fraction(outw, 2)/aspect))
     else:
-        fitw, fith = max(2, 2*int(540*aspect)), 1080
+        fitw, fith = max(2, 2*int(Fraction(outh, 2)*aspect)), outh
     positions = [(0, 0), (ew, 0)] if horizontal else [(0, 0), (0, eh)]
     if swap:
         positions.reverse()
     # Normalise the complete packed pair before splitting it. Even a stream
     # labelled CFR may have valid timestamp jitter or variable frame durations.
     # Exact 24-fps sources retain their established 0.1% slowdown below.
-    cadence_rate = Fraction(24) if rate == 24 and not variable and not fields else BD_RATE
+    slowdown = mode == "1080p" and rate == 24 and not variable and not fields
+    cadence_rate = Fraction(24) if slowdown else output_rate
     conversion = (f'setpts=PTS-STARTPTS,fps=fps={cadence_rate}:'
                   'start_time=0:round=near:eof_action=pass,')
     # MVC needs BT.709 YUV, unlike anaglyph matrices it needs no sRGB working
@@ -92,22 +103,22 @@ def prepare(video: dict, layout: str, swap: bool = False) -> Preparation:
              'sidedata=mode=delete:type=SPHERICAL,' + ('' if fields else conversion) + 'split[a][b]']
     for label, (x, y), eye in zip(('a', 'b'), positions, ('left', 'right')):
         sizing = (f'scale={fitw}:{fith}:flags=lanczos+accurate_rnd+full_chroma_int,'
-                  'pad=1920:1080:(ow-iw)/2:(oh-ih)/2:color=black,') if (
-                      (ew, eh) != (fitw, fith) or (fitw, fith) != (1920, 1080)) else ''
+                  f'pad={outw}:{outh}:(ow-iw)/2:(oh-ih)/2:color=black,') if (
+                      (ew, eh) != (fitw, fith) or (fitw, fith) != (outw, outh)) else ''
         graph.append(f'[{label}]crop={ew}:{eh}:{x}:{y},' +
                      (deinterlace(video, y) + conversion if fields else '') + transform + sizing +
-                     f'setsar=1,format=yuv420p,settb=1/24000,setpts=N*1001[{eye}]')
-    speed = BD_RATE / rate if rate == 24 and not variable and not fields else Fraction(1)
+                     f'setsar=1,format=yuv420p,settb=1/{output_rate.numerator},setpts=N*{output_rate.denominator}[{eye}]')
+    speed = BD_RATE / rate if slowdown else Fraction(1)
     if speed != 1:
         warnings.append('24 → 23,976 fps: Video und Ton werden um 0,1 % verlangsamt; bei konstanten Bildzeiten bleiben alle Bilder erhalten.')
     elif variable:
-        warnings.append('Variable Bildzeiten → 23,976 fps: Ganze Stereobildpaare werden bei Bedarf ausgelassen oder wiederholt. Laufzeit und Ton bleiben erhalten.')
-    elif rate != BD_RATE:
-        warnings.append(f'{float(rate):.3f} → 23,976 fps: Ganze Stereobildpaare werden ausgelassen oder wiederholt. '
+        warnings.append(f'Variable Bildzeiten → {rate_label} fps: Ganze Stereobildpaare werden bei Bedarf ausgelassen oder wiederholt. Laufzeit und Ton bleiben erhalten.')
+    elif rate != output_rate:
+        warnings.append(f'{float(rate):.3f} → {rate_label} fps: Ganze Stereobildpaare werden ausgelassen oder wiederholt. '
                         'Laufzeit und Ton bleiben erhalten; Bewegungen können ungleichmäßiger werden. '
                         'Keine Bewegungsinterpolation; Video wird nur einmal kodiert.')
     return Preparation(';'.join(graph), rate, speed,
-                       'atempo=1000/1001' if speed != 1 else 'anull', tuple(warnings))
+                       'atempo=1000/1001' if speed != 1 else 'anull', tuple(warnings), (outw, outh), output_rate)
 
 
 def check_cadence(timestamps: list[float], rate: Fraction, time_base: str) -> None:
@@ -200,21 +211,22 @@ class SourceClock(Cadence):
         return self.count, self.first
 
 
-def encoder_args(executable: Path, left: Path, right: Path, base: Path, dependent: Path, bitrate_mbps: int = 40) -> list[str]:
+def encoder_args(executable: Path, left: Path, right: Path, base: Path, dependent: Path, bitrate_mbps: int = 40, *, mode="1080p") -> list[str]:
     from .model import BD_BITRATES
     if type(bitrate_mbps) is not int or bitrate_mbps not in BD_BITRATES:
         raise ValueError('Ungültige BD-3D-Bitrate.')
     kbps = str(bitrate_mbps * 1000)
+    width, height, rate = output_mode(mode)
     # FRIM rate control is the aggregate of both views, per the author's manual.
     return list(map(str, [executable, '-sw', '-i', left, right, '-viewoutput', '-o:mvc', base, dependent,
-                         '-w', '1920', '-h', '1080', '-f', str(BD_RATE), '-I420',
+                         '-w', str(width), '-h', str(height), '-f', str(rate), '-I420',
                          '-vbr', kbps, kbps, '-u', '1', '-profile', 'high', '-level', '4.1',
-                         '-gop', '24', '4', '0', 'S', '-cpbsize', '3750', '-l', '6', '-maxdpb', '4',
+                         '-gop', '24' if mode == '1080p' else '48', '4', '0', 'S', '-cpbsize', '3750', '-l', '6', '-maxdpb', '4',
                          '-colormatrix', 'bt709', '-colorprim', 'bt709', '-colortransfer', 'bt709',
                          '-VuiNalHrd', 'on', '-PicTimingSEI', 'off', '-EndOfSequence', 'off']))
 
 
-def mux_meta(base: Path, dependent: Path, audio: Path | None, *, disc=True, label=None, audios=None) -> str:
+def mux_meta(base: Path, dependent: Path, audio: Path | None, *, disc=True, label=None, audios=None, mode="1080p") -> str:
     tracks = audios if audios is not None else ([(audio, 'und')] if audio else [])
     paths = [base, dependent] + [p for p, _ in tracks]
     if any(any(c in str(p) for c in ('"', '\n', '\r')) for p in paths):
@@ -227,8 +239,9 @@ def mux_meta(base: Path, dependent: Path, audio: Path | None, *, disc=True, labe
                 raise ValueError('BD-3D: Ungültiger Disc-Titel.')
             result += ' --label=\"' + label + '\"'
     result += '\n'
-    result += f'V_MPEG4/ISO/AVC, "{base}", fps=23.976, insertSEI, contSPS\n'
-    result += f'V_MPEG4/ISO/MVC, "{dependent}", fps=23.976, insertSEI, contSPS\n'
+    fps = {'1080p': '23.976', '720p50': '50', '720p5994': '59.94'}[mode]
+    result += f'V_MPEG4/ISO/AVC, "{base}", fps={fps}, insertSEI, contSPS\n'
+    result += f'V_MPEG4/ISO/MVC, "{dependent}", fps={fps}, insertSEI, contSPS\n'
     for path, language in tracks:
         if len(language) != 3 or not language.isascii() or not language.isalpha():
             language = 'und'

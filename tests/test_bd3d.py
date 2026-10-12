@@ -33,6 +33,33 @@ class BdPreparationTests(unittest.TestCase):
                 samples = lambda rows: [r.rsplit(',', 1)[-1] for r in rows if not r.startswith('#')]
                 self.assertEqual(samples(hashes(config.graph)), samples(hashes(expected)))
 
+    def test_720_modes_keep_timeline_and_produce_the_exact_stereo_clock(self):
+        from transcora.core.bd3d import output_mode, encoder_args, mux_meta
+        tools=Toolchain.find()
+        video=dict(index=0,width=128,height=64,r_frame_rate='25/1',avg_frame_rate='25/1',
+                   pix_fmt='yuv420p',color_space='bt709',color_primaries='bt709',
+                   color_transfer='bt709',color_range='tv')
+        for mode in ('720p50','720p5994'):
+            width,height,rate=output_mode(mode)
+            config=prepare(video,'full_sbs',mode=mode)
+            self.assertEqual(config.size,(1280,720))
+            self.assertEqual(config.audio_filter,'anull')
+            self.assertEqual(config.speed,1)
+            graph=config.graph+';[left][right]hstack,showinfo@bd_output=checksum=0[v]'
+            result=subprocess.run([str(tools.ffmpeg),'-v','info','-f','lavfi','-i',
+                'testsrc2=s=128x64:r=25:d=1','-filter_complex_threads','1','-filter_complex',
+                graph,'-map','[v]','-fps_mode','passthrough','-f','null','-'],capture_output=True,text=True,check=True)
+            clock=Cadence(rate,str(Fraction(1,rate.numerator)),'bd_output')
+            for line in result.stderr.splitlines():clock.line(line)
+            count,first=clock.finish()
+            self.assertEqual(first,0)
+            self.assertAlmostEqual(count/float(rate),1,delta=1/float(rate))
+            args=encoder_args(Path('encoder'),Path('left'),Path('right'),Path('base'),Path('mvc'),mode=mode)
+            self.assertEqual(args[args.index('-f')+1],str(rate))
+            self.assertEqual(args[args.index('-w')+1],'1280')
+            meta=mux_meta(Path('base'),Path('mvc'),None,mode=mode)
+            self.assertEqual(meta.count('fps='+('50' if mode=='720p50' else '59.94')),2)
+
     def test_ntsc_average_is_not_slowed_again_when_nominal_rate_is_rounded(self):
         video = dict(index=0, width=3840, height=1080, r_frame_rate='24/1',
                      avg_frame_rate='24000/1001', color_space='bt709', color_primaries='bt709',

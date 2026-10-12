@@ -1065,7 +1065,33 @@ EN.update({
 EN.update({'Dateiformat':'File format', 'Gemischte Werte':'Mixed values',
            'Testen: Datei {0} von {1}':'Checking: file {0} of {1}',
            'Datei {0} von {1}':'File {0} of {1}'})
+EN.update({
+    'Test abgeschlossen: {0} bereit · {1} blockiert.':'Check finished: {0} ready · {1} blocked.',
+    '{0}/{1} · Restzeit etwa {2} s':'{0}/{1} · Remaining approx. {2} s',
+    'Spur {0}: {1} → {2} · {3} Kanäle':'Track {0}: {1} → {2} · {3} channels',
+    'Kein Lauf gestartet':'No run started',
+})
 
+EN.update({
+ '1080p · 23,976 fps': '1080p · 23.976 fps',
+ '720p · 59,94 fps': '720p · 59.94 fps',
+ 'Ungültiger BD-3D-Ausgabemodus.': 'Invalid BD-3D output mode.',
+ 'Bildzeiten bei Bedarf anpassen': 'Adjust frame timing as needed',
+ 'Laufzeit erhalten': 'Preserve duration',
+ ' · AVC/MVC · Hohe Qualität.': ' · AVC/MVC · High quality.',
+ '{0} → {1} fps: Ganze Stereobildpaare werden ausgelassen oder wiederholt. Laufzeit und Ton bleiben erhalten; Bewegungen können ungleichmäßiger werden. Keine Bewegungsinterpolation; Video wird nur einmal kodiert.': '{0} → {1} fps: complete stereo image pairs are dropped or repeated. Duration and audio are retained; motion may become less even. No motion interpolation; video is encoded only once.',
+ 'Variable Bildzeiten → {0} fps: Ganze Stereobildpaare werden bei Bedarf ausgelassen oder wiederholt. Laufzeit und Ton bleiben erhalten.': 'Variable frame timing → {0} fps: complete stereo image pairs are dropped or repeated as needed. Duration and audio are retained.',
+})
+EN.update({'ca. ': 'approx. ', 'Restzeit: Datei {0} · Stapel {1}': 'Remaining: file {0} · batch {1}'})
+EN.update({
+ 'Restzeit: Datei ca. {0} · Stapel ca. {1}': 'Remaining: file approx. {0} · batch approx. {1}',
+ 'Restzeit: Datei ca. {0} · Stapel —': 'Remaining: file approx. {0} · batch —',
+ 'Restzeit: Datei — · Stapel —': 'Remaining: file — · batch —',
+})
+EN.update({'{0} → 23,976 fps: Ganze Stereobildpaare werden ausgelassen oder wiederholt. Laufzeit und Ton bleiben erhalten; Bewegungen können ungleichmäßiger werden. Keine Bewegungsinterpolation; Video wird nur einmal kodiert.': '{0} → 23.976 fps: complete stereo image pairs are dropped or repeated. Duration and audio are retained; motion may become less even. No motion interpolation; video is encoded only once.', 'Variable Bildzeiten → 23,976 fps: Ganze Stereobildpaare werden bei Bedarf ausgelassen oder wiederholt. Laufzeit und Ton bleiben erhalten.': 'Variable frame timing → 23.976 fps: complete stereo image pairs are dropped or repeated as needed. Duration and audio are retained.', '{0} → 50 fps: Ganze Stereobildpaare werden ausgelassen oder wiederholt. Laufzeit und Ton bleiben erhalten; Bewegungen können ungleichmäßiger werden. Keine Bewegungsinterpolation; Video wird nur einmal kodiert.': '{0} → 50 fps: complete stereo image pairs are dropped or repeated. Duration and audio are retained; motion may become less even. No motion interpolation; video is encoded only once.', 'Variable Bildzeiten → 50 fps: Ganze Stereobildpaare werden bei Bedarf ausgelassen oder wiederholt. Laufzeit und Ton bleiben erhalten.': 'Variable frame timing → 50 fps: complete stereo image pairs are dropped or repeated as needed. Duration and audio are retained.', '{0} → 59,94 fps: Ganze Stereobildpaare werden ausgelassen oder wiederholt. Laufzeit und Ton bleiben erhalten; Bewegungen können ungleichmäßiger werden. Keine Bewegungsinterpolation; Video wird nur einmal kodiert.': '{0} → 59.94 fps: complete stereo image pairs are dropped or repeated. Duration and audio are retained; motion may become less even. No motion interpolation; video is encoded only once.', 'Variable Bildzeiten → 59,94 fps: Ganze Stereobildpaare werden bei Bedarf ausgelassen oder wiederholt. Laufzeit und Ton bleiben erhalten.': 'Variable frame timing → 59.94 fps: complete stereo image pairs are dropped or repeated as needed. Duration and audio are retained.'})
+for key in list(EN):
+    if '{0} '+chr(8594)+' {1} fps:' in key or 'Variable Bildzeiten '+chr(8594)+' {0} fps:' in key:
+        del EN[key]
 PATTERNS = []
 for source, target in EN.items():
     parts = re.split(r"(\{\d+\})", source)
@@ -1080,11 +1106,17 @@ def translate(text, language='de'):
     text = str(text)
     if language != 'en' or not text:
         return text
+    if text.endswith((' ▲',' ▼')):
+        return translate(text[:-2],language)+text[-2:]
     if text in EN:
         return EN[text]
     if '\n' in text:
         return '\n'.join(translate(line, language) for line in text.split('\n'))
     if re.match(r'^(?:[A-Za-z]:[\\/]|\\\\|/)', text):
+        return text
+    # Audio summaries translate their labels before adding source metadata.
+    # Preserve track titles/language codes when the presentation is rendered.
+    if text.startswith('Audio: '):
         return text
     for pattern, target in PATTERNS:
         match = pattern.fullmatch(text)

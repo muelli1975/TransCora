@@ -1,7 +1,7 @@
 """One checked FFmpeg plan for manual files, folders and saved lists."""
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, replace, field
 from fractions import Fraction
 from pathlib import Path
 from collections import deque
@@ -14,7 +14,7 @@ import threading
 import time
 import uuid
 
-from .model import Job, Options, app_root, frame_rate, LAYOUTS, COMPATIBILITY_NOTE
+from .model import Job, Options, app_root, frame_rate, LAYOUTS, COMPATIBILITY_NOTE, ANAGLYPH_PLAYER_NOTE
 from .naming import filename_layout, reserve_output
 from .toolchain import Toolchain, process_options
 from .mp4 import packed_stereo_boxes
@@ -188,6 +188,7 @@ class Plan:
     warnings: list[str]
     colors: dict
     layout_reason: str
+    review_warnings: list[str] = field(default_factory=list)
 
     @property
     def stereo(self) -> tuple[str, bool] | None:
@@ -224,7 +225,11 @@ class Plan:
 
     @property
     def summary(self) -> str:
+        return self.summary_text()
+
+    def summary_text(self, translate=None) -> str:
         from .audio import summary as audio_summary
+        t = translate or (lambda text: text)
         video = self.info["video"]
         rate = video.get("avg_frame_rate", "?")
         try:
@@ -237,15 +242,15 @@ class Plan:
             timing = f" → {float(target):.3f} fps ({target}) · Laufzeit unverändert"
         if self.options.target == "bd3d":
             from .bd3d import prepare, BD_RATE
-            config = prepare(video, self.layout, self.swap)
-            timing = " → 23,976 fps (24000/1001) · " + (
-                "Video und Ton um 0,1 % verlangsamen" if config.speed != 1
-                else "Bildzeiten bei Bedarf anpassen · Laufzeit erhalten")
+            config = prepare(video, self.layout, self.swap, self.options.bd_mode)
+            timing = f" → {float(config.rate):.3f} fps ({config.rate}) · " + (
+                t("Video und Ton um 0,1 % verlangsamen") if config.speed != 1
+                else t("Bildzeiten bei Bedarf anpassen") + " · " + t("Laufzeit erhalten"))
         codec = "AVC/MVC" if self.options.target == "bd3d" else self.options.codec.upper()
         return (f"{video['width']} × {video['height']} · {video.get('codec_name', '?')} · "
                 f"{fps} fps ({rate}){timing} → {self.size[0]} × {self.size[1]} · "
                 f"{codec} / {self.pixel_format}\n{self.layout_reason}\n"
-                f"{self.stereo_summary}\n{audio_summary(self.info, self.options)}\n{self.output}")
+                f"{self.stereo_summary}\n{audio_summary(self.info, self.options, translate)}\n{self.output}")
 
 
 def build_graph(video: dict, options: Options, layout: str, swap: bool, colors: dict,
@@ -423,6 +428,10 @@ def plan_job(tools: Toolchain, job: Job, output_root: Path, reserved: set[str],
         hint_warning = str(error) + " Manuelle Quellinterpretation verwendet."
     multiview = info.get('multiview')
     warnings = [hint_warning] if hint_warning else []
+    review_warnings = list(warnings)
+    def review(message):
+        warnings.append(message)
+        review_warnings.append(message)
     from .video import interlaced
     if interlaced(video):
         warnings.append("Interlaced: Ein progressives Bild je Halbbildzeit; die zeitliche Auflösung bleibt erhalten. BD-3D und die Zielbildrate passen die Bildfolge anschließend an.")
@@ -433,7 +442,7 @@ def plan_job(tools: Toolchain, job: Job, output_root: Path, reserved: set[str],
         if options.layout == 'auto':
             raise
         metadata = geometry_hint = None
-        warnings.append('Manuelle Quellinterpretation ersetzt abweichende Stereo-Metadaten.')
+        review('Manuelle Quellinterpretation ersetzt abweichende Stereo-Metadaten.')
     if multiview:
         if options.layout not in {'auto', 'mvc', 'mvhevc'}:
             raise ValueError('Diese Quelle enthält echte Multiview-Halbbilder. Automatisch oder das passende Multiview-Format wählen.')
@@ -445,6 +454,8 @@ def plan_job(tools: Toolchain, job: Job, output_root: Path, reserved: set[str],
             warnings.append('MVC: Basis-Halbbild laut Blu-ray-Playlist '+('rechts' if multiview['base_view_right'] else 'links')+'.'
                 if 'base_view_right' in multiview else
                 'MVC: Basis-Halbbild als links angenommen. Reihenfolge im Kontrollbild prüfen; L/R tauschen ist verfügbar.')
+            if 'base_view_right' not in multiview:
+                review_warnings.append(warnings[-1])
         if multiview.get('playlist'):
             warnings.append('Blu-ray-ISO: Längste Film-Playlist '+multiview['playlist']+' ausgewählt.')
     elif options.layout == "auto":
@@ -461,9 +472,9 @@ def plan_job(tools: Toolchain, job: Job, output_root: Path, reserved: set[str],
             raise ValueError('Die Quelle enthält nicht das gewählte Multiview-Format.')
         layout, swap = options.layout, options.swap
         if hint and hint != (layout, swap):
-            warnings.append("Manuell gewähltes Layout/L/R weicht vom Dateinamen ab.")
+            review("Manuell gewähltes Layout/L/R weicht vom Dateinamen ab.")
         if metadata and metadata != ("sbs" if layout.endswith("sbs") else "ou", swap):
-            warnings.append("Manuelle Quellinterpretation ersetzt abweichende Stereo-Metadaten.")
+            review("Manuelle Quellinterpretation ersetzt abweichende Stereo-Metadaten.")
     if options.target != 'framerate' and sar not in {'1:1', '0:1', 'N/A', None}:
         if (layout, sar) in {('half_sbs', '2:1'), ('half_ou', '1:2')}:
             video['sample_aspect_ratio'] = '1:1'
@@ -490,25 +501,28 @@ def plan_job(tools: Toolchain, job: Job, output_root: Path, reserved: set[str],
         raise ValueError("Das gepackte Raster lässt sich nicht in zwei gleich große Halbbilder teilen.")
     colors, color_warnings = color_spec(video, layout)
     warnings.extend(color_warnings)
+    review_warnings.extend(color_warnings)
     if layout.startswith('half_') and options.target in {'full_sbs', 'full_ou', 'cross_sbs'}:
         warnings.append('Half → Full: Die gestauchte Achse wird hochskaliert. Verlorene Bilddetails werden nicht wiederhergestellt.')
     if any(s.get("codec_type") == "subtitle" for s in info["streams"]):
-        warnings.append("Untertitel werden nicht übernommen.")
+        review("Untertitel werden nicht übernommen.")
     from .audio import validate
     stage('Auflösung, Bildrate und Tonoptionen prüfen')
     audios = validate(info, options)
     if options.target == "anaglyph":
         warnings.append(COMPATIBILITY_NOTE
-                        if options.profile == "compatible" else "4:4:4 wird nicht von allen Playern/Hardwaredecodern unterstützt.")
+                        if options.profile == "compatible" else ANAGLYPH_PLAYER_NOTE)
+        if options.profile != 'compatible':
+            review_warnings.append(ANAGLYPH_PLAYER_NOTE)
     if options.target == 'bd3d':
         from .bd3d import prepare
         from .bd3d_export import BdTools, validate_audio
         BdTools.find()
-        preparation = prepare(video, layout, swap)
+        preparation = prepare(video, layout, swap, options.bd_mode)
         validate_audio(audios)
         warnings.extend(preparation.warnings)
         warnings.append('BD-3D: FFmpeg bereitet die Quelle vor, FRIM kodiert AVC/MVC und tsMuxeR erstellt die Ausgabe. Gewählter Ton wird als LPCM gespeichert.')
-        graph, size, pixel_format = preparation.graph, (1920, 1080), 'yuv420p'
+        graph, size, pixel_format = preparation.graph, preparation.size, 'yuv420p'
     else:
         graph, size, pixel_format = build_graph(video, options, layout, swap, colors, catalog[options.method])
     graph = graph_prefix(info, graph)
@@ -539,7 +553,7 @@ def plan_job(tools: Toolchain, job: Job, output_root: Path, reserved: set[str],
     reason = (f"{multiview['kind'].upper()} · Zwei vollständige Halbbilder aus dem Bitstream" if multiview else
               f"{LAYOUTS[layout]} · " + ((f"erkannt am Dateizusatz in {job.source.name}" if filename_layout(job.source.stem)
                   else 'erkannt an Stereo-Metadaten und Halbbildgeometrie') if options.layout == "auto" else "manuell gewählt"))
-    return Plan(job.source.resolve(), output, options, info, layout, swap, size, pixel_format, graph, duration, warnings, output_colors, reason)
+    return Plan(job.source.resolve(), output, options, info, layout, swap, size, pixel_format, graph, duration, warnings, output_colors, reason, review_warnings)
 
 
 def command(tools: Toolchain, plan: Plan, temporary: Path) -> list[str]:

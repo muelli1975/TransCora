@@ -5,6 +5,38 @@ from transcora.core.images import ImageOptions, resized_dimensions
 
 
 class LocalisationTests(unittest.TestCase):
+    def test_batch_status_and_audio_labels_are_english_without_translating_metadata(self):
+        from transcora.core.audio import summary
+        from transcora.core.model import Options
+        self.assertEqual(translate('Test abgeschlossen: 5 bereit · 0 blockiert.','en'),
+                         'Check finished: 5 ready · 0 blocked.')
+        self.assertEqual(translate('2/5 · Restzeit etwa 31 s','en'),
+                         '2/5 · Remaining approx. 31 s')
+        info={'streams':[{'index':1,'codec_type':'audio','codec_name':'aac','channels':2,
+                          'tags':{'language':'und','title':'Fertig · Wartet; Original'}},
+                         {'index':2,'codec_type':'audio','codec_name':'aac','channels':6,
+                          'tags':{'language':'deu','title':'Datei'}}]}
+        result=summary(info,Options(target='bd3d',container='iso'),lambda s:translate(s,'en'))
+        self.assertEqual(result,'Audio: Track 1: AAC → PCM_BLURAY · 2 channels · und · Fertig · Wartet; Original; Track 2: AAC → PCM_BLURAY · 6 channels · deu · Datei')
+        self.assertEqual(translate(result,'en'),result)
+
+    def test_bd_modes_and_file_batch_eta_have_english_labels(self):
+        from transcora.core.bd3d import prepare
+        from transcora.core.model import BD_MODES
+        video=dict(index=0,width=128,height=64,r_frame_rate='25/1',avg_frame_rate='25/1',
+                   pix_fmt='yuv420p',color_space='bt709',color_primaries='bt709',
+                   color_transfer='bt709',color_range='tv')
+        for mode in BD_MODES:
+            for message in prepare(video,'full_sbs',mode=mode).warnings:
+                result=translate(message,'en')
+                self.assertIn('Duration and audio are retained',result)
+                self.assertNotIn('Ganze',result)
+                self.assertNotIn('59,94',result)
+        self.assertEqual(translate('Restzeit: Datei ca. 01:10 · Stapel ca. 02:20','en'),
+                         'Remaining: file approx. 01:10 · batch approx. 02:20')
+        self.assertEqual(translate('Restzeit: Datei ca. 01:10 · Stapel —','en'),
+                         'Remaining: file approx. 01:10 · batch —')
+
     def test_message_values_and_paths_remain_user_data(self):
         self.assertEqual(translate('1080p · 23,976 fps · AVC/MVC · Hohe Qualität.', 'en'),
                          '1080p · 23.976 fps · AVC/MVC · High quality.')

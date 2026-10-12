@@ -12,7 +12,7 @@ import tempfile
 import threading
 import time
 
-from .bd3d import BD_RATE, prepare, encoder_args, mux_meta
+from .bd3d import BD_RATE, prepare, encoder_args, mux_meta, output_mode
 from .engine import Cancelled, stop_process, publish_without_overwrite, capture
 from .model import app_root
 from .mvc import tag_generated_stream, coded_fingerprint
@@ -114,6 +114,7 @@ def run(args, cancel, log, env, on_output=None, on_line=None):
 def encode(tools, bd, plan, base, dependent, cancel, emit, log, estimated_frames, decoder=None):
     from .multiview import input_args, check_decoder
     frames = 0
+    _, _, output_rate = output_mode(plan.options.bd_mode)
     # FFmpeg supplies progress; source timing and cadence are not approval gates.
     graph = plan.graph+';[left][right]hstack=inputs=2[packed]'
     args = [str(tools.ffmpeg), '-hide_banner', '-nostdin', '-nostats', '-loglevel', 'info', '-copyts',
@@ -121,7 +122,7 @@ def encode(tools, bd, plan, base, dependent, cancel, emit, log, estimated_frames
             '-protocol_whitelist', 'file,pipe', '-noautorotate', *input_args(plan, copyts=True),
             '-filter_complex', graph, '-map', '[packed]', '-an', '-c:v', 'rawvideo',
             '-pix_fmt', 'yuv420p', '-fps_mode', 'passthrough', '-f', 'rawvideo', 'pipe:1']
-    frim = encoder_args(bd.encoder, Path('-'), Path('-'), base, dependent, plan.options.bd_bitrate_mbps)
+    frim = encoder_args(bd.encoder, Path('-'), Path('-'), base, dependent, plan.options.bd_bitrate_mbps, mode=plan.options.bd_mode)
     # The author's documented single-input SBS stdin mode, not two raw temp files.
     frim[frim.index('-i')+1:frim.index('-viewoutput')] = ['-']
     frim += ['-sbs', '2']
@@ -141,7 +142,7 @@ def encode(tools, bd, plan, base, dependent, cancel, emit, log, estimated_frames
                 try:
                     frames = int(value)
                     emit('progress', {'percent': min(70, 5+65*int(value)/estimated_frames) if estimated_frames else None,
-                                      'seconds': int(value)/float(BD_RATE),
+                                      'seconds': int(value)/float(output_rate),
                                       'phase_percent': min(100, 100*int(value)/estimated_frames) if estimated_frames else None,
                                       'remaining_scope': 'phase'})
                 except ValueError:
@@ -177,7 +178,7 @@ def encode(tools, bd, plan, base, dependent, cancel, emit, log, estimated_frames
             raise ValueError('BD-3D: Der Encoder hat keine vollständige Ausgabe erstellt.')
         original = plan.info.get('multiview', {}).get('original_video', plan.info['video'])
         first = float(original.get('start_time') or 0)
-        log.write(f'ENCODED BD3D frames={frames} rate={BD_RATE}\n')
+        log.write(f'ENCODED BD3D frames={frames} rate={output_rate}\n')
         return frames, first
     finally:
         for p in reversed(producers):
@@ -191,8 +192,10 @@ def encode(tools, bd, plan, base, dependent, cancel, emit, log, estimated_frames
         log.flush()
 
 
-def decoded_digest(bd, base, dependent, frames, cancel, log, emit=None):
+def decoded_digest(bd, base, dependent, frames, cancel, log, emit=None, *, mode="1080p"):
     count, digest = 0, hashlib.sha256()
+    width,height,output_rate = output_mode(mode)
+    frame_bytes = width*height*3
     last_report = 0
     started = time.monotonic()
     def pictures(pipe):
@@ -202,16 +205,16 @@ def decoded_digest(bd, base, dependent, frames, cancel, log, emit=None):
             count += len(chunk)
             digest.update(chunk)
             now = time.monotonic()
-            if emit and (now-last_report >= .5 or count == frames*FRAME_BYTES):
+            if emit and (now-last_report >= .5 or count == frames*frame_bytes):
                 last_report = now
                 elapsed = now-started
-                remaining = max(0, frames*FRAME_BYTES-count)*elapsed/count if elapsed >= 2 else None
-                emit('progress', {'percent': 93+6*min(1, count/(frames*FRAME_BYTES)),
-                                  'seconds': count/FRAME_BYTES/float(BD_RATE), 'remaining_seconds': remaining,
+                remaining = max(0, frames*frame_bytes-count)*elapsed/count if elapsed >= 2 else None
+                emit('progress', {'percent': 93+6*min(1, count/(frames*frame_bytes)),
+                                  'seconds': count/frame_bytes/float(output_rate), 'remaining_seconds': remaining,
                                   'remaining_scope': 'phase'})
     run([bd.decoder, '-sw', '-i:mvc', base, dependent, '-sbs', '-o', '-'],
         cancel, log, bd.environment, pictures)
-    if count != frames*FRAME_BYTES:
+    if count != frames*frame_bytes:
         raise ValueError('BD-3D: Die Dekodierung beider Halbbilder enthält nicht die erwartete Bildanzahl.')
     return digest.hexdigest()
 
@@ -225,9 +228,10 @@ def verify_mux(tools, bd, plan, movie, base, dependent, frames, fingerprints, au
     if len(base_tracks) != 1 or len(dependent_tracks) != 1:
         raise ValueError('BD-3D: AVC-Basis oder zweites MVC-Halbbild fehlt im Multiplex.')
     video = base_tracks[0]
-    if (video.get('width'), video.get('height'), video.get('pix_fmt'), video.get('level')) != (1920, 1080, 'yuv420p', 41):
+    width,height,output_rate = output_mode(plan.options.bd_mode)
+    if (video.get('width'), video.get('height'), video.get('pix_fmt'), video.get('level')) != (width, height, 'yuv420p', 41):
         raise ValueError('BD-3D: Ausgaberaster, Farbauflösung oder AVC-Level falsch.')
-    if Fraction(video.get('r_frame_rate', '0/1')) != BD_RATE or any(video.get(key) != 'bt709' for key in
+    if Fraction(video.get('r_frame_rate', '0/1')) != output_rate or any(video.get(key) != 'bt709' for key in
             ('color_space', 'color_primaries', 'color_transfer')) or video.get('color_range') != 'tv':
         raise ValueError('BD-3D: Bildrate oder Farbkennzeichnung falsch.')
     tracks = [s for s in info['streams'] if s.get('codec_type') == 'audio']
@@ -253,13 +257,14 @@ def verify_mux(tools, bd, plan, movie, base, dependent, frames, fingerprints, au
             raise ValueError('BD-3D: Kodierte Halbbilder oder Bildparameter wurden beim Verpacken verändert.')
     if emit:
         emit('phase', 'BD-3D: Fertige Ausgabe vollständig dekodieren und beide Halbbilder prüfen')
-    return decoded_digest(bd, avc[0], mvc[0], frames, cancel, log, emit)
+    return decoded_digest(bd, avc[0], mvc[0], frames, cancel, log, emit, mode=plan.options.bd_mode)
 
 
 def export(tools, plan, cancel, emit, log_path, decoder=None):
     from .audio import selected, channels
     bd = BdTools.find()
-    config = prepare(plan.info['video'], plan.layout, plan.swap)
+    config = prepare(plan.info['video'], plan.layout, plan.swap, plan.options.bd_mode)
+    output_rate = config.rate
     audios = selected(plan.info, plan.options)
     validate_audio(audios)
     plan.output.parent.mkdir(parents=True, exist_ok=True)
@@ -283,7 +288,7 @@ def export(tools, plan, cancel, emit, log_path, decoder=None):
                 raise ValueError('Quelle seit der Prüfung geändert. Erneut prüfen.')
         unchanged()
         duration = plan.duration/float(config.speed)
-        estimated_frames = max(2, round(duration*float(BD_RATE))) if duration > 0 else 0
+        estimated_frames = max(2, round(duration*float(output_rate))) if duration > 0 else 0
         # Compressed views, audio, mux, extracted SSIF and demux; no raw video files.
         audio_copies = 3 if plan.options.container == 'iso' else 2
         required = duration*(40000*1000/8*4 + audio_copies*sum(
@@ -296,7 +301,8 @@ def export(tools, plan, cancel, emit, log_path, decoder=None):
         phase('BD-3D: Beide Halbbilder in hoher Qualität kodieren')
         base, dependent = folder/'base.avc', folder/'dependent.mvc'
         frames, video_start = encode(tools, bd, plan, base, dependent, cancel, emit, log, estimated_frames, decoder)
-        duration = frames/float(BD_RATE)
+        duration = frames/float(output_rate)
+        emit('estimate', {'encoding_complete': True})
         phase('BD-3D: BT.709-Farbkennzeichnung in beiden Bildspuren setzen')
         for p in (base, dependent):
             log.write(f'BT709 {p.name}: {tag_generated_stream(p, lambda: check_cancel(cancel))} parameter sets\n')
@@ -317,7 +323,7 @@ def export(tools, plan, cancel, emit, log_path, decoder=None):
         meta = folder/'movie.meta'
         label = plan.options.disc_title or default_disc_title(plan.source)
         meta.write_text(mux_meta(base, dependent, None, disc=plan.options.container == 'iso',
-                                 label=label, audios=audio_paths), encoding='utf-8')
+                                 label=label, audios=audio_paths, mode=plan.options.bd_mode), encoding='utf-8')
         run([bd.muxer, meta, movie], cancel, log, bd.environment)
         emit('progress', {'percent': 90, 'seconds': duration})
         if plan.options.container == 'iso':
@@ -328,5 +334,5 @@ def export(tools, plan, cancel, emit, log_path, decoder=None):
         check_cancel(cancel)
         publish_without_overwrite(movie, plan.output, cancel)
         log.write(f'PHASE COMPLETED {time.monotonic()-phase_started:.3f}s {previous_phase}\n')
-        log.write(f'COMPLETED BD3D frames={frames} rate={BD_RATE}\nCOMPLETED {plan.output}\n')
+        log.write(f'COMPLETED BD3D frames={frames} rate={output_rate}\nCOMPLETED {plan.output}\n')
         emit('progress', {'percent': 100, 'seconds': duration})

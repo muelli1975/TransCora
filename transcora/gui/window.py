@@ -1,4 +1,5 @@
 from __future__ import annotations
+from .remaining import RemainingTime
 
 from dataclasses import asdict, replace
 from pathlib import Path
@@ -16,8 +17,9 @@ from transcora import __version__
 from transcora.i18n import LANGUAGES
 from transcora.gui.localization import Localizer, TextVar
 from transcora.gui.settings_area import SettingsArea, section, CurrentFile
+from transcora.gui.file_list import FileListSorter
 from transcora.core.engine import Cancelled, execute, methods, plan_job, preview
-from transcora.core.model import Job, LAYOUTS, PROFILES, TARGETS, Options, VIDEO_EXTENSIONS, app_root, FPS_CHOICES, FPS_MODES, COMPATIBILITY_NOTE, AUDIO_FORMATS, AUDIO_TRACKS, AUDIO_CHANNELS, VIDEO_SIZES, BD_BITRATES, ROW_ORDERS
+from transcora.core.model import Job, LAYOUTS, PROFILES, TARGETS, Options, VIDEO_EXTENSIONS, app_root, FPS_CHOICES, FPS_MODES, COMPATIBILITY_NOTE, ANAGLYPH_PLAYER_NOTE, AUDIO_FORMATS, AUDIO_TRACKS, AUDIO_CHANNELS, VIDEO_SIZES, BD_BITRATES, BD_MODES, ROW_ORDERS
 from transcora.core.naming import effective_suffix, suffix_choices, reserve_output, filename_layout, fps_suffix, default_disc_title
 from transcora.core.storage import load_list, save_list, write_json, new_run_log, delete_run_logs, load_presets, save_presets, validate_preset_name
 from transcora.core.toolchain import Toolchain
@@ -39,11 +41,8 @@ class Window:
         self.cancel = threading.Event()
         self.busy = False
         self.run_started = None
-        self.phase_started = None
-        self.remaining_scope = None
         self.estimate_weights = []
-        self.estimated_finish = None
-        self.estimate_updated = None
+        self.remaining_time = RemainingTime()
         self.closing = False
         self.updating = False
         self.controls = []
@@ -197,6 +196,7 @@ class Window:
         scrollbar.grid(row=0, column=1, sticky="ns")
         self.tree.configure(yscrollcommand=scrollbar.set)
         self.tree.bind("<<TreeviewSelect>>", self.selection_changed)
+        self.sorter = FileListSorter(self,dict(file='Datei',layout='Quelle',fps='fps',duration='Dauer',target='Ziel',status='Status'))
         self.tree.bind('<Control-a>', self.select_all)
         self.tree.bind('<Control-A>', self.select_all)
         if self.root.tk.call('tk', 'windowingsystem') == 'aqua':
@@ -224,7 +224,7 @@ class Window:
                          "codec": {"h264": "H.264", "h265": "H.265 / HEVC"},
                          "rate_mode": {"crf": "Qualität (CRF)", "abr": "Zielbitrate (Durchschnitt)"},
                          'video_size': dict(VIDEO_SIZES, default='Automatisch'), 'bd_bitrate_mbps': {n: str(n)+' Mbit/s' for n in BD_BITRATES},
-                         'row_first': ROW_ORDERS,
+                         'row_first': ROW_ORDERS, 'bd_mode': BD_MODES,
                          'fps_mode': FPS_MODES,
                          'audio_format': AUDIO_FORMATS, 'audio_tracks': AUDIO_TRACKS, 'audio_channels': AUDIO_CHANNELS}
         self.combos = {}
@@ -301,6 +301,9 @@ class Window:
         self.combos["target_fps"] = fps
         self.controls.append((fps, "normal"))
         combo(fields, 2, 1, "video_size", "Ausgabegröße")
+        self.variables['bd_mode'] = tk.StringVar(value=self.t(BD_MODES[self.defaults.bd_mode]))
+        self.combos['video_size'].bind('<<ComboboxSelected>>', lambda e: self.option_changed(
+            'bd_mode' if (self.selected_jobs()[0].options if self.selected_jobs() else self.defaults).target == 'bd3d' else 'video_size'))
         self.output_name = TextVar(self.localizer, )
         output_example = ttk.Label(save_fields, textvariable=self.output_name, foreground=GOLD_LIGHT, width=1)
         output_example.grid(row=1, column=1, columnspan=2, sticky="ew", pady=(3, 0))
@@ -324,6 +327,8 @@ class Window:
         self.controls.append((check, "normal"))
         self.warning = TextVar(self.localizer, )
         self.attention = TextVar(self.localizer, )
+        self.option_attention = TextVar(self.localizer, )
+        self.file_notes = TextVar(self.localizer, )
 
         self.details = TextVar(self.localizer, value="Dateien hinzufügen oder eine gespeicherte Liste laden.")
         detail_frame = ttk.Frame(outer, style="Bordered.TFrame", padding=1)
@@ -331,6 +336,7 @@ class Window:
         detail_frame.columnconfigure(0, weight=1)
         self.detail_text = tk.Text(detail_frame, height=4, width=1, wrap="word", background=APP_BG,
             foreground=MUTED, insertbackground=TEXT, selectbackground=GOLD_LIGHT, selectforeground=APP_BG,
+            inactiveselectbackground=GOLD_LIGHT, exportselection=False,
             borderwidth=0, highlightthickness=0, padx=8, pady=6, state="disabled")
         self.detail_text.grid(row=0, column=0, sticky="ew")
         detail_scroll = ttk.Scrollbar(detail_frame, orient="vertical", command=self.detail_text.yview)
@@ -341,13 +347,26 @@ class Window:
             self.detail_text.delete("1.0", "end")
             if self.attention.get():
                 self.detail_text.insert('end', '⚠ '+self.attention.get()+'\n', 'attention')
-            if self.warning.get():
-                self.detail_text.insert('end', self.warning.get()+'\n', 'warning')
+            represented = self.attention.source.splitlines()+self.file_notes.source.splitlines()
+            if self.option_attention.source and self.option_attention.source not in represented:
+                self.detail_text.insert('end', '⚠ '+self.option_attention.get()+'\n', 'attention')
+            if self.file_notes.get():
+                self.detail_text.insert('end',self.file_notes.get()+'\n')
+            # File warnings already explain these options. Keep only additional
+            # option notes (such as the 10-bit explanation) below them.
+            notes = self.warning.source
+            for shown in represented:
+                if shown:
+                    notes = notes.replace(shown, '')
+            if notes.strip():
+                self.detail_text.insert('end', self.t(notes.strip())+'\n')
             self.detail_text.insert('end', self.details.get())
             self.detail_text.configure(state="disabled")
-        self.detail_text.tag_configure('warning', foreground=GOLD_LIGHT)
         self.detail_text.tag_configure('attention', foreground=GOLD_LIGHT, font=('Segoe UI',9,'bold'))
+        self.detail_text.tag_raise('sel')
         self.attention.trace_add('write', show_details)
+        self.option_attention.trace_add('write',show_details)
+        self.file_notes.trace_add('write',show_details)
         self.warning.trace_add('write', show_details)
         self.details.trace_add("write", show_details)
         show_details()
@@ -645,7 +664,7 @@ class Window:
             seconds = int(job.source_duration + .5)
             duration = f"{seconds//3600:02}:{seconds//60%60:02}:{seconds%60:02}"
         values = (job.source.name, self.t(LAYOUTS.get(layout, "?")), fps, duration,
-                  self.t(TARGETS[job.options.target]), self.t(STATUS[job.status]))
+                  self.t(('BD-3D · ' + self.t(BD_MODES[job.options.bd_mode]) if job.options.target == 'bd3d' else TARGETS[job.options.target])), self.t(STATUS[job.status]))
         if self.tree.exists(job.id):
             self.tree.item(job.id, values=values)
         else:
@@ -655,6 +674,7 @@ class Window:
         selected = self.selected_jobs()
         if not selected:
             self.attention.set('')
+            self.file_notes.set('')
             self.details.set("Dateien hinzufügen oder eine gespeicherte Liste laden.")
             self.selection_text.set("Vorgaben für neue Dateien")
             self.updating = True
@@ -692,10 +712,14 @@ class Window:
         self.refresh_controls()
 
     def show_job_details(self, job):
-        attention = job.detail if job.status in {'blocked','failed'} else '\n'.join(getattr(job.plan,'warnings',())) if job.plan else ''
+        warnings = list(dict.fromkeys(getattr(job.plan,'warnings',()))) if job.plan else []
+        review = list(dict.fromkeys(getattr(job.plan,'review_warnings',warnings))) if job.plan else []
+        attention = job.detail if job.status in {'blocked','failed'} else '\n'.join(review)
         self.attention.set(attention)
-        summary = job.plan.summary if job.plan else str(job.source)
-        self.details.set(summary+('' if attention else '\n'+job.detail))
+        self.file_notes.set('\n'.join(note for note in warnings if note not in review))
+        summary = (job.plan.summary_text(self.t) if hasattr(job.plan,'summary_text') else job.plan.summary) if job.plan else str(job.source)
+        extra = job.detail if job.status not in {'blocked','failed'} and job.detail != '\n'.join(getattr(job.plan,'warnings',())) else ''
+        self.details.set(summary+('\n'+extra if extra else ''))
 
     def option_changed(self, key):
         if self.busy or self.updating:
@@ -759,7 +783,7 @@ class Window:
                 self.update_row(job)
             if key == "codec" and value == "h265":
                 self.variables["container"].set("MKV")
-            if key in {"target", "method", "target_fps", "layout", "disc_title", "container", 'audio_channels', "video_size", 'row_first', 'fps_mode'}:
+            if key in {"target", "method", "target_fps", "layout", "disc_title", "container", 'audio_channels', "video_size", 'bd_mode', 'row_first', 'fps_mode'}:
                 self.selection_changed()
             self.last_suffix_display = self.variables['suffix'].get()
             self.status.set("Einstellungen übernommen. Vor dem Start wird erneut geprüft.")
@@ -796,9 +820,12 @@ class Window:
         self.combos['fps_mode'].configure(state='disabled' if bd3d else 'readonly')
         self.combos['target_fps'].configure(state='normal' if not bd3d and options.fps_mode == 'custom' else 'disabled')
         self.option_frames['video_size'].grid()
-        self.combos['video_size'].configure(state='disabled' if bd3d or framerate or rows else 'readonly')
-        if bd3d or framerate or rows:
-            self.variables['video_size'].set(self.t('1080p · je Halbbild' if bd3d else 'Monitorauflösung' if rows else 'Original'))
+        self.combos['video_size'].configure(
+            textvariable=self.variables['bd_mode' if bd3d else 'video_size'],
+            values=[self.t(v) for v in (BD_MODES if bd3d else self.mappings['video_size']).values()],
+            state='disabled' if framerate or rows else 'readonly')
+        if framerate or rows:
+            self.variables['video_size'].set(self.t('Monitorauflösung' if rows else 'Original'))
         self.video_dimensions.pack_forget() if rows else self.video_dimensions.pack(fill='x',pady=(4,0))
         custom_size = not bd3d and not framerate and not rows and options.video_size == "custom"
         self.video_size_caption.set('Ausgabegröße je Halbbild' if bd3d else 'Ausgabegröße')
@@ -838,17 +865,18 @@ class Window:
         for key, frame in self.rate_fields.items():
             frame.grid() if key == active_field else frame.grid_remove()
         text = ""
+        review_text = ''
         if anaglyph:
             if options.profile == "compatible":
                 text = COMPATIBILITY_NOTE
             else:
-                text = "4:4:4: Nicht alle Player und Hardwaredecoder unterstützen dieses Format."
+                review_text = ANAGLYPH_PLAYER_NOTE
                 if options.profile == "quality10":
                     text += " 10 Bit: Feinere Abstufungen; kein HDR-Modus."
         if framerate:
             text = "Layout, Auflösung und Halbbildreihenfolge bleiben erhalten. Video wird neu kodiert; Ton gemäß Tonoptionen."
         if bd3d:
-            text = "1080p · 23,976 fps · AVC/MVC · Hohe Qualität."
+            text = self.t(BD_MODES[options.bd_mode]) + self.t(" · AVC/MVC · Hohe Qualität.")
             if options.container == 'm2ts':
                 text += " M2TS enthält beide Halbbilder, jedoch keine Blu-ray-Disc-Struktur."
         if options.target == "cross_sbs":
@@ -859,6 +887,7 @@ class Window:
             text += " H.265: MKV, längere Rechenzeit und Zielplayer prüfen; CRF ist codecabhängig."
         if options.rate_mode == "abr" and not bd3d:
             text += " Zielbitrate = Videodurchschnitt, kein festes Dateigrößenlimit."
+        self.option_attention.set(review_text)
         self.warning.set(text)
         self.update_output_name()
         self.settings_area.layout()
@@ -948,6 +977,7 @@ class Window:
             added.append(job.id)
         if added:
             self.tree.selection_set(added)
+        self.sorter.refresh()
         self.status.set(f"{len(added)} hinzugefügt · {len(self.jobs)} Dateien insgesamt.")
 
     def add_files(self):
@@ -967,6 +997,7 @@ class Window:
             return
         folder = Path(value).resolve()
         output = self.output_path()
+        excluded_output = output if output != folder and output.is_relative_to(folder) else None
         recursive = self.recursive.get()
         self.input_folder = str(folder)
         def work():
@@ -976,7 +1007,7 @@ class Window:
                     raise Cancelled()
                 if path.is_file() and path.suffix.lower() in VIDEO_EXTENSIONS:
                     resolved = path.resolve()
-                    if resolved == output or output in resolved.parents:
+                    if excluded_output is not None and resolved.is_relative_to(excluded_output):
                         continue
                     if folder not in resolved.parents:
                         continue
@@ -1014,6 +1045,7 @@ class Window:
                 self.output_var.set(str(output))
                 self.invalidate_all()
             self.status.set("Jobliste ergänzt. Alle Quellen werden vor dem Start neu geprüft.")
+            self.sorter.refresh()
         except (OSError, ValueError, TypeError) as error:
             messagebox.showerror(self.t("Jobliste"), self.t(str(error)), parent=self.root)
 
@@ -1093,7 +1125,8 @@ class Window:
         for job in selected or [None]:
             opts = job.options if job else self.defaults
             if opts.target == 'bd3d':
-                values.append((1920,1080)); continue
+                from transcora.core.bd3d import output_mode
+                values.append(output_mode(opts.bd_mode)[:2]); continue
             if opts.video_size == 'custom':
                 size = opts.video_width, opts.video_height
             elif opts.video_size in {'1080p', '2160p'} or (opts.video_size == 'default' and opts.target.startswith('half_')):
@@ -1146,49 +1179,32 @@ class Window:
         self.abort_button.configure(state="normal" if value else "disabled")
         if not value:
             self.update_elapsed()
-            self.elapsed.set('Restzeit: —')
+            self.elapsed.set('Restzeit: Datei — · Stapel —')
             self.run_started = None
-            self.estimated_finish = None
             self.progress.stop()
             self.progress.configure(mode="determinate")
             self.refresh_controls()
+            self.sorter.refresh()
 
     def update_elapsed(self):
         if self.run_started is None:
             return
         now = time.monotonic()
         self.elapsed_time.set('Vergangene Zeit: ' + PreviewWindow.time_text(max(0, now-self.run_started)))
-        prefix = 'Restzeit (aktueller Schritt): ' if self.remaining_scope == 'phase' else 'Restzeit: '
-        if self.estimated_finish is None or now-(self.estimate_updated or now) > 15:
-            self.elapsed.set(prefix + '—')
-        else:
-            remaining = max(1, self.estimated_finish-now)
-            self.elapsed.set(prefix + 'ca. ' + PreviewWindow.time_text(remaining))
+        file_left, batch_left = self.remaining_time.remaining(now)
+        def label(value):
+            return self.t('ca. ') + PreviewWindow.time_text(value) if value is not None else '—'
+        self.elapsed.set(f'Restzeit: Datei {label(file_left)} · Stapel {label(batch_left)}')
 
-    def estimate_phase_remaining(self, percent):
-        if self.run_started is None or self.phase_started is None:
+    def estimate_remaining(self, index, count, percent, phase_percent=None, remaining=None):
+        if self.run_started is None:
             return
         now = time.monotonic()
-        elapsed, fraction = now-self.phase_started, percent/100
-        if .01 <= fraction < 1 and elapsed >= 2:
-            predicted = now+elapsed*(1-fraction)/fraction
-            self.estimated_finish = predicted if self.estimated_finish is None else .25*predicted+.75*self.estimated_finish
-            self.estimate_updated = now
-        elif fraction >= 1:
-            self.estimated_finish = None
-        self.update_elapsed()
-
-    def estimate_remaining(self, index, count, percent):
-        if self.run_started is None or percent is None:
-            return
-        weights = self.estimate_weights if len(self.estimate_weights) == count else [1]*count
-        fraction = (sum(weights[:index-1])+weights[index-1]*percent/100)/sum(weights)
-        now = time.monotonic()
-        elapsed = now-self.run_started
-        if .01 <= fraction < 1 and elapsed >= 2:
-            predicted = now+elapsed*(1-fraction)/fraction
-            self.estimated_finish = predicted if self.estimated_finish is None else .25*predicted+.75*self.estimated_finish
-            self.estimate_updated = now
+        if not self.remaining_time.items:
+            weights = self.estimate_weights if len(self.estimate_weights) == count else [1]*count
+            self.remaining_time = RemainingTime([(w, 'video', False) for w in weights])
+        self.remaining_time.start(index, self.run_started if self.remaining_time.index is None else now)
+        self.remaining_time.progress(now, percent, phase_percent, remaining)
         self.update_elapsed()
 
     def background(self, work, phase, track_time=False):
@@ -1197,11 +1213,8 @@ class Window:
         self.cancel.clear()
         if track_time:
             self.run_started = time.monotonic()
-            self.remaining_scope = None
-            self.phase_started = None
-            self.estimated_finish = None
-            self.estimate_updated = None
             self.estimate_weights = []
+            self.remaining_time = RemainingTime()
             self.update_elapsed()
         self.speed.set("")
         self.set_busy(True)
@@ -1271,7 +1284,10 @@ class Window:
             if not run:
                 self.events.put(("notice", f"Test abgeschlossen: {len(ready)} bereit · {blocked} blockiert."))
                 return
-            self.events.put(("batch", [max(1, plan.duration) for _, plan in ready]))
+            self.events.put(("batch", [(max(1, plan.duration),
+                (plan.options.target, plan.options.codec, plan.options.profile, plan.size,
+                 plan.options.bd_mode if plan.options.target == 'bd3d' else plan.options.target_fps if plan.options.fps_mode == 'custom' else plan.info['video'].get('avg_frame_rate')),
+                plan.options.target == 'bd3d') for _, plan in ready]))
             if ready:
                 log_path = new_run_log(app_root())
             counts = {"completed": 0, "failed": 0, "cancelled": 0}
@@ -1300,7 +1316,7 @@ class Window:
                     self.events.put(("job", (job.id, "failed", str(error), plan)))
                     self.events.put(("log", job.source.name + ": " + str(error)))
             summary = (f"{counts['completed']} erfolgreich · {counts['failed']} Fehler · {blocked} blockiert · "
-                       f"{counts['cancelled']} abgebrochen. Log: {log_path or 'Kein Lauf gestartet'}")
+                       f"{counts['cancelled']} abgebrochen. Log: {log_path or self.t('Kein Lauf gestartet')}")
             self.events.put(("notice", summary))
             self.events.put(("log", summary))
             if ready and not self.cancel.is_set():
@@ -1419,9 +1435,13 @@ class Window:
                 kind, payload = self.events.get_nowait()
                 if kind == "current":
                     self.current_file.set(*payload)
+                    if self.remaining_time.items:
+                        self.remaining_time.start(payload[1], time.monotonic())
                 elif kind == "job":
                     id_, status, detail, plan = payload
                     job = next((job for job in self.jobs if job.id == id_), None)
+                    if self.remaining_time.items and status in {'completed','failed','cancelled'} and job and job.status == 'running':
+                        self.remaining_time.complete(time.monotonic(), status == 'completed')
                     if job:
                         job.status, job.detail, job.plan = status, detail, plan
                         self.update_row(job)
@@ -1438,31 +1458,20 @@ class Window:
                 elif kind == "paths":
                     self.add_paths(*payload)
                 elif kind == "batch":
-                    self.estimate_weights = payload
+                    self.remaining_time = RemainingTime(payload)
+                    self.estimate_weights = [item[0] for item in payload]
                 elif kind == "progress":
                     _, index, count, value = payload
                     if value["percent"] is not None:
-                        if value.get('remaining_scope') == 'phase':
-                            self.remaining_scope = 'phase'
-                            if 'remaining_seconds' in value:
-                                now = time.monotonic()
-                                remaining = value['remaining_seconds']
-                                self.estimated_finish = now+remaining if remaining is not None else None
-                                self.estimate_updated = now
-                                self.update_elapsed()
-                            elif 'phase_percent' in value:
-                                self.estimate_phase_remaining(value['phase_percent'])
-                        elif 'remaining_seconds' in value and index == count:
-                            now = time.monotonic()
-                            remaining = value['remaining_seconds']
-                            self.estimated_finish = now+remaining if remaining is not None else None
-                            self.estimate_updated = now
-                            self.update_elapsed()
-                        elif self.remaining_scope != 'phase':
-                            self.estimate_remaining(index, count, value["percent"])
+                        self.estimate_remaining(index, count, value['percent'],
+                            value.get('phase_percent'), value.get('remaining_seconds'))
                         self.progress.stop()
                         self.progress.configure(mode="determinate")
                         self.progress["value"] = ((index - 1) + value["percent"] / 100) / count * 100
+                elif kind == 'estimate':
+                    if payload[3].get('encoding_complete'):
+                        self.remaining_time.end_encoding(time.monotonic())
+                        self.update_elapsed()
                 elif kind == "speed":
                     value = payload[3]
                     parts = []
@@ -1479,10 +1488,7 @@ class Window:
                     self.progress.stop()
                     self.progress.configure(mode='indeterminate')
                     self.progress.start(15)
-                    self.estimated_finish = None
-                    self.phase_started = time.monotonic()
-                    job = next((j for j in self.jobs if j.id == payload[0]), None)
-                    self.remaining_scope = 'phase' if job and job.options.target == 'bd3d' else None
+                    self.remaining_time.phase(time.monotonic())
                     self.update_elapsed()
                 elif kind == "preview":
                     viewer, png, plan = payload

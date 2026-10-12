@@ -18,6 +18,34 @@ from transcora.core.mp4 import packed_stereo_boxes
 
 
 class CoreTests(unittest.TestCase):
+    def test_only_reviewable_plan_messages_are_classified_as_warnings(self):
+        from copy import deepcopy
+        from transcora.core.engine import plan_job
+        from transcora.core.model import ANAGLYPH_PLAYER_NOTE
+        video=dict(index=0,codec_type='video',codec_name='h264',width=3840,height=1080,
+                   r_frame_rate='30000/1001',avg_frame_rate='30000/1001',pix_fmt='yuv420p',
+                   color_space='bt709',color_primaries='bt709',color_transfer='bt709',color_range='tv')
+        with tempfile.TemporaryDirectory() as tmp:
+            folder=Path(tmp);source=folder/'slideshow_full_sbs.mp4';source.write_bytes(b'source')
+            def planned(options, stream=video):
+                info={'video':deepcopy(stream),'streams':[deepcopy(stream)],'format':{'duration':'1'}}
+                with patch('transcora.core.multiview.inspect_source',return_value=info), \
+                     patch('transcora.core.bd3d_export.BdTools.find'):
+                    return plan_job(SimpleNamespace(),Job(source,options),folder/'out',set())
+            bd=planned(Options(layout='full_sbs',target='bd3d',container='iso'))
+            self.assertTrue(any('23,976 fps' in note for note in bd.warnings))
+            self.assertTrue(any('FRIM' in note for note in bd.warnings))
+            self.assertEqual(bd.review_warnings,[])
+            anaglyph=planned(Options(layout='full_sbs',target='anaglyph'))
+            self.assertEqual(anaglyph.review_warnings,[ANAGLYPH_PLAYER_NOTE])
+            compatible=planned(Options(layout='full_sbs',target='anaglyph',profile='compatible'))
+            self.assertEqual(compatible.review_warnings,[])
+            inferred=dict(video)
+            for key in ('color_space','color_primaries','color_transfer'):inferred.pop(key)
+            inferred_plan=planned(Options(layout='full_sbs',target='bd3d',container='iso'),inferred)
+            self.assertTrue(inferred_plan.review_warnings)
+            self.assertTrue(all(note.startswith('Farbannahme') for note in inferred_plan.review_warnings))
+
     def test_catalog_is_exactly_batch_without_cielab(self):
         batch = (app_root() / 'reference/AnaglyphBatch_DE.bat').read_text(encoding='utf-8-sig')
         blocks = re.findall(r'if "%~1"=="(\d+)" \((.*?)\n\)', batch, re.S)

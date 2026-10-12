@@ -16,11 +16,15 @@ Everything runs locally, without an account, cloud or tracking. The interface ca
 
 The default output folder is `output` beside the program. Folder batches preserve relative subfolders. Existing files receive a numbered alternative name. A failed entry does not stop the remaining valid entries. **Cancel** stops the current operation; completed files remain available.
 
+Video status shows estimated remaining time for the **file** and **batch**. Estimates use live progress and durations of comparable completed files. BD-3D also learns audio and mux finishing times; the first title has a coarser estimate. A dash indicates an unmeasured format or missing progress.
+
 Videos and images share **Source**, **Output**, **Format** and **Save** sections. **Output size** shows dimensions beside the size menu. Video dimensions describe the complete output picture; BD-3D shows dimensions per eye image. Images can be scaled proportionally by their long or short edge.
 
 **Advanced** expands additional settings inside the window. **Default settings** restores defaults for new files; existing entries keep their settings. In smaller windows, settings scroll while the file list, information area and processing buttons retain their space. Use **Choose** to select the output folder.
 
 The current file remains visible beside progress information when the processing phase changes. Long filenames are shortened in the middle to fit the window.
+
+Click a column heading to sort the file list in ascending or descending order. Frame rate and duration sort numerically; the visible order also applies to the next processing run. Input and output folders may be identical. Recursive imports skip a nested output subfolder.
 
 ## Video output
 
@@ -33,7 +37,7 @@ The current file remains visible beside progress information when the processing
 | Mono | Export the left eye as an ordinary video |
 | Keep layout | Re-encode with the existing arrangement, optionally changing frame rate |
 | Row-interleaved | Direct output for a compatible polarised monitor |
-| BD-3D · 1080p | Blu-ray 3D ISO or AVC/MVC M2TS, 1920 × 1080 per eye |
+| BD-3D | Blu-ray 3D ISO or AVC/MVC M2TS: 1080p at 23.976 fps or 720p at 50/59.94 fps per eye |
 
 **MP4 is the default; MKV is selectable**, including cross-view. MKV carries the appropriate stereo metadata. Cross-view MP4 keeps the R/L picture arrangement without a misleading L/R marker. Player support varies; check the first output on the intended device.
 
@@ -58,7 +62,7 @@ Temporal interlaced sources are converted to progressive pictures while retainin
 
 Under **Advanced**, select H.264 or H.265 (MKV), CRF quality or a target bitrate. Anaglyph quality modes use 4:4:4 colour; a 4:2:0 compatibility mode is available for players that need it. Row-interleaved video uses 4:4:4 to preserve the separate eye rows.
 
-**Audio options** select all tracks, individual tracks or no audio. Keep the original audio, convert to AAC, or downmix to stereo. For BD-3D, audio options and bitrate are grouped under **Advanced**, in separate video and audio rows. BD-3D uses LPCM audio and a fixed 23.976 fps output; its selectable total AVC/MVC target bitrate is 20–40 Mbit/s, with a factory default of 40 Mbit/s.
+**Audio options** select all tracks, individual tracks or no audio. Keep the original audio, convert to AAC, or downmix to stereo. For BD-3D, audio options and bitrate are grouped under **Advanced**, in separate video and audio rows. BD-3D uses LPCM audio; **Output size per eye image** selects 1080p/23.976, 720p/50 or 720p/59.94. The 720p modes offer smoother motion from suitable sources at lower spatial resolution. Complete stereo pairs are dropped or repeated as needed, without motion interpolation; duration and audio are retained (only 24 → 23.976 is slowed by 0.1%). Its selectable total AVC/MVC target bitrate is 20–40 Mbit/s, with a factory default of 40 Mbit/s.
 
 ## Polarised monitors
 

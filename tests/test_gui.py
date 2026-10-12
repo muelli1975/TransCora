@@ -81,32 +81,56 @@ class GuiTests(unittest.TestCase):
             self.assertIn('1 erfolgreich', panel.status.get())
             self.assertFalse(panel.busy)
 
-    def test_bd_remaining_time_is_per_phase_and_resets_between_steps(self):
+    def test_bd_file_and_batch_estimates_survive_audio_and_mux_phases(self):
+        from transcora.gui.remaining import RemainingTime
         window = self.window
         window.add_paths([Path('test_full_sbs.mp4')])
         job = window.jobs[0]
         job.options = replace(job.options, target='bd3d', container='iso')
         window.run_started = 10
+        window.events.put(('batch', [(100, 'bd', True), (200, 'bd', True)]))
+        window.events.put(('current', (job.source.name, 1, 2)))
         with patch('transcora.gui.window.time.monotonic', return_value=100):
-            window.events.put(('phase', (job.id, 1, 2, 'BD-3D: Beide Halbbilder in hoher Qualität kodieren')))
             window.poll()
         with patch('transcora.gui.window.time.monotonic', return_value=200):
-            window.events.put(('progress', (job.id, 1, 2, {'percent': 18, 'phase_percent': 20,
-                                                       'remaining_scope': 'phase'})))
+            window.events.put(('progress', (job.id, 1, 2, {'percent': 37.5, 'phase_percent': 50})))
             window.poll()
-        self.assertEqual(window.estimated_finish, 600)
-        self.assertEqual(window.remaining_scope, 'phase')
-        self.assertIn('aktueller Schritt', window.elapsed.get())
+        self.assertIn('Restzeit: Datei ca.', window.elapsed.get())
+        self.assertIn(' · Stapel ca.', window.elapsed.get())
+        file_left,batch_left = window.remaining_time.remaining(200)
+        self.assertGreater(batch_left,file_left)
         with patch('transcora.gui.window.time.monotonic', return_value=300):
+            window.events.put(('estimate', (job.id, 1, 2, {'encoding_complete': True})))
             window.events.put(('phase', (job.id, 1, 2, 'BD-3D: Blu-ray-ISO erstellen')))
-            window.events.put(('progress', (job.id, 1, 2, {'percent': 90})))
             window.poll()
-        self.assertIsNone(window.estimated_finish)
-        with patch('transcora.gui.window.time.monotonic', return_value=400):
-            window.events.put(('progress', (job.id, 1, 2, {'percent': 95, 'remaining_seconds': 30,
-                                                       'remaining_scope': 'phase'})))
-            window.poll()
-        self.assertEqual(window.estimated_finish, 430)
+        self.assertIn('Datei ca.',window.elapsed.get())
+        self.assertNotIn('Schritt',window.elapsed.get())
+        window.language='en';window.apply_language()
+        self.assertIn('Remaining: file approx.',window.elapsed.get())
+        self.assertIn(' · batch approx.',window.elapsed.get())
+
+    def test_bd_modes_keep_bitrate_and_survive_language_list_and_target_changes(self):
+        from transcora.core.model import BD_MODES
+        window=self.window
+        window.add_paths([Path('film_full_sbs.mp4')])
+        job=window.jobs[0]
+        window.tree.selection_set(job.id);window.selection_changed()
+        window.variables['target'].set('BD-3D');window.option_changed('target')
+        for mode,size in [('720p50',(1280,720)),('720p5994',(1280,720)),('1080p',(1920,1080))]:
+            window.variables['bd_mode'].set(window.t(BD_MODES[mode]))
+            window.combos['video_size'].event_generate('<<ComboboxSelected>>')
+            self.root.update()
+            self.assertEqual(job.options.bd_mode,mode)
+            self.assertEqual(job.options.bd_bitrate_mbps,40)
+            self.assertEqual(tuple(map(int,(window.variables[k].get() for k in ('video_width','video_height')))),size)
+            self.assertEqual(Options.from_dict(job.serializable()['options']).bd_mode,mode)
+            for language in ('en','de'):
+                window.language=language;window.apply_language()
+                self.assertEqual(window.variables['bd_mode'].get(),window.t(BD_MODES[mode]))
+                self.assertEqual(str(window.combos['video_size'].cget('state')),'readonly')
+        self.assertEqual(Options.from_dict({'target':'bd3d','container':'iso'}).bd_mode,'1080p')
+        with self.assertRaises(ValueError):
+            Options.from_dict({'bd_mode':'720p60'})
 
     def test_image_extended_selection_and_changes_apply_to_all_selected(self):
         panel = self.window.images
@@ -407,11 +431,11 @@ class GuiTests(unittest.TestCase):
         self.window.add_paths([Path('/one/current_full_sbs.mp4')])
         job=self.window.jobs[-1]
         self.window.tree.selection_set(job.id);self.window.selection_changed()
-        self.window.variables['target'].set('BD-3D · 1080p');self.window.option_changed('target')
+        self.window.variables['target'].set('BD-3D');self.window.option_changed('target')
         self.root.update()
         height=self.window.tree.winfo_height();detail=self.window.detail_text.winfo_height()
         self.window.elapsed_time.set('Vergangene Zeit: 02:34')
-        self.window.elapsed.set('Restzeit: ca. 05:12');self.root.update()
+        self.window.elapsed.set('Restzeit: Datei ca. 05:12 · Stapel ca. 01:42:00');self.root.update()
         self.window.toggle_advanced();self.root.update()
         self.assertEqual(self.window.tree.winfo_height(),height)
         self.assertEqual(self.window.detail_text.winfo_height(),detail)
@@ -507,6 +531,119 @@ class GuiTests(unittest.TestCase):
         self.window.poll()
         self.assertTrue(self.window.detail_text.get('1.0','end').startswith('⚠ Check your player'))
         self.assertEqual(self.window.detail_text.get('1.0','end').count('Check your player'),1)
+
+    def test_notes_are_distinct_from_review_warnings_and_selection_has_contrast(self):
+        from types import SimpleNamespace
+        from transcora.core.model import ANAGLYPH_PLAYER_NOTE, COMPATIBILITY_NOTE
+        self.window.add_paths([Path('slideshow_full_sbs.mp4')])
+        job=self.window.jobs[0]
+        self.window.tree.selection_set(job.id)
+        for language in ('de','en'):
+            self.window.language=language
+            for profile in ('quality','quality10','compatible'):
+                note=COMPATIBILITY_NOTE if profile=='compatible' else ANAGLYPH_PLAYER_NOTE
+                job.options=replace(job.options,target='anaglyph',profile=profile)
+                job.plan=SimpleNamespace(summary='Summary',warnings=[note,note],
+                    review_warnings=[] if profile=='compatible' else [note],layout='full_sbs',output=Path('slideshow.mkv'))
+                job.status='ready';job.detail='\n'.join(job.plan.warnings)
+                self.window.selection_changed(); self.root.update()
+                text=self.window.detail_text; body=text.get('1.0','end')
+                self.assertEqual(body.count(self.window.t(note)),1)
+                self.assertEqual('⚠' in body,profile!='compatible')
+                if profile=='quality10':self.assertIn(self.window.t('10 Bit: Feinere Abstufungen; kein HDR-Modus.'),body)
+            info='29.970 → 23,976 fps: Ganze Stereobildpaare werden ausgelassen oder wiederholt. Laufzeit und Ton bleiben erhalten; Bewegungen können ungleichmäßiger werden. Keine Bewegungsinterpolation; Video wird nur einmal kodiert.'
+            process='BD-3D: FFmpeg bereitet die Quelle vor, FRIM kodiert AVC/MVC und tsMuxeR erstellt die Ausgabe. Gewählter Ton wird als LPCM gespeichert.'
+            job.options=replace(job.options,target='bd3d',container='iso')
+            job.plan=SimpleNamespace(summary='Summary',warnings=[info,process],review_warnings=[],layout='full_sbs',output=Path('slideshow.iso'))
+            job.detail='\n'.join(job.plan.warnings)
+            self.window.selection_changed(); self.root.update()
+            body=text.get('1.0','end')
+            self.assertNotIn('⚠',body)
+            self.assertIn(self.window.t(info),body);self.assertIn(self.window.t(process),body)
+            self.assertFalse(text.tag_ranges('attention'))
+        job.status='blocked';job.plan=None;job.detail='Quelllayout für diese Datei auswählen.'
+        self.window.selection_changed(); self.root.update()
+        text.tag_add('sel','1.0','1.end')
+        self.assertEqual(text.tag_names()[-1],'sel')
+        self.assertEqual(text.tag_cget('sel','foreground'),APP_BG)
+        self.assertEqual(text.tag_cget('sel','background'),GOLD_LIGHT)
+
+    def test_heading_clicks_sort_both_lists_preserve_selection_and_numeric_metadata(self):
+        window=self.window
+        window.add_paths([Path('Film10_full_sbs.mp4'),Path('Film2_full_sbs.mp4'),Path('Film1_full_sbs.mp4')])
+        ten,two,one=window.jobs
+        ten.source_fps='30000/1001';ten.source_duration=20
+        two.source_fps='3/1';two.source_duration=3
+        for job in window.jobs:window.update_row(job)
+        window.tree.selection_set((ten.id,two.id));window.selection_changed();self.root.update()
+        def click(panel,column):
+            command=panel.tree.heading(column,'command')
+            self.assertTrue(command)
+            self.root.tk.call(command);self.root.update()
+        self.assertEqual(window.tree.identify_region(20,10),'heading')
+        window.tree.event_generate('<ButtonPress-1>',x=20,y=10)
+        window.tree.event_generate('<ButtonRelease-1>',x=20,y=10)
+        self.root.update()
+        self.assertEqual(window.tree.get_children(),(one.id,two.id,ten.id))
+        self.assertEqual([j.id for j in window.jobs],[one.id,two.id,ten.id])
+        self.assertEqual(set(window.tree.selection()),{ten.id,two.id})
+        click(window,'file');self.assertEqual(window.tree.get_children(),(ten.id,two.id,one.id))
+        click(window,'fps');self.assertEqual(window.tree.get_children(),(two.id,ten.id,one.id))
+        click(window,'fps');self.assertEqual(window.tree.get_children(),(ten.id,two.id,one.id))
+        click(window,'duration');self.assertEqual(window.tree.get_children(),(two.id,ten.id,one.id))
+        for language,label in [('en','Duration ▲'),('de','Dauer ▲')]:
+            window.language=language;window.apply_language();self.root.update()
+            self.assertEqual(window.tree.heading('duration','text'),label)
+        window.set_busy(True);click(window,'file')
+        self.assertEqual(window.tree.get_children(),(two.id,ten.id,one.id))
+        window.set_busy(False)
+        panel=window.images;window.notebook.select(window.image_tab)
+        panel.add_paths([Path('Bild10_full_sbs.jpg'),Path('Bild2_full_sbs.jpg')])
+        ten,two=panel.jobs;panel.tree.selection_set(ten.id);self.root.update()
+        click(panel,'file');self.assertEqual(panel.tree.get_children(),(two.id,ten.id))
+        self.assertEqual(panel.tree.selection(),(ten.id,))
+        click(panel,'file');self.assertEqual(panel.tree.get_children(),(ten.id,two.id))
+        for column in ('task','target','status'):self.assertTrue(panel.tree.heading(column,'command'))
+
+    def test_real_folder_import_and_twenty_file_batch_with_shared_output_directory(self):
+        import shutil
+        from PIL import Image
+        tools=Toolchain.find()
+        with tempfile.TemporaryDirectory() as tmp, patch('transcora.gui.window.app_root',return_value=Path(tmp)):
+            base=Path(tmp);folder=base/'videos';folder.mkdir()
+            sample=base/'sample.mp4'
+            capture([str(tools.ffmpeg),'-v','error','-f','lavfi','-i','testsrc2=s=128x32:r=30',
+                     '-frames:v','1','-c:v','libx264','-pix_fmt','yuv420p','-colorspace','bt709',
+                     '-color_trc','bt709','-color_primaries','bt709','-color_range','tv',str(sample)])
+            for number in range(20):shutil.copy2(sample,folder/f'Diashow_{number+1}_full_sbs.MP4')
+            window=self.window
+            window.defaults=replace(Options(),target='full_ou',container='mkv',video_size='original')
+            window.output_var.set(str(folder));window.recursive.set(True)
+            def idle(timeout=90):
+                deadline=time.monotonic()+timeout
+                while window.busy and time.monotonic()<deadline:self.root.update();time.sleep(.01)
+                self.assertFalse(window.busy,window.status.get())
+            with patch('transcora.gui.window.filedialog.askdirectory',return_value=str(folder)):
+                window.add_folder();idle(10)
+            self.assertEqual(len(window.jobs),20)
+            self.assertEqual(len(window.tree.get_children()),20)
+            self.assertTrue(all(j.source_root==folder for j in window.jobs))
+            window.check(True);idle()
+            self.assertTrue(all(j.status=='completed' for j in window.jobs),[(j.source.name,j.status,j.detail) for j in window.jobs])
+            self.assertEqual(len(list(folder.glob('*_full_ou.mkv'))),20)
+            self.assertEqual(window.current_file.index,20)
+            # An output directory above the selected input must not hide it.
+            child=base/'parent/child';child.mkdir(parents=True);shutil.copy2(sample,child/'child_full_sbs.mp4')
+            window.output_var.set(str(child.parent))
+            with patch('transcora.gui.window.filedialog.askdirectory',return_value=str(child)):
+                window.add_folder();idle(10)
+            self.assertEqual(len(window.jobs),21)
+            # The corresponding image import supports shared input/output too.
+            pictures=base/'pictures';pictures.mkdir();Image.new('RGB',(32,16)).save(pictures/'photo_full_sbs.png')
+            panel=window.images;panel.output.set(str(pictures))
+            with patch('transcora.gui.images_panel.filedialog.askdirectory',return_value=str(pictures)):
+                panel.add_folder()
+            self.assertEqual(len(panel.jobs),1)
 
     def setUp(self):
         try:
@@ -711,7 +848,7 @@ class GuiTests(unittest.TestCase):
         first, second = self.window.jobs
         self.window.tree.selection_set(first.id)
         self.window.selection_changed()
-        self.window.variables['target'].set('BD-3D · 1080p')
+        self.window.variables['target'].set('BD-3D')
         self.window.option_changed('target')
         self.window.variables['disc_title'].set('Mein Film')
         self.window.option_changed('disc_title')
@@ -747,22 +884,22 @@ class GuiTests(unittest.TestCase):
             self.window.run_started = 30
             self.window.set_busy(True)
             self.window.update_elapsed()
-            self.assertEqual(self.window.elapsed.get(), 'Restzeit: —')
+            self.assertEqual(self.window.elapsed.get(), 'Restzeit: Datei — · Stapel —')
             self.window.estimate_remaining(1, 1, 50)
-            self.assertEqual(self.window.elapsed.get(), 'Restzeit: ca. 01:10')
+            self.assertEqual(self.window.elapsed.get(), 'Restzeit: Datei ca. 01:10 · Stapel ca. 01:10')
             self.assertEqual(self.window.elapsed_time.get(), 'Vergangene Zeit: 01:10')
             self.window.abort()
             self.assertIsNotNone(self.window.run_started)
             self.window.set_busy(False)
         with patch('transcora.gui.window.time.monotonic', return_value=9999):
             self.window.update_elapsed()
-        self.assertEqual(self.window.elapsed.get(), 'Restzeit: —')
+        self.assertEqual(self.window.elapsed.get(), 'Restzeit: Datei — · Stapel —')
         self.assertEqual(self.window.elapsed_time.get(), 'Vergangene Zeit: 01:10')
         self.assertEqual(PreviewWindow.time_text(3661), '01:01:01')
 
     def test_bd_audio_options_remain_available_and_phase_replaces_stale_estimate(self):
         self.root.geometry('860x680')
-        self.window.variables['target'].set('BD-3D · 1080p')
+        self.window.variables['target'].set('BD-3D')
         self.window.option_changed('target')
         self.window.toggle_advanced()
         self.root.update()
@@ -783,20 +920,20 @@ class GuiTests(unittest.TestCase):
         self.window.close_audio_options()
         self.assertFalse(self.window.audio_dialog.winfo_ismapped())
         self.window.run_started = time.monotonic()-30
-        self.window.estimated_finish = time.monotonic()+100
+        self.window.remaining_time.finish = time.monotonic()+100
         self.window.speed.set('Alte Geschwindigkeit')
-        text = 'BD-3D: Fertige Ausgabe vollständig dekodieren und beide Halbbilder prüfen'
+        text = 'BD-3D: Blu-ray-ISO erstellen'
         self.window.events.put(('phase', ('job', 1, 1, text)))
         self.window.poll()
         self.assertEqual(self.window.status.get(), text)
         self.assertEqual(self.window.speed.get(), '')
-        self.assertEqual(self.window.elapsed.get(), 'Restzeit: —')
+        self.assertEqual(self.window.elapsed.get(), 'Restzeit: Datei — · Stapel —')
         self.assertEqual(str(self.window.progress.cget('mode')), 'indeterminate')
         self.window.events.put(('progress', ('job', 1, 1,
             {'percent': 94, 'seconds': 100, 'remaining_seconds': 120})))
         with patch('transcora.gui.window.time.monotonic', return_value=100):
             self.window.poll()
-        self.assertEqual(self.window.elapsed.get(), 'Restzeit: ca. 02:00')
+        self.assertEqual(self.window.elapsed.get(), 'Restzeit: Datei ca. 02:00 · Stapel ca. 02:00')
         self.assertEqual(str(self.window.progress.cget('mode')), 'determinate')
         self.window.set_busy(False)
 

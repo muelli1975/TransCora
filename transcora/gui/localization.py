@@ -40,6 +40,11 @@ class Localizer:
         widget.insert('1.0', self.t(source))
         widget.configure(state='disabled')
 
+    def heading(self, tree, column, source):
+        value = self.t(source)
+        self.sources.setdefault(tree,{})['heading'+column] = (source,value)
+        tree.heading(column,text=value)
+
     def apply(self):
         for var in list(self.variables.values()):
             var.render()

@@ -15,7 +15,7 @@ LAYOUTS = {"auto": "Automatisch", "full_sbs": "Full-SBS", "half_sbs": "Half-SBS"
 TARGETS = {"half_sbs": "Half-SBS", "half_ou": "Half-OU",
            "row_interleaved": "Zeilenverschachtelt (Polfilter)",
            "cross_sbs": "Kreuzblick · Full-SBS R/L", "full_sbs": "Full-SBS", "full_ou": "Full-OU",
-           "anaglyph": "Anaglyph", "mono": "Mono · linkes Halbbild", "framerate": "Layout beibehalten", "bd3d": "BD-3D · 1080p"}
+           "anaglyph": "Anaglyph", "mono": "Mono · linkes Halbbild", "framerate": "Layout beibehalten", "bd3d": "BD-3D"}
 NAMING = {"original": "Kein Layout-Zusatz", "layout": "Layout-Zusatz",
           "players": "Player-Kürzel (Kodi/Bino)"}
 PROFILES = {"quality": "Qualität · 8 Bit / 4:4:4", "quality10": "Hohe Farbtiefe · 10 Bit / 4:4:4",
@@ -23,9 +23,11 @@ PROFILES = {"quality": "Qualität · 8 Bit / 4:4:4", "quality10": "Hohe Farbtief
 COMPATIBILITY_NOTE = ("Breitere Player-Unterstützung, jedoch mit deutlich geringerer Farbauflösung. "
                       "Farbdetails und farbige Kanten können sichtbar leiden. "
                       "Für hochwertige Anaglyphen wird 4:4:4 empfohlen.")
+ANAGLYPH_PLAYER_NOTE = "4:4:4 wird nicht von allen Playern/Hardwaredecodern unterstützt."
 FPS_CHOICES = ("23,976", "24", "25", "29,97", "30", "50", "59,94", "60")
 FPS_MODES = {'source': 'Quelle beibehalten', 'custom': 'Zielbildrate wählen'}
 VIDEO_SIZES = {'default': 'Standard', 'original': 'Original', '1080p': '1080p', '2160p': '2160p', 'custom': 'Benutzerdefiniert'}
+BD_MODES = {"1080p": "1080p · 23,976 fps", "720p50": "720p · 50 fps", "720p5994": "720p · 59,94 fps"}
 BD_BITRATES = (20, 25, 30, 35, 40)
 ROW_ORDERS = {'left': 'Linkes Auge in erster Zeile', 'right': 'Rechtes Auge in erster Zeile'}
 AUDIO_FORMATS = {'copy': 'Original beibehalten', 'aac': 'AAC · Hohe Kompatibilität'}
@@ -78,6 +80,7 @@ class Options:
     video_width: int = 1920
     video_height: int = 1080
     bd_bitrate_mbps: int = 40
+    bd_mode: str = "1080p"
     screen_width: int = 1920
     screen_height: int = 1080
     row_first: str = 'left'
@@ -124,6 +127,8 @@ class Options:
                 raise ValueError('Videomaße: Gerade Pixelzahlen von 2 bis 16384 verwenden.')
         if type(self.bd_bitrate_mbps) is not int or self.bd_bitrate_mbps not in BD_BITRATES:
             raise ValueError('BD-3D-Bitrate: 20, 25, 30, 35 oder 40 Mbit/s wählen.')
+        if self.bd_mode not in BD_MODES:
+            raise ValueError("Ungültiger BD-3D-Ausgabemodus.")
         if not isinstance(self.swap, bool):
             raise ValueError("Ungültige L/R-Einstellung.")
         if not isinstance(self.method, str):

@@ -57,19 +57,21 @@ def validate(info, options):
     return tracks
 
 
-def summary(info, options):
+def summary(info, options, translate=None):
+    t = translate or (lambda text:text)
     tracks = selected(info, options)
     if not tracks:
-        return 'Ton: Ohne Ton' if sources(info) else 'Ton: Quelle enthält keinen Ton'
+        return t('Ton: Ohne Ton' if sources(info) else 'Ton: Quelle enthält keinen Ton')
     descriptions = []
     all_tracks = sources(info)
     for track in tracks:
         number = all_tracks.index(track)+1
         tags = track.get('tags', {})
         identity = ' · '.join(str(tags[k]) for k in ('language', 'title') if tags.get(k))
-        descriptions.append(f"Spur {number}: {track.get('codec_name', '?').upper()} → "
-            f"{codec(track, options).upper()} · {channels(track, options)} Kanäle"+(f' · {identity}' if identity else ''))
-    return 'Ton: '+'; '.join(descriptions)
+        descriptions.append(t('Spur {0}: {1} → {2} · {3} Kanäle').format(
+            number,track.get('codec_name','?').upper(),codec(track,options).upper(),channels(track,options))
+            +(f' · {identity}' if identity else ''))
+    return t('Ton: ')+'; '.join(descriptions)
 
 
 def arguments(info, options, input_number):

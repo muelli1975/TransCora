@@ -16,11 +16,15 @@ Alles läuft lokal, ohne Account, Cloud oder Tracking. Die Oberfläche lässt si
 
 Standardmäßig landen Ergebnisse im Ordner `output` neben dem Programm. Bei Ordnerstapeln bleiben relative Unterordner erhalten. Vorhandene Dateien erhalten einen nummerierten Alternativnamen. Ein fehlerhafter Eintrag hält die übrigen gültigen Dateien nicht auf. **Abbrechen** beendet die aktuelle Verarbeitung; bereits fertige Dateien bleiben erhalten.
 
+Bei Videos zeigt der Status die geschätzte Restzeit für **Datei** und **Stapel**. Die Schätzung nutzt den laufenden Fortschritt und die Laufzeiten vergleichbarer fertiger Dateien. Bei BD-3D fließen auch die gemessenen Abschlusszeiten für Ton und Multiplexing ein; beim ersten Titel ist die Schätzung gröber. Für noch nicht vergleichbare Formate oder fehlenden Fortschritt steht ein Strich.
+
 Fotos und Videos verwenden dieselben Bereiche **Quelle**, **Ausgabe**, **Format** und **Speichern**. Unter **Ausgabegröße** stehen die Maße direkt beim Größenmenü. Videomaße beziehen sich auf das gesamte Ausgabebild; BD-3D zeigt die Maße je Halbbild. Bilder lassen sich proportional nach langer oder kurzer Seite skalieren.
 
 **Erweitert** klappt zusätzliche Einstellungen im Fenster auf. **Standardeinstellungen** stellt die Vorgaben für neue Dateien wieder her; bestehende Einträge behalten ihre Einstellungen. Bei kleinen Fenstern scrollen die Einstellungen, während Dateiliste, Informationsfeld und Verarbeitungsschaltflächen Platz behalten. Wähle den Ausgabeordner mit **Auswählen**.
 
 Die aktuelle Datei bleibt beim Fortschritt sichtbar, auch wenn der Verarbeitungsschritt wechselt. Lange Dateinamen werden passend zur Fensterbreite in der Mitte gekürzt.
+
+Klicke auf einen Spaltenkopf, um die Dateiliste auf- oder absteigend zu sortieren. Bildrate und Dauer werden numerisch sortiert; die sichtbare Reihenfolge gilt auch für den nächsten Verarbeitungslauf. Eingabe- und Ausgabeordner dürfen identisch sein. Beim rekursiven Import wird ein darunterliegender Ausgabe-Unterordner ausgelassen.
 
 ## Videoausgaben
 
@@ -33,7 +37,7 @@ Die aktuelle Datei bleibt beim Fortschritt sichtbar, auch wenn der Verarbeitungs
 | Mono | Linkes Auge als gewöhnliches Video ausgeben |
 | Layout beibehalten | Anordnung erhalten und neu kodieren, optional mit anderer Bildrate |
 | Zeilenverschachtelt | Direkte Ausgabe für einen passenden Polfilter-Monitor |
-| BD-3D · 1080p | Blu-ray-3D-ISO oder AVC/MVC-M2TS mit 1920 × 1080 je Auge |
+| BD-3D | Blu-ray-3D-ISO oder AVC/MVC-M2TS: 1080p mit 23,976 fps oder 720p mit 50/59,94 fps je Auge |
 
 **MP4 ist voreingestellt; MKV bleibt wählbar**, auch für Kreuzblick. MKV erhält die passende Stereo-Kennzeichnung. Kreuzblick-MP4 behält die R/L-Anordnung ohne irreführenden L/R-Marker. Die Player-Unterstützung unterscheidet sich; prüfe die erste Ausgabe auf dem vorgesehenen Gerät.
 
@@ -58,7 +62,7 @@ Zeitlich interlaced aufgenommene Videos werden progressiv ausgegeben, mit erhalt
 
 Unter **Erweitert** wählst du H.264 oder H.265 (MKV), CRF-Qualität oder eine Zielbitrate. Anaglyphen bieten 4:4:4-Farbqualität und optional 4:2:0 für Player, die dies benötigen. Zeilenverschachtelte Videos verwenden 4:4:4, damit die Augenzeilen getrennt bleiben.
 
-**Tonoptionen** übernehmen alle Spuren, ausgewählte Spuren oder keinen Ton. Du kannst Originalton beibehalten, nach AAC wandeln oder auf Stereo heruntermischen. Bei BD-3D stehen die Tonoptionen und die Bitrate unter **Erweitert**, getrennt nach Video und Audio. BD-3D verwendet LPCM und fest 23,976 fps; die gemeinsame AVC/MVC-Zielbitrate ist zwischen 20 und 40 Mbit/s wählbar, mit 40 Mbit/s als Werkseinstellung.
+**Tonoptionen** übernehmen alle Spuren, ausgewählte Spuren oder keinen Ton. Du kannst Originalton beibehalten, nach AAC wandeln oder auf Stereo heruntermischen. Bei BD-3D stehen die Tonoptionen und die Bitrate unter **Erweitert**, getrennt nach Video und Audio. BD-3D verwendet LPCM; unter **Ausgabegröße je Halbbild** wählst du 1080p/23,976 oder 720p/50 beziehungsweise 720p/59,94. Die 720p-Modi bieten flüssigere Bewegung bei geeigneten Quellen, mit geringerer räumlicher Auflösung. Bildpaare werden bei Bedarf ausgelassen oder wiederholt, ohne Bewegungsinterpolation; Laufzeit und Ton bleiben erhalten (nur 24 → 23,976 wird um 0,1 % verlangsamt). Die gemeinsame AVC/MVC-Zielbitrate ist zwischen 20 und 40 Mbit/s wählbar, mit 40 Mbit/s als Werkseinstellung.
 
 ## Polfilter-Monitore
 

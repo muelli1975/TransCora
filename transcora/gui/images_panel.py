@@ -20,6 +20,7 @@ from .theme import checkbox, set_control_state, GOLD_LIGHT, MUTED, SECONDARY_BG,
 from .native import schedule_dark_titlebar
 from .localization import TextVar
 from .settings_area import SettingsArea, section, CurrentFile
+from .file_list import FileListSorter
 
 STATUS = {'queued': 'Wartet', 'ready': 'Bereit', 'running': 'Läuft', 'completed': 'Fertig',
           'blocked': 'Prüfen!', 'failed': 'Fehler', 'cancelled': 'Abgebrochen'}
@@ -63,6 +64,7 @@ class ImagePanel:
         self.tree.grid(row=0, column=0, sticky='nsew'); scroll = ttk.Scrollbar(holder, command=self.tree.yview)
         scroll.grid(row=0, column=1, sticky='ns'); self.tree.configure(yscrollcommand=scroll.set)
         self.tree.bind('<<TreeviewSelect>>', self.selection_changed)
+        self.sorter = FileListSorter(self,dict(file='Datei',task='Aufgabe',target='Ziel',status='Status'))
         self.tree.bind('<Control-a>', self.select_all)
         self.tree.bind('<Control-A>', self.select_all)
         if self.tree.tk.call('tk', 'windowingsystem') == 'aqua':
@@ -329,6 +331,7 @@ class ImagePanel:
             values = (job.source.name, self.t(TASKS[job.options.task]), self.t(TARGETS[job.options.target]), self.t(STATUS[job.status]))
             if self.tree.exists(job.id): self.tree.item(job.id, values=values)
             else: self.tree.insert('', 'end', iid=job.id, values=values)
+        self.sorter.refresh()
 
     def add_paths(self, paths, source_root=None):
         if self.busy or self.owner.busy: return
@@ -338,6 +341,7 @@ class ImagePanel:
             if path.suffix.lower() in EXTENSIONS and key not in existing:
                 self.jobs.append(ImageJob(path, replace(self.defaults), source_root)); existing.add(key)
         self.refresh()
+
 
     def add_files(self):
         if self.busy: return
@@ -350,8 +354,9 @@ class ImagePanel:
         value = filedialog.askdirectory(parent=self.root, initialdir=self.input_folder)
         if value:
             root = Path(value).resolve(); self.input_folder = value; output = Path(self.output.get()).expanduser().resolve()
+            excluded_output = output if output != root and output.is_relative_to(root) else None
             paths = root.rglob('*') if self.recursive.get() else root.iterdir()
-            self.add_paths(sorted(p for p in paths if p.is_file() and not p.is_relative_to(output)), root)
+            self.add_paths(sorted(p for p in paths if p.is_file() and (excluded_output is None or not p.is_relative_to(excluded_output))), root)
 
     def choose_output(self):
         value = filedialog.askdirectory(parent=self.root, initialdir=self.output.get())
@@ -448,6 +453,7 @@ class ImagePanel:
         self.owner.notebook.tab(self.owner.video_tab, state='disabled' if value else 'normal')
         for widget, normal in self.controls: set_control_state(widget, 'disabled' if value else normal)
         self.abort_button.configure(state='normal' if value else 'disabled'); self.sensitivity()
+        if not value:self.sorter.refresh()
 
     def abort(self):
         if self.busy: self.cancel.set(); self.status.set('Abbruch angefordert …'); self.abort_button.configure(state='disabled')

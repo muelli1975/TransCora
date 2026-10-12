@@ -19,7 +19,7 @@ from transcora.core.engine import plan_job, execute, capture, Cancelled, preview
 from transcora.core.model import Options, Job
 from transcora.core.toolchain import Toolchain
 from transcora.core.bd3d_export import BdTools, FRAME_BYTES
-from transcora.core.bd3d import BD_RATE, prepare
+from transcora.core.bd3d import BD_RATE, prepare, output_mode
 from transcora.core.udf import Disc
 
 OUT = ROOT/'output/bd3d-integration'
@@ -32,16 +32,25 @@ def main():
     bd = BdTools.find()
     report = {'ok': False}
     try:
-        for rate, container, title, channels in [('24', 'iso', 'Mein 3D Film – ÄÖÜ', 2),
+        cases = [(r,c,t,ch,'1080p') for r,c,t,ch in [('24', 'iso', 'Mein 3D Film – ÄÖÜ', 2),
                                                  ('24000/1001', 'm2ts', 'Native 23.976', 6),
                                                  ('24000/1001', 'm2ts', 'Native 7.1', 8),
                                                  ('25', 'm2ts', 'Converted 25', 2),
                                                  ('30', 'm2ts', 'Converted 30', 2),
                                                  ('50', 'm2ts', 'Interlaced 50 fields', 2),
-                                                 ('60000/1001', 'm2ts', 'Converted 59.94', 2)]:
-            case = container + '-' + str(channels) + ('-'+rate.replace('/', '-') if channels == 2 and container == 'm2ts' else '')
+                                                 ('60000/1001', 'm2ts', 'Converted 59.94', 2)]]
+        cases += [('50', 'iso', '720p50 stereo', 2, '720p50'),
+                  ('60000/1001', 'iso', '720p5994 stereo', 2, '720p5994'),
+                  ('25', 'm2ts', '720p50 converted', 2, '720p50'),
+                  ('30000/1001', 'm2ts', '720p5994 converted', 2, '720p5994')]
+        for rate, container, title, channels, mode in cases:
+            if os.environ.get('TRANSCORA_BD_TEST_MODES') and mode not in os.environ['TRANSCORA_BD_TEST_MODES'].split(','):
+                continue
+            width, height, output_rate = output_mode(mode)
+            eye_bytes = width*height*3//2
+            case = mode+'-'+container + '-' + str(channels) + ('-'+rate.replace('/', '-') if channels == 2 and container == 'm2ts' else '')
             source = OUT/f'source-{case}_full_sbs.mkv'
-            fields = rate == '50'
+            fields = rate == '50' and mode == '1080p'
             tones = '|'.join(f'0.1*sin(2*PI*{997+i*173}*t)' for i in range(channels))
             audio_fixture = f"aevalsrc={tones}:s=48000:c="+{2:'stereo', 6:'5.1', 8:'7.1'}[channels]
             # Distinct animated eyes; include 997 Hz on every audio channel.
@@ -56,7 +65,7 @@ def main():
                 '-color_primaries', 'bt709', '-color_trc', 'bt709', '-color_range', 'tv',
                 '-c:a', 'flac', '-sample_fmt', 's32', '-bits_per_raw_sample', '24', '-ac', str(channels), str(source)], timeout=120)
             job = Job(source, Options(target='bd3d', container=container, disc_title=title,
-                                      bd_bitrate_mbps=30 if fields else 40))
+                                      bd_bitrate_mbps=30 if fields else 40, bd_mode=mode))
             plan = plan_job(tools, job, OUT, set(), threading.Event(), capabilities)
             png = preview(tools, plan, threading.Event(), .5)
             if not png.startswith(b'\x89PNG'):
@@ -81,6 +90,9 @@ def main():
                         raise ValueError('Unicode disc title not preserved')
                     packed = OUT/'iso-packed.ssif'
                     disc.extract('BDMV/STREAM/SSIF/00000.ssif', packed)
+            video = json.loads(capture([str(tools.ffprobe), '-v', 'error', '-show_streams', '-of', 'json', str(packed)]))['streams'][0]
+            if (video['width'],video['height']) != (width,height) or Fraction(video['r_frame_rate']) != output_rate:
+                raise ValueError('Muxed BD dimensions/frame rate mismatch')
             # Independently compare each eye with the prepared source. This catches
             # a swapped/duplicated view or planar-SBS stdin error despite roundtrip equality.
             raw = OUT/f'raw-{case}'
@@ -97,26 +109,26 @@ def main():
                             str(raw/'decoded-left.yuv'), str(raw/'decoded-right.yuv')],
                            env=bd.environment, check=True, timeout=120)
             args = [str(tools.ffmpeg), '-y', '-v', 'error', '-filter_complex_threads', '1',
-                    '-i', str(source), '-filter_complex', prepare(plan.info['video'], plan.layout).graph]
+                    '-i', str(source), '-filter_complex', prepare(plan.info['video'], plan.layout, plan.swap, mode).graph]
             for eye in ('left', 'right'):
                 args += ['-map', '['+eye+']', '-c:v', 'rawvideo', '-pix_fmt', 'yuv420p',
                          '-fps_mode', 'passthrough', '-f', 'rawvideo', str(raw/(eye+'.yuv'))]
             subprocess.run(args, check=True, timeout=120)
             for eye in ('left', 'right'):
-                result = subprocess.run([str(tools.ffmpeg), '-hide_banner', '-f', 'rawvideo', '-s', '1920x1080',
-                    '-pix_fmt', 'yuv420p', '-i', str(raw/(eye+'.yuv')), '-f', 'rawvideo', '-s', '1920x1080',
+                result = subprocess.run([str(tools.ffmpeg), '-hide_banner', '-f', 'rawvideo', '-s', f'{width}x{height}',
+                    '-pix_fmt', 'yuv420p', '-i', str(raw/(eye+'.yuv')), '-f', 'rawvideo', '-s', f'{width}x{height}',
                     '-pix_fmt', 'yuv420p', '-i', str(raw/('decoded-'+eye+'.yuv')), '-lavfi', 'psnr',
                     '-f', 'null', '-'], capture_output=True, encoding='utf-8', timeout=120, check=True)
                 score = re.search(r'average:([0-9.]+)', result.stderr)
                 if not score or float(score[1]) < 40:
                     raise ValueError('Source eye identity/quality failed: '+eye)
-            frames = (raw/'left.yuv').stat().st_size//(1920*1080*3//2)
-            if (raw/'decoded-left.yuv').stat().st_size != frames*(1920*1080*3//2):
+            frames = (raw/'left.yuv').stat().st_size//eye_bytes
+            if (raw/'decoded-left.yuv').stat().st_size != frames*eye_bytes:
                 raise ValueError('Converted output frame count differs from prepared stereo source')
             shutil.rmtree(raw)
             # Independently decode prepared audio to match the actual muxed LPCM.
-            samples = round(frames*48000/float(BD_RATE))
-            af = prepare(plan.info['video'], plan.layout).audio_filter+f',apad,atrim=end_sample={samples}'
+            samples = round(frames*48000/float(output_rate))
+            af = prepare(plan.info['video'], plan.layout, plan.swap, mode).audio_filter+f',apad,atrim=end_sample={samples}'
             expected_audio = capture([str(tools.ffmpeg), '-v', 'error', '-i', str(source), '-map', '0:a:0',
                 '-af', af, '-ar', '48000', '-c:a', 'pcm_s24le', '-f', 's24le', 'pipe:1'], timeout=120)
             actual_audio = capture([str(tools.ffmpeg), '-v', 'error', '-i', str(packed), '-map', '0:a:0',
@@ -132,7 +144,7 @@ def main():
             if again.output == plan.output:
                 raise ValueError('Output naming collision protection failed')
             report[case] = {'file': plan.output.name, 'size': plan.output.stat().st_size,
-                                'frames': frames, 'source_rate': rate, 'rate': str(BD_RATE), 'channels': channels,
+                                'frames': frames, 'source_rate': rate, 'rate': str(output_rate), 'channels': channels,
                                 'audio_identical': True, 'preview_ok': True}
             source.unlink()
             if packed != plan.output:
