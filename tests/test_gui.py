@@ -402,6 +402,22 @@ class GuiTests(unittest.TestCase):
             buttons=[widget for widget,_ in panel.controls if isinstance(widget,ttk.Button) and widget.cget('text')=='Auswählen']
             self.assertEqual(len(buttons),1)
 
+    def test_late_timing_bar_keeps_footer_and_list_inside_small_window(self):
+        self.root.geometry('780x680');self.root.update()
+        self.window.add_paths([Path('/one/current_full_sbs.mp4')])
+        job=self.window.jobs[-1]
+        self.window.tree.selection_set(job.id);self.window.selection_changed()
+        self.window.variables['target'].set('BD-3D · 1080p');self.window.option_changed('target')
+        self.root.update()
+        height=self.window.tree.winfo_height();detail=self.window.detail_text.winfo_height()
+        self.window.elapsed_time.set('Vergangene Zeit: 02:34')
+        self.window.elapsed.set('Restzeit: ca. 05:12');self.root.update()
+        self.window.toggle_advanced();self.root.update()
+        self.assertEqual(self.window.tree.winfo_height(),height)
+        self.assertEqual(self.window.detail_text.winfo_height(),detail)
+        self.assertLessEqual(self.window.start_button.winfo_rooty()+self.window.start_button.winfo_height(),
+                             self.root.winfo_rooty()+self.root.winfo_height())
+
     def setUp(self):
         try:
             self.root = tk.Tk()

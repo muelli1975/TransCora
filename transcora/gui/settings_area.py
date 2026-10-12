@@ -40,7 +40,7 @@ class SettingsArea:
                 self.parent.after_cancel(self.callback)
 
     def schedule(self, event=None):
-        if self.closed or (event and event.widget not in (self.parent,self.parent.winfo_toplevel())):
+        if self.closed or (event and event.widget not in (self.parent,self.parent.winfo_toplevel()) and getattr(event.widget,'master',None) is not self.parent):
             return
         if not self.pending:
             self.pending = True

@@ -452,6 +452,7 @@ class Window:
         ttk.Label(timing, textvariable=self.speed, foreground=MUTED).pack(side="right")
         def timing_visibility(*args):
             timing.grid() if self.elapsed.get() or self.elapsed_time.get() or self.speed.get() else timing.grid_remove()
+            self.settings_area.schedule()
         for var in (self.elapsed, self.elapsed_time, self.speed):
             var.trace_add('write', timing_visibility)
         timing_visibility()
