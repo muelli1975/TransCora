@@ -190,6 +190,13 @@ angeben, keine bestätigte Vision-Pro-Wiedergabe behaupten. Fehlt ein funktionie
 Encoder-/Container-Weg, die Entscheidung offen dokumentieren, bevor ein sichtbares
 Ausgabeziel oder eine Versionsfreigabe erfolgt.
 
+Ergebnis der ersten vollständigen Probe vom 12. Oktober: Der festgelegte x265-
+Encoder baut und kodiert zwei Views. Die Dekodierungsprüfung meldet jedoch eine
+Abweichung des zweiten Halbbilds; außerdem fehlt die eindeutige L/R-Kennzeichnung.
+Der Bericht ist `verification/1.1-mvhevc-probe.json`. Dieser Weg ist noch nicht
+freigegeben und wird nicht als vorhandene MV-HEVC-Ausgabe angeboten. Die technische
+Ursache muss vor einer Integration geklärt werden.
+
 ## 7. Reihenfolge und Freigabe
 
 1. Journal/Ergebnisdaten, Bearbeitungszeit, Sortierung und Listenaktionen.

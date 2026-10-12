@@ -1,0 +1,41 @@
+{
+  "development_probe": true,
+  "x265_source": "e9b88125dc21393b3fd8d68e98083bdfb89778a8",
+  "status": "blocked",
+  "checks": [
+    {
+      "container": "stereo.hevc",
+      "result": "blocked",
+      "views": {
+        "view_ids_available": "0,1",
+        "view_pos_available": ""
+      },
+      "reason": "View 1: frames, pixels or ordering differ"
+    },
+    {
+      "container": "hev1.mp4",
+      "result": "blocked",
+      "views": {
+        "view_ids_available": "0,1",
+        "view_pos_available": ""
+      },
+      "reason": "View 1: frames, pixels or ordering differ"
+    },
+    {
+      "container": "hvc1.mp4",
+      "result": "blocked",
+      "views": {
+        "view_ids_available": "0,1",
+        "view_pos_available": ""
+      },
+      "reason": "View 1: frames, pixels or ordering differ"
+    }
+  ],
+  "not_checked": [
+    "Apple device playback",
+    "production integration"
+  ],
+  "encoder": "passed",
+  "workflow_run": "https://github.com/muelli1975/TransCora/actions/runs/38281236340",
+  "source_commit": "7b82b3d6af252ecc10f2af8a4fec8d31ed1e87bc"
+}

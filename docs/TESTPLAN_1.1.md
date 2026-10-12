@@ -30,6 +30,34 @@ und Erfolgsstatus erhalten; die Abschlussmeldung weist auf fehlende Einträge hi
 Die plattformübergreifenden Pakettests für den erweiterten Stand mit Pause und
 Mono-Auswahl werden gesondert ausgeführt.
 
+## Wiederaufgenommener Stand vom 12. Oktober
+
+Commit `7b82b3d` enthält die erhaltenen neueren lokalen HEIF-Änderungen und die
+Reparaturen der Spaltenbreite sowie der x265-Quellvorbereitung. **148 Tests auf
+Windows, Linux und macOS bestanden**, einschließlich des echten HEIF-Stereopaarimports.
+Alle drei Pakete starten erfolgreich. Ihre eingefrorenen HEIF-
+Leser bestehen vier Proben; zusätzlich bestehen die sechs Import-/Exportfälle
+in der gestarteten gepackten TransCora-Anwendung (inklusive Metadaten).
+Lauf: https://github.com/muelli1975/TransCora/actions/runs/38281236329
+
+Die lokale Windows-Quelle bestand 146 von 148 Tests. Zwei ExifTool-Starts wurden
+vom lokalen Testhost mit WinError 623 (DLL-Ladefehler) verhindert; diese beiden
+Tests bestehen in den unabhängigen Läufen aller drei Systeme. Die abschließende
+Windows-Paketprüfung war erfolgreich, einschließlich echter BD-3D-ISO/M2TS-
+Ausgaben, Bildzeiten, großem LPCM, MVC/MV-HEVC-Eingaben und gefrorener EXE.
+
+Die korrigierte x265-Probe lässt sich bauen und kodiert zwei Views. Das Ergebnis
+ist dennoch **blocked**, nicht candidate: View 1 ist in der verlustfreien Probe
+nicht pixelgleich mit ihrer Quelle; eindeutige L/R-Positionen fehlen. Rohes HEVC,
+MP4/hev1 und MP4/hvc1 bestehen deshalb die Abnahme nicht. Der technische Lauf
+selbst war erfolgreich und hat diese Einschränkungen gemeldet. Es wird kein
+MV-HEVC-Ausgabeziel freigegeben. Vollständiger Bericht:
+[1.1-mvhevc-probe.json](verification/1.1-mvhevc-probe.json).
+
+AVIF bleibt optional und ist für diesen Stand nicht aktiviert: Der Pillow-Leser
+liefert hier keine NCLX-/HDR-Transferkennzeichnung an die vorhandene Bildpipeline.
+Die Ausgabe darf nicht still eine HDR-Datei als gewöhnliches SDR behandeln.
+
 ## Neue Stereo-Eingaben und HEIF-Prototyp
 
 Zeilenverschachtelte Bilder/Videos und Frame sequential sind in den Import und die
