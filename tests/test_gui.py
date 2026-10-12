@@ -425,7 +425,10 @@ class GuiTests(unittest.TestCase):
         self.window.selection_changed()
         # The CI desktop can be shorter than a normal desktop. Test the client
         # area independently, then check the bounded small-window view too.
+        # Tk's default maximum follows the physical desktop on Windows.
+        self.root.maxsize(2000,2000)
         self.root.geometry('860x860'); self.root.update()
+        self.assertEqual(self.root.winfo_height(),860)
         for language in ('de','en'):
             self.window.language=language; self.window.apply_language()
             for target in ('anaglyph','row_interleaved','bd3d'):
