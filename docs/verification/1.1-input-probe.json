@@ -1,0 +1,103 @@
+{
+  "development_probe": true,
+  "ffmpeg_version": "ffmpeg version 7.1.1-full_build-www.gyan.dev Copyright (c) 2000-2025 the FFmpeg developers",
+  "fixture_generation": "independent raw YUV generator",
+  "host_dependencies": {
+    "Pillow": "12.1.0",
+    "pillow-heif": null
+  },
+  "checks": [
+    {
+      "layout": "irl",
+      "result": "passed",
+      "input": {
+        "width": 16,
+        "height": 16,
+        "frames": 3,
+        "fps": "24",
+        "duration_seconds": 0.125
+      },
+      "output": {
+        "width": 32,
+        "height": 8,
+        "frames": 3,
+        "fps": "24",
+        "duration_seconds": 0.125
+      },
+      "pixels_equal": true
+    },
+    {
+      "layout": "irr",
+      "result": "passed",
+      "input": {
+        "width": 16,
+        "height": 16,
+        "frames": 3,
+        "fps": "24",
+        "duration_seconds": 0.125
+      },
+      "output": {
+        "width": 32,
+        "height": 8,
+        "frames": 3,
+        "fps": "24",
+        "duration_seconds": 0.125
+      },
+      "pixels_equal": true
+    },
+    {
+      "layout": "al",
+      "result": "passed",
+      "input": {
+        "width": 16,
+        "height": 8,
+        "frames": 6,
+        "fps": "48",
+        "duration_seconds": 0.125
+      },
+      "output": {
+        "width": 32,
+        "height": 8,
+        "frames": 3,
+        "fps": "24",
+        "duration_seconds": 0.125
+      },
+      "pixels_equal": true
+    },
+    {
+      "layout": "ar",
+      "result": "passed",
+      "input": {
+        "width": 16,
+        "height": 8,
+        "frames": 6,
+        "fps": "48",
+        "duration_seconds": 0.125
+      },
+      "output": {
+        "width": 32,
+        "height": 8,
+        "frames": 3,
+        "fps": "24",
+        "duration_seconds": 0.125
+      },
+      "pixels_equal": true
+    },
+    {
+      "layout": "ml",
+      "result": "passed",
+      "pixels_equal": true
+    },
+    {
+      "layout": "mr",
+      "result": "passed",
+      "pixels_equal": true
+    }
+  ],
+  "not_checked": [
+    "TransCora GUI or import integration",
+    "audio synchronization",
+    "HEIC/HEIF/AVIF decoding and stereo metadata",
+    "MV-HEVC encoding and device playback"
+  ]
+}
