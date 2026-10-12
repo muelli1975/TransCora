@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - '.github/workflows/probe-1.1.yml'
+      - 'scripts/prepare_mvhevc_probe.py'
+      - 'scripts/heif-sources.json'
       - 'scripts/probe_1_1_heif.py'
       - 'scripts/probe_1_1_mvhevc.py'
       - 'native/heif/**'
@@ -18,11 +20,6 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/checkout@v4
-        with:
-          repository: Multicorewareinc/x265
-          ref: e9b88125dc21393b3fd8d68e98083bdfb89778a8
-          path: work/x265-source
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -32,6 +29,8 @@ jobs:
         run: python scripts/fetch_ffmpeg.py
       - name: Decode primary photos and tagged stereo half-images
         run: python scripts/probe_1_1_heif.py --ffmpeg tools/ffmpeg/bin/ffmpeg.exe --folder work/heif-probe --report work/heif-probe/report.json
+      - name: Prepare verified official multiview encoder sources
+        run: python scripts/prepare_mvhevc_probe.py
       - uses: msys2/setup-msys2@v2
         with:
           msystem: UCRT64
@@ -43,7 +42,7 @@ jobs:
       - name: Build an actual multiview x265 encoder
         shell: msys2 {0}
         run: |
-          cmake -S work/x265-source/source -B work/x265-build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DENABLE_MULTIVIEW=ON -DENABLE_ASSEMBLY=OFF -DENABLE_SHARED=OFF -DENABLE_LIBNUMA=OFF
+          cmake -S work/x265-source/x265_4.3/source -B work/x265-build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DENABLE_MULTIVIEW=ON -DENABLE_ASSEMBLY=OFF -DENABLE_SHARED=OFF -DENABLE_LIBNUMA=OFF
           cmake --build work/x265-build --parallel 2
           cygpath -w /ucrt64/bin >> "$GITHUB_PATH"
       - name: Probe both multiview layers, containers, timing and audio

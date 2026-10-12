@@ -20,13 +20,16 @@ def main():
     parser.add_argument('--ffmpeg', required=True)
     parser.add_argument('--folder', type=Path, required=True)
     parser.add_argument('--report', type=Path, required=True)
+    parser.add_argument('--reader', type=Path)
+    parser.add_argument('--application', type=Path)
     args = parser.parse_args()
     args.folder.mkdir(parents=True, exist_ok=True)
     root = Path(__file__).resolve().parents[1]
     from PIL import Image
-    import pillow_heif
-    report = {'development_probe': True, 'reader': pillow_heif.__version__,
-              'libraries': pillow_heif.libheif_info(), 'checks': [],
+    command = [str(args.reader.resolve())] if args.reader else [sys.executable, str(root/'native/heif/read_heif.py')]
+    version = json.loads(subprocess.run(command+['--version'], capture_output=True, text=True,
+                                       check=True, timeout=30).stdout)
+    report = {'development_probe': True, **version, 'packaged_reader': bool(args.reader), 'checks': [],
               'not_checked': ['packaged readers on all platforms', 'TransCora import integration',
                               'HDR tone mapping', 'Apple device playback']}
     for name, (directory, digest) in FIXTURES.items():
@@ -37,7 +40,7 @@ def main():
                 source.write_bytes(response.read())
         assert hashlib.sha256(source.read_bytes()).hexdigest() == digest, name
         output = args.folder/source.stem
-        result = subprocess.run([sys.executable, str(root/'native/heif/read_heif.py'), str(source),
+        result = subprocess.run(command+[str(source),
                                  '--decode-to', str(output), '--ffmpeg', str(Path(args.ffmpeg).resolve())],
                                 capture_output=True, text=True, check=True, timeout=90)
         metadata = json.loads(result.stdout)
@@ -58,6 +61,13 @@ def main():
             assert decoded[0]['pixel_sha256'] != decoded[1]['pixel_sha256'], name
         report['checks'].append({'source': url, 'sha256': digest, 'result': 'passed',
                                  'metadata': metadata, 'decoded': decoded})
+    if args.application:
+        result_path = args.folder.resolve()/'application-check.json'
+        subprocess.run([str(args.application.resolve()), '--self-test-heif', str(result_path),
+                        str(args.folder.resolve())], check=True, timeout=180)
+        report['application'] = json.loads(result_path.read_text('utf-8'))
+        assert report['application']['ok']
+        report['not_checked'].remove('TransCora import integration')
     args.report.parent.mkdir(parents=True, exist_ok=True)
     args.report.write_text(json.dumps(report, indent=2)+'\n', 'utf-8')
     print(f"HEIF probe: {len(report['checks'])} passed; report: {args.report}")

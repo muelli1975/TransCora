@@ -193,7 +193,12 @@ class Window:
         holder.columnconfigure(0, weight=1)
         holder.rowconfigure(0, weight=1)
         self.tree = ttk.Treeview(holder, columns=("file", "layout", "fps", "duration", "target", "status", "processing"), show="headings", height=6, selectmode="extended")
-        for key, label, width in (("file", "Datei", 170), ("layout", "Quelle", 120), ("fps", "fps", 55),
+        from tkinter import font
+        table_font = font.Font(font=ttk.Style().lookup('Treeview', 'font'))
+        source_width = max(100, *(table_font.measure(label)+16 for label in
+                                 ('Frame sequential', 'Zeilenverschachtelt', 'Row interleaved', 'MVC / Blu-ray 3D')))
+        file_width = max(120, 290-source_width)
+        for key, label, width in (("file", "Datei", file_width), ("layout", "Quelle", source_width), ("fps", "fps", 55),
                                   ("duration", "Dauer", 70), ("target", "Ziel", 185), ("status", "Status", 80),
                                   ("processing", "Bearbeitungszeit", 126)):
             self.tree.heading(key, text=label)

@@ -41,7 +41,7 @@ def main():
         report['encoder'] = 'passed'
         audio = folder/'audio.wav'
         run([ffmpeg, '-v', 'error', '-f', 'lavfi', '-i', 'sine=frequency=700:sample_rate=48000',
-             '-t', '.48', '-c:a', 'pcm_s16le', audio])
+             '-t', '0.48', '-c:a', 'pcm_s16le', audio])
         candidates = [raw]
         for tag in ('hev1', 'hvc1'):
             path = folder/f'{tag}.mp4'

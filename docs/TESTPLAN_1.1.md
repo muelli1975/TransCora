@@ -52,8 +52,12 @@ Item-IDs und Pixelprüfsummen stehen in `verification/1.1-heif-probe.json`. Zus�
 Tests verhindern, dass Tiefenkarten/Gainmaps/andere Bilder als zweites Halbbild
 gewählt werden. HDR wird anhand PQ/HLG erkannt, nicht allein an Lichtpegel-Metadaten.
 
-**HEIF ist noch nicht im Paket oder Bildimport freigegeben.** Separate Paketierung,
-zugehörige Quellen/Lizenzen und Prüfung aller drei Systeme stehen aus. Die öffentliche
+**HEIF ist in den Entwicklungs-Bildimport integriert.** Der separate Windows-Leser
+wurde gebaut und bestand alle vier ursprünglichen Proben auch als EXE. Der Paketbau
+enthält die passenden nativen Quellarchive, Bauanleitungen und Lizenznachweise.
+Die erweiterten Pakettests starten zusätzlich die gepackte TransCora-Anwendung:
+Stereo-Gruppen/L/R-Tausch, normales gedrehtes Foto, Spatial Photo, ICC und Metadaten.
+Die Prüfung aller drei Systeme ist für diesen Stand noch ausstehend. Die öffentliche
 Upstream-Fixture wurde zur Prüfung heruntergeladen; Fotos werden nicht ins Repository
 kopiert. Der MV-HEVC-Prototyp baut x265 mit echtem ENABLE_MULTIVIEW und prüft beide
 expliziten Views, MP4-Container, Zeitstempel und Ton in einem getrennten CI-Lauf.

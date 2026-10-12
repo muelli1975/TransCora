@@ -15,6 +15,39 @@ class Container(list):
 
 
 class HeifReaderTests(unittest.TestCase):
+    def test_actual_heif_import_exports_the_tagged_half_images_and_respects_swap(self):
+        import importlib.util
+        import tempfile
+        import threading
+        from PIL import Image
+        from transcora.core.model import app_root
+        from transcora.core.images import ImageJob, ImageOptions, plans, execute_image
+        from transcora.core.toolchain import Toolchain
+        binaries = [app_root()/'tools/heif/TransCora-HEIF.exe', app_root()/'tools/heif/TransCora-HEIF']
+        if not any(path.is_file() for path in binaries) and not importlib.util.find_spec('pillow_heif'):
+            self.skipTest('Separate HEIF development reader is unavailable')
+        tools = Toolchain.find()
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            for filename, blue_left in [('stereo_pair.heic', False), ('entity_groups.heic', True)]:
+                source = Path(__file__).parent/'fixtures/heif'/filename
+                for swap in (False, True):
+                    plan = plans([ImageJob(source, ImageOptions(target='split', format='png', metadata=False, swap=swap))],
+                                 folder, threading.Event())[0]
+                    self.assertEqual(plan.layout, 'full_sbs')
+                    self.assertEqual(plan.size, (128, 64))
+                    self.assertEqual(plan.warnings, ('HEIF: Halbbilder anhand der Stereo-Gruppe links/rechts zugeordnet.',))
+                    execute_image(tools, plan, threading.Event(), lambda *a: None, folder/'heif.log')
+                    for index, output in enumerate(plan.outputs):
+                        with Image.open(output) as half:
+                            self.assertEqual(half.size, (64, 64))
+                            pixel = half.convert('RGB').getpixel((32, 32))
+                            blue = blue_left ^ swap ^ bool(index)
+                            self.assertGreater(pixel[2 if blue else 0], 240)
+                            self.assertLess(pixel[0 if blue else 2], 10)
+                with self.assertRaisesRegex(ValueError, 'MPO'):
+                    plans([ImageJob(source, ImageOptions(task='mpo'))], folder, threading.Event())
+
     def image(self, **info):
         return SimpleNamespace(info=info, size=(64, 64), mode='RGB')
 

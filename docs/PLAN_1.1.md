@@ -6,7 +6,8 @@ Diese Datei beschreibt den vereinbarten Umfang. Journal, Bearbeitungszeit,
 Listenaktionen und die Bereinigung doppelter Hinweise sind als erster
 Entwicklungsstand implementiert. Pausensteuerung und Mono-Halbbildwahl sind
 ebenfalls umgesetzt. Zeilenverschachtelte und Frame-sequential-Eingaben sind
-integriert; HEIF-Leser und MV-HEVC-Encoding werden separat erprobt.
+integriert. HEIF-Bildimport nutzt den separaten Leser; die plattformübergreifende
+Paketabnahme läuft. MV-HEVC-Encoding wird separat erprobt.
 Die Abnahme ist im Testplan dokumentiert. Grundlage ist `main` bei
 `7ef801f8aff9697ecd40882a763fdac0cdd2d3fe`; die veröffentlichte 1.0 wurde aus
 `c3f23155db3c56da8377bc7e4dd7bf9bc1eb35e8` gebaut. Die Vorbereitung ändert

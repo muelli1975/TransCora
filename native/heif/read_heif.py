@@ -87,16 +87,25 @@ def pixels(image, ffmpeg):
                                 '-frames:v', '1', '-f', 'image2pipe', '-c:v', 'png', 'pipe:1'],
                                input=data.getvalue(), capture_output=True, timeout=60, check=True)
     from PIL import Image
-    return Image.open(io.BytesIO(converted.stdout)).copy()
+    output = Image.open(io.BytesIO(converted.stdout)).copy()
+    if 'A' in result.getbands():
+        output.putalpha(result.getchannel('A'))
+    return output
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('source', type=Path)
+    parser.add_argument('source', type=Path, nargs='?')
+    parser.add_argument('--version', action='store_true')
     parser.add_argument('--decode-to', type=Path)
     parser.add_argument('--ffmpeg')
     args = parser.parse_args()
     import pillow_heif
+    if args.version:
+        print(json.dumps({'reader': pillow_heif.__version__, 'libraries': pillow_heif.libheif_info()}))
+        return
+    if args.source is None:
+        parser.error('source is required')
     container = pillow_heif.open_heif(args.source, convert_hdr_to_8bit=True)
     images, entities = selected_images(container)
     report = describe(images, entities)
@@ -105,7 +114,9 @@ def main():
             parser.error('--decode-to requires --ffmpeg')
         args.decode_to.mkdir(parents=True, exist_ok=True)
         for index, image in enumerate(images):
-            pixels(image, args.ffmpeg).save(args.decode_to/f'{index}.png', icc_profile=image.info.get('icc_profile'))
+            decoded = pixels(image, args.ffmpeg)
+            decoded.save(args.decode_to/f'{index}.png', icc_profile=decoded.info.get('icc_profile'),
+                         exif=decoded.info.get('exif', b''))
     print(json.dumps(report))
 
 

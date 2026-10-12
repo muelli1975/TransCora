@@ -9,9 +9,16 @@ with that wheel must be distributed under the applicable combined GPL terms,
 with the exact corresponding source, build scripts and dependency notices.
 The main application license does not replace these terms.
 
-This is currently a development prototype, not a packaged component. Do not
-add a frozen reader to a release until the source/build/license bundle and all
-three platform tests are in place. Decoder-only LGPL builds remain an alternative.
+The combined reader executable is distributed under GPL-3.0-or-later. x265's
+source permits GPL version 2 or any later version; version 3 accommodates the
+LGPLv3 components. Original component notices are retained under `licenses/`.
+Complete pinned native source archives, the wrapper source (including upstream
+wheel build scripts), the reader source and packaging recipe are under `source/`.
+`BUILD_SOURCES.json` records their download origins, versions and checksums.
+The replaceable native libraries remain beside the executable in `_internal/`.
+
+Development builds require tests of the actual frozen reader on every supported
+platform before release. Decoder-only LGPL builds remain an alternative.
 
 Primary sources:
 

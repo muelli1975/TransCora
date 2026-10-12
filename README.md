@@ -14,6 +14,12 @@ half-image. Frame sequential pairs consecutive half-images before frame-rate
 conversion; 120 individual frames/s represent 60 stereo pairs/s. An unpaired final
 half-image is omitted. Choose an output layout for frame-sequential input.
 
+The 1.1 development build reads **HEIC/HEIF** SDR images, including tagged stereo
+HEIC and Spatial Photos. Stereo groups determine left/right assignment; depth
+maps and gainmaps are not selected as a second half-image. Orientation and colour
+profiles are respected. The existing image outputs and preview are available.
+HDR tone mapping, HEIC output and MV-HEVC output are not released yet.
+
 ## Quick start
 
 1. Open **Videos** or **Images** and add files or a folder. Enable **Include subfolders** if needed.

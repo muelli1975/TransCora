@@ -1123,6 +1123,23 @@ EN.update({
         'Row-interleaved input: stereo rows are separated before scaling. Each half-image retains half the vertical detail resolution.',
 })
 
+EN.update({
+    'HEIF: Halbbilder anhand der Stereo-Gruppe links/rechts zugeordnet.':
+        'HEIF: half-images assigned left/right using the stereo group.',
+    'HEIF-Leser fehlt. TransCora vollständig entpacken.': 'HEIF reader missing. Extract TransCora completely.',
+    'HEIF-Leser meldet widersprüchliche Bildmaße.': 'HEIF reader reports inconsistent image dimensions.',
+})
+
+EN.update({
+    'HDR-HEIF: SDR-Kopie mit bewusster Tonwertwandlung verwenden.': 'HDR HEIF: use an SDR copy with deliberate tone mapping.',
+    'HEIF enthält mehrere passende Stereo-Gruppen; das gewünschte Paar separat exportieren.':
+        'HEIF contains several applicable stereo groups; export the intended pair separately.',
+    'HEIF-Stereo-Gruppe enthält keine zwei lesbaren Halbbilder.': 'HEIF stereo group does not contain two readable half-images.',
+    'HEIF-Halbbilder haben unterschiedliche Maße.': 'HEIF half-images have different dimensions.',
+    'Nicht unterstützte HEIF-SDR-Farbinterpretation.': 'Unsupported HEIF SDR colour interpretation.',
+    'HEIF mit nichtquadratischen Pixeln wird noch nicht unterstützt.': 'HEIF with non-square pixels is not yet supported.',
+})
+
 PATTERNS = []
 for source, target in EN.items():
     parts = re.split(r"(\{\d+\})", source)

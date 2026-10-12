@@ -14,6 +14,13 @@ die Zuordnung des ersten Halbbilds. Frame sequential bildet vor der Bildratenwan
 vollständige Paare: 120 Einzelbilder/s entsprechen 60 Stereobildpaaren/s. Ein
 ungepaartes Schlussbild wird ausgelassen. Dafür ein Ausgabe-Layout wählen.
 
+**HEIC/HEIF** wird in der 1.1-Entwicklungsfassung als SDR-Bildeingabe gelesen,
+einschließlich gekennzeichneter Stereo-HEIC und Spatial Photos. Die Stereo-Gruppe
+bestimmt die L/R-Zuordnung; Tiefenkarten und Gainmaps werden nicht als zweites
+Halbbild verwendet. Orientierung und Farbprofile werden berücksichtigt. Die
+vorhandenen Bildziele und das Kontrollbild stehen auch dafür zur Verfügung.
+HDR-Tonwertwandlung, HEIC-Ausgabe und MV-HEVC-Ausgabe sind noch nicht freigegeben.
+
 ## Schnellstart
 
 1. Öffne **Videos** oder **Bilder** und füge Dateien oder einen Ordner hinzu. Aktiviere bei Bedarf **Unterordner mitverarbeiten**.

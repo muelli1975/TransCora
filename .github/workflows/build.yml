@@ -31,7 +31,7 @@ jobs:
       - name: Install test tools
         run: |
           sudo apt-get update && sudo apt-get install -y ffmpeg xvfb
-          python -m pip install Pillow==11.3.0 cmake==4.4.4 customtkinter==5.2.2 darkdetect==0.8.0
+          python -m pip install Pillow==11.3.0 pillow-heif==1.8.1 cmake==4.4.4 customtkinter==5.2.2 darkdetect==0.8.0
           python scripts/prepare_exiftool.py
       - name: Build pinned native CIELab image method
         run: python scripts/build_cielab.py
@@ -102,8 +102,10 @@ jobs:
           $process = Start-Process -FilePath ./dist/TransCora/TransCora.exe -ArgumentList @("--self-test", "`"$report`"") -WindowStyle Hidden -Wait -PassThru
           if ($process.ExitCode -ne 0) { throw "TransCora self-test failed" }
           $result = Get-Content $report | ConvertFrom-Json
-          if (-not $result.ok -or $result.methods -ne 17 -or -not $result.bd3d -or -not $result.mvc -or -not $result.images -or -not $result.cielab) { throw "TransCora assets/toolchain check failed" }
+          if (-not $result.ok -or $result.methods -ne 17 -or -not $result.bd3d -or -not $result.mvc -or -not $result.images -or -not $result.cielab -or -not $result.heif) { throw "TransCora assets/toolchain check failed" }
           Get-Content $report
+      - name: Test the packaged HEIF reader with both tagged half-images
+        run: python scripts/probe_1_1_heif.py --ffmpeg dist/TransCora/tools/ffmpeg/bin/ffmpeg.exe --reader dist/TransCora/tools/heif/TransCora-HEIF.exe --application dist/TransCora/TransCora.exe --folder work/heif-package-test --report work/heif-package-test/report.json
       - uses: actions/upload-artifact@v4
         with:
           name: TransCora-Release-Windows
@@ -201,6 +203,8 @@ jobs:
         run: |
           dist/TransCora/TransCora --self-test smoke.json
           dist/TransCora/TransCora.app/Contents/MacOS/TransCora --self-test smoke-app.json
+      - name: Test the packaged HEIF reader
+        run: python scripts/probe_1_1_heif.py --ffmpeg "$(command -v ffmpeg)" --reader dist/TransCora/tools/heif/TransCora-HEIF --application dist/TransCora/TransCora --folder work/heif-package-test --report work/heif-package-test/report.json
       - uses: actions/upload-artifact@v4
         with:
           name: TransCora-Release-${{ matrix.label }}

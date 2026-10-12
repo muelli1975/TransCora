@@ -13,6 +13,7 @@ def main():
     root = Path(__file__).resolve().parents[1]
     sys.path.insert(0, str(root))
     from transcora import __version__
+    subprocess.run([sys.executable, str(root/'scripts/prepare_heif.py')], cwd=root, check=True)
     icon_args = ['--icon', str(root/'assets/transcora.ico')] if sys.platform == 'win32' else []
     subprocess.run([sys.executable, '-m', 'PyInstaller', '--noconfirm', '--clean', '--windowed',
                     '--onedir', '--name', 'TransCora', '--collect-all=customtkinter', *icon_args,

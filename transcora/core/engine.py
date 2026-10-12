@@ -488,7 +488,7 @@ def plan_job(tools: Toolchain, job: Job, output_root: Path, reserved: set[str],
             review("Manuell gewähltes Layout/L/R weicht vom Dateinamen ab.")
         if metadata and metadata != (layout_axis(layout), swap):
             review("Manuelle Quellinterpretation ersetzt abweichende Stereo-Metadaten.")
-    if interlaced(video) and layout not in {'row_interleaved', 'frame_sequential'}:
+    if interlaced(video) and layout != 'row_interleaved':
         warnings.append("Interlaced: Ein progressives Bild je Halbbildzeit; die zeitliche Auflösung bleibt erhalten. BD-3D und die Zielbildrate passen die Bildfolge anschließend an.")
     if layout == 'frame_sequential':
         if options.target == 'framerate':
