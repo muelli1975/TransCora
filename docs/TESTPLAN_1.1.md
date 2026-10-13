@@ -46,21 +46,39 @@ Tests bestehen in den unabhängigen Läufen aller drei Systeme. Die abschließen
 Windows-Paketprüfung war erfolgreich, einschließlich echter BD-3D-ISO/M2TS-
 Ausgaben, Bildzeiten, großem LPCM, MVC/MV-HEVC-Eingaben und gefrorener EXE.
 
-Die korrigierte x265-Probe lässt sich bauen und kodiert zwei Views. Das Ergebnis
-ist dennoch **blocked**, nicht candidate: View 1 ist in der verlustfreien Probe
-nicht pixelgleich mit ihrer Quelle; eindeutige L/R-Positionen fehlen. Rohes HEVC,
-MP4/hev1 und MP4/hvc1 bestehen deshalb die Abnahme nicht. Der technische Lauf
-selbst war erfolgreich und hat diese Einschränkungen gemeldet. Es wird kein
-MV-HEVC-Ausgabeziel freigegeben. Vollständiger Bericht:
-[1.1-mvhevc-probe.json](verification/1.1-mvhevc-probe.json).
+## MV-HEVC-Machbarkeit vom 13. Oktober
 
-Gezielte Wiederholung mit `-fps_mode passthrough` (keine vom Test hinzugefügten
-Bilder) bestätigt die Einschränkung: View 0 liefert 12 pixelgleiche Bilder,
-View 1 nur 11 statt 12 und abweichende Pixel. Dies betrifft rohes HEVC und beide
-MP4-Varianten mit x265 4.3 und dem festgelegten FFmpeg 7.1.1. Die Zuordnung zum
-Encoder oder Decoder ist damit noch nicht geklärt. Encoderlog und synthetische
-Ausgaben sind im gesonderten Codec-Artefakt gesichert. Kein neues Ausgabeziel
-und keine zusätzliche Produkt-Sperrprüfung werden daraus abgeleitet.
+Der Prototyp ist jetzt **candidate**. x265 4.3 mit Multiview und FFmpeg 7.1.1
+bestehen die vollständige Prüfung beider Views mit 36 Bildern pro Halbbild,
+128×64 je View, 25 fps und drei GOPs. Die unabhängigen Luma-Bildfolgen und
+Chroma-Werte sind nach verlustfreier Kodierung vollständig pixelgleich.
+
+| Prüfung | Ergebnis |
+| --- | --- |
+| Ursprünglicher Stream mit wiederholten Headern | Fehler reproduziert; Negativkontrolle bleibt erhalten. |
+| Native Option `--no-repeat-headers` | Beide Views vollständig und pixelgleich, Decoderthreads automatisch und einzeln. |
+| Gepacktes Full-SBS über stdin | Ohne Bildzahlbegrenzung und ohne künstliche Encoder-Threadbegrenzung korrekt bis EOF. |
+| Getrennte `hvcC`/`lhvC` und Basisprofil Main | MP4 wird mit beiden Views und expliziten L/R-Positionen erkannt. |
+| L/R und absichtlich vertauschte R/L-Kennzeichnung | `vidx` und `vpos:left/right` liefern jeweils das erwartete Halbbild. |
+| Container, Ton und Zeit | Kodierte Mediendaten unverändert; dekodierter Ton vor/nach Anpassung identisch; 36 Pakete mit 1/25-s-Abständen. |
+| Kleine gezielte Regressionen | Neun Tests für Signalisierung, NAL-Payloads und Container-/Chunk-Adressen bestanden. |
+| Aktuelle Linux-Anwendungssuite | 157 Tests bestanden; Windows-/macOS-Paketlauf für diesen Probe-Commit läuft separat. |
+
+Ursache der ursprünglichen 11-statt-12-Abweichung: x265 fügt mit
+`--repeat-headers` einen identischen Basis-Layer-Präfix zwischen Basis- und
+Sekundärbild ein; der Parser erzeugt dadurch getrennte Access Units.
+Der native Schalter vermeidet diesen Fehler. Eine bytegenaue Konsolidierung der
+doppelten Präfixe bestätigt die Ursache und bleibt ausschließlich eine
+Entwicklungsdiagnose.
+
+Vollständiger Bericht: [1.1-mvhevc-probe.json](verification/1.1-mvhevc-probe.json).
+Lauf: https://github.com/muelli1975/TransCora/actions/runs/38336666171
+
+**Noch offen:** Einbindung als Anwendungsausgabe, gepackter Multiview-Encoder,
+speichersparende Containeranpassung für große Videos sowie Fortschritt/Abbruch,
+Tonoptionen, Journal und Paketprüfungen des neuen Ziels. Kein Test auf einem
+Apple-Gerät; keine bestätigte Vision-Pro-Wiedergabe. Die Probe führt keine
+zusätzliche Produkt-Sperrprüfung oder vollständige Mediennachkontrolle ein.
 
 AVIF bleibt optional und ist für diesen Stand nicht aktiviert: Der Pillow-Leser
 liefert hier keine NCLX-/HDR-Transferkennzeichnung an die vorhandene Bildpipeline.
@@ -93,14 +111,15 @@ wurde gebaut und bestand alle vier ursprünglichen Proben auch als EXE. Der Pake
 enthält die passenden nativen Quellarchive, Bauanleitungen und Lizenznachweise.
 Die erweiterten Pakettests starten zusätzlich die gepackte TransCora-Anwendung:
 Stereo-Gruppen/L/R-Tausch, normales gedrehtes Foto, Spatial Photo, ICC und Metadaten.
-Die Prüfung aller drei Systeme ist für diesen Stand noch ausstehend. Die öffentliche
+Die Prüfung aller drei Systeme bestand im wiederaufgenommenen Stand bei
+`7b82b3d`, einschließlich der tatsächlich gepackten Anwendung. Die öffentliche
 Upstream-Fixture wurde zur Prüfung heruntergeladen; Fotos werden nicht ins Repository
 kopiert. Der MV-HEVC-Prototyp baut x265 mit echtem ENABLE_MULTIVIEW und prüft beide
 expliziten Views, MP4-Container, Zeitstempel und Ton in einem getrennten CI-Lauf.
 Ein erfolgreich ausgeführter Probelauf bedeutet nicht automatisch einen brauchbaren
 Codec: dessen JSON-Ergebnis kann `blocked` oder `candidate` sein.
 
-## Bereits geprüft bei der Vorbereitung
+## Historischer Ausgangsstand der Vorbereitung
 
 - 1.0-Basis: veröffentlichter Build `c3f2315`, aktueller Dokumentationsstand `7ef801f`.
 - Derzeitiger Paketbau: Pillow **11.3.0**, kein `pillow-heif` in den festgelegten
@@ -164,9 +183,9 @@ private Fotos in das öffentliche Repository übernehmen. Wiederverteilbare Fixt
 mit Quelle, Lizenz und SHA-256 festlegen; private Vergleichsdateien bleiben lokal.
 
 Die bestehenden MVC-/MV-HEVC-/MPO-Fixtures und Integrationstests weiterverwenden.
-Neue Stereo-HEIC-Fixtures, ein MV-HEVC-Encoderbuild und dessen Container-Prototyp
-sind noch offen. Ohne tatsächlich ausgeführte Prüfung weder HEIC-Paketunterstützung
-noch MV-HEVC-Ausgabe oder Vision-Pro-Wiedergabe als bestanden kennzeichnen.
+Stereo-HEIC-Fixtures und der MV-HEVC-Encoder-/Container-Prototyp wurden inzwischen
+geprüft. Die Produktionsintegration des MV-HEVC-Ausgabeziels und eine
+Apple-Geräteprüfung sind weiterhin offen.
 
 Ausgabe-Roundtrips bleiben Entwicklungs-/CI-Tests. Keine neue vollständige
 Nachkontrolle, Hash-Prüfung oder selbst entwickelte Annahmesperre im Produkt.

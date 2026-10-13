@@ -1,13 +1,14 @@
 # TransCora 1.1: vereinbarter Umfang und Umsetzung
 
-Stand: 12. Oktober 2026. Entwicklungszweig: `prepare/v1.1`.
+Stand: 13. Oktober 2026. Entwicklungszweig: `prepare/v1.1`.
 
 Diese Datei beschreibt den vereinbarten Umfang. Journal, Bearbeitungszeit,
 Listenaktionen und die Bereinigung doppelter Hinweise sind als erster
 Entwicklungsstand implementiert. Pausensteuerung und Mono-Halbbildwahl sind
 ebenfalls umgesetzt. Zeilenverschachtelte und Frame-sequential-Eingaben sind
-integriert. HEIF-Bildimport nutzt den separaten Leser; die plattformübergreifende
-Paketabnahme läuft. MV-HEVC-Encoding wird separat erprobt.
+integriert. HEIF-Bildimport nutzt den separaten Leser und hat die Paketprüfung
+auf allen drei Systemen bestanden. Der MV-HEVC-Prototyp besteht die technische
+Machbarkeitsprüfung; die Einbindung als Ausgabeziel ist noch offen.
 Die Abnahme ist im Testplan dokumentiert. Grundlage ist `main` bei
 `7ef801f8aff9697ecd40882a763fdac0cdd2d3fe`; die veröffentlichte 1.0 wurde aus
 `c3f23155db3c56da8377bc7e4dd7bf9bc1eb35e8` gebaut. Die Vorbereitung ändert
@@ -190,14 +191,31 @@ angeben, keine bestätigte Vision-Pro-Wiedergabe behaupten. Fehlt ein funktionie
 Encoder-/Container-Weg, die Entscheidung offen dokumentieren, bevor ein sichtbares
 Ausgabeziel oder eine Versionsfreigabe erfolgt.
 
-Ergebnis der ersten vollständigen Probe vom 12. Oktober: Der festgelegte x265-
-Encoder baut und kodiert zwei Views. Die Dekodierungsprüfung meldet jedoch eine
-Abweichung des zweiten Halbbilds; außerdem fehlt die eindeutige L/R-Kennzeichnung.
-Die Wiederholung ohne automatische Bildergänzung liefert für View 1 nur 11 statt
-12 Bilder; der Encoder-/Decoderweg ist damit noch nicht brauchbar nachgewiesen.
-Der Bericht ist `verification/1.1-mvhevc-probe.json`. Dieser Weg ist noch nicht
-freigegeben und wird nicht als vorhandene MV-HEVC-Ausgabe angeboten. Die technische
-Ursache muss vor einer Integration geklärt werden.
+Ergebnis vom 13. Oktober: Der festgelegte x265-4.3-Build mit Multiview und
+FFmpeg 7.1.1 liefern einen technisch brauchbaren MP4-Prototyp (`candidate`).
+Die ursprüngliche Abweichung wurde eingegrenzt: `--repeat-headers` wiederholt
+den Basis-Layer-Präfix zwischen den beiden ersten Halbbildern; der HEVC-Parser
+trennt dadurch ein Stereopaar. Mit `--no-repeat-headers` bleiben beide Views
+vollständig und pixelgleich. Eine zusätzliche künstliche Threadbegrenzung ist
+nicht erforderlich.
+
+Der MP4-Prototyp ergänzt getrennte `hvcC`-/`lhvC`-Decoderkonfigurationen und
+explizite L/R-Informationen. 36 Bilder je View über drei GOPs bestehen die
+verlustfreie Dekodierung, beide Halbbildzuordnungen (L/R und R/L), Zeitstempel
+und Ton. Die Containeranpassung lässt kodierte Mediendaten und dekodierten Ton
+unverändert. Ein gepackter SBS-Strom über stdin funktioniert ebenfalls mit
+automatischer Encoder-/Decoder-Threadzahl, ohne unkomprimierte Zwischenvideos.
+Unveränderte fehlerhafte Varianten bleiben als Negativkontrollen im Bericht.
+
+Der Bericht steht in `verification/1.1-mvhevc-probe.json`, der reproduzierbare
+Lauf unter https://github.com/muelli1975/TransCora/actions/runs/38336666171.
+Dies ist noch kein Ausgabeziel in der Anwendung. Vor dessen Einbindung fehlen
+der gepackte Encoder mit Herkunfts-/Lizenznachweisen, eine speichersparende
+Containeranpassung für große Dateien und die Anbindung an Fortschritt, Abbruch,
+Ton, Einstellungen und Journal. Der kleine Prototyp liest den gesamten MP4-Inhalt
+in den Speicher und darf nicht unverändert für lange Videos verwendet werden.
+Apple-Gerätewiedergabe ist weiterhin ungeprüft; räumliche Kameradaten werden nicht
+erfunden.
 
 ## 7. Reihenfolge und Freigabe
 
