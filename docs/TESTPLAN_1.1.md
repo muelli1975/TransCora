@@ -15,17 +15,21 @@ erst nach den Anwendungstests und den Prüfungen der tatsächlich gepackten Prog
 | Mono/Zeilen | Asymmetrische Halbbilder, beide Zuordnungen, Tausch; Stereo-Zeilen vor Skalierung trennen, kein zeitlicher Deinterlacer. |
 | Frame sequential | 48/50/59,94/120 Einzelbilder/s, Paarbildrate, letzte Paare, ungepaartes Schlussbild, variable Zeitstempel und Ton. |
 | HEIF | Normales/gedrehtes Foto, gekennzeichnete Stereo-Gruppe, echte Spatial Photo, vertauschte Item-Reihenfolge, ICC/NCLX, Zusatzdaten und HDR-Erkennung. |
-| Native Medien | Tatsächliche BD-3D-ISO/M2TS, alle BD-Modi, Zeitstempeljitter, großes LPCM, MVC und MV-HEVC-Eingaben mit beiden Views, originales Fujifilm-MPO. |
+| Native Medien | Tatsächliche BD-3D-ISO/M2TS, alle BD-Modi, Zeitstempeljitter, großes LPCM, MVC und MV-HEVC-Eingaben mit beiden Halbbildern, originales Fujifilm-MPO. |
 | Pakete | Windows x64, Linux x64, macOS Apple Silicon: vollständige Suite, Start des gefrorenen Programms, HEIF und Dual durch das tatsächlich gepackte Programm; Quellen/Lizenzen vollständig. |
 
 ## Prüfstand
 
-Der Stand `fbdc3b5` bestand die vollständige CI und Paketprüfung auf Windows,
-Linux und macOS, einschließlich HEIF, Dual und der nativen Windows-BD-3D-/MVC-/MV-HEVC-Prüfungen:
-https://github.com/muelli1975/TransCora/actions/runs/38377284871
+Der Stand `fb64836` bestand alle 163 Tests und die vollständige Paketprüfung
+auf Windows, Linux und macOS. Die gefrorenen Programme wurden gestartet;
+HEIF und Dual wurden durch die Pakete verarbeitet. Windows bestand außerdem
+BD-3D-ISO/M2TS, Zeitstempeljitter, großes LPCM, MVC und MV-HEVC:
+https://github.com/muelli1975/TransCora/actions/runs/38398039792
 
-Die ergänzte Restzeitkorrektur wird durch Rechen- und GUI-Regressionstests geprüft.
-Der zugehörige neue CI-Lauf prüft anschließend die vollständige Suite und Pakete.
+Alle 59 lokalen Rechen- und GUI-Tests sind bestanden. Die Dokumentationen wurden
+anschließend mit der vereinfachten Restzeitrechnung abgeglichen. Die Paketdokumente
+werden vor Veröffentlichung synchronisiert; Programmdateien bleiben identisch
+mit den erfolgreich geprüften Paketen.
 
 Auf dem lokalen Windows-Testhost verhindern zwei ExifTool-Starts einen vollständigen
 Bildmetadatentest (WinError 623). Dafür sind die unabhängigen CI- und Paketläufe maßgeblich.

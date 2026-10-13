@@ -31,7 +31,7 @@ MV-HEVC bleibt eine Eingabe zum Dekodieren; Version 1.1 enthält keinen zusätzl
 
 Standardmäßig landen Ergebnisse im Ordner `output` neben dem Programm. Bei Ordnerstapeln bleiben relative Unterordner erhalten. Vorhandene Dateien erhalten einen nummerierten Alternativnamen. Ein fehlerhafter Eintrag hält die übrigen gültigen Dateien nicht auf. **Abbrechen** beendet die aktuelle Verarbeitung; bereits fertige Dateien bleiben erhalten.
 
-Bei Videos zeigt der Status die geschätzte Restzeit für **Datei** und **Stapel**. Die Schätzung nutzt den laufenden Fortschritt und die Laufzeiten vergleichbarer fertiger Dateien. Bei BD-3D fließen auch die gemessenen Abschlusszeiten für Ton und Multiplexing ein; beim ersten Titel ist die Schätzung gröber. Für noch nicht vergleichbare Formate oder fehlenden Fortschritt steht ein Strich.
+Bei Videos zeigt der Status die geschätzte Restzeit für **Datei** und **Stapel**. Grundlage sind die verbleibende Videodauer und der bisherige, nach Videodauer gewichtete Verarbeitungsdurchschnitt. Unterschiedliche Auflösungen, Bildraten oder Codecs verhindern die Stapelschätzung nicht. Sie bleibt bei Dateiwechseln und verspäteten Fortschrittsmeldungen erhalten. Bei BD-3D zählt die gesamte Bearbeitungszeit einschließlich Ton und Multiplexing. Vor der ersten Fortschrittsmessung steht ein Strich.
 
 Fotos und Videos verwenden dieselben Bereiche **Quelle**, **Ausgabe**, **Format** und **Speichern**. Unter **Ausgabegröße** stehen die Maße direkt beim Größenmenü. Videomaße beziehen sich auf das gesamte Ausgabebild; BD-3D und Dual zeigen die Maße je Halbbild. Bilder lassen sich proportional nach langer oder kurzer Seite skalieren.
 
@@ -136,3 +136,4 @@ Die Pakete enthalten den zugehörigen Programmquellcode. Bauanleitung: [BUILD.md
 ## Lizenz
 
 Copyright Christoph Müller. TransCora steht unter der MIT-Lizenz; mitgelieferte Fremdwerkzeuge behalten ihre eigenen Lizenzen. Siehe [LICENSE](LICENSE) und [THIRD_PARTY.md](THIRD_PARTY.md).
+

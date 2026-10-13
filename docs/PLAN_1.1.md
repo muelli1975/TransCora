@@ -44,10 +44,7 @@ Das vorhandene Release v1.0 bleibt erhalten.
 
 ## Bewusste Begrenzungen
 
-MV-HEVC bleibt ausschließlich Eingabe/Dekodierung beider gekennzeichneter Ansichten.
-Kein eigener MV-HEVC-Encoder, Ausgabeziel, Machbarkeits-Workflow oder entsprechender
-Container-Writer wird aufgenommen. Der verworfene Prototyp ist nur noch in der
-Git-Historie vorhanden.
+MV-HEVC wird als Eingabe mit beiden gekennzeichneten Halbbildern unterstützt.
 
 Die bestehende H.265-Ausgabe und die Bibliotheken des HEIF-Lesers behalten ihre
 benötigten Komponenten, Quellarchive und Lizenznachweise.
@@ -66,7 +63,9 @@ auf Windows x64, Linux x64 und macOS Apple Silicon.
 
 Version, Titel, Paket-Selbsttest, Dateinamen, Anleitungen und Release Notes verwenden
 die gemeinsame Versionsquelle. Testbuilds sind Artefakte. Stabile Veröffentlichung
-ist ein ausdrücklich ausgelöster Workflow auf main und darf v1.0 nicht überschreiben.
+verwendet die geprüften Plattformpakete. Die bestehende Version 1.0 erhält
+separat die Restzeitkorrektur bei unveränderter Versionsnummer.
 
 Details: [TESTPLAN_1.1.md](TESTPLAN_1.1.md), [CHANGES_1.1_DE.md](CHANGES_1.1_DE.md)
 und [TECHNICAL_REFERENCE.md](TECHNICAL_REFERENCE.md).
+

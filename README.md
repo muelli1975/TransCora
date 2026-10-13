@@ -30,7 +30,7 @@ MV-HEVC remains a decoding input; version 1.1 contains no additional MV-HEVC enc
 
 The default output folder is `output` beside the program. Folder batches preserve relative subfolders. Existing files receive a numbered alternative name. A failed entry does not stop the remaining valid entries. **Cancel** stops the current operation; completed files remain available.
 
-Video status shows estimated remaining time for the **file** and **batch**. Estimates use live progress and durations of comparable completed files. BD-3D also learns audio and mux finishing times; the first title has a coarser estimate. A dash indicates an unmeasured format or missing progress.
+Video status shows estimated remaining time for the **file** and **batch**, based on remaining video duration and the duration-weighted processing average measured during the run. Different resolutions, frame rates and codecs do not suppress the batch estimate. Estimates remain available across file transitions and delayed progress updates. BD-3D includes total processing time, including audio and muxing. A dash appears before the first progress measurement.
 
 Videos and images share **Source**, **Output**, **Format** and **Save** sections. **Output size** shows dimensions beside the size menu. Video dimensions describe the complete output picture; BD-3D and Dual show dimensions per half-image. Images can be scaled proportionally by their long or short edge.
 
@@ -59,7 +59,7 @@ Completed jobs show **Processing time**. **Remove completed** clears successful 
 **MP4 is the default; MKV is selectable**, including cross-view. MKV carries the appropriate stereo metadata. Cross-view MP4 keeps the R/L picture arrangement without a misleading L/R marker. Player support varies; check the first output on the intended device.
 
 
-Dual inputs contain two equally sized video tracks. `-dual` enables automatic detection; otherwise explicitly choose the **Dual** source layout. Unambiguous Left/Right track titles determine assignment; otherwise the first track is left and the second right. Unsynchronised views produce an error instead of an incomplete stereo output. MP4 is the default and MKV remains selectable.
+Dual inputs contain two equally sized video tracks. `-dual` enables automatic detection; otherwise explicitly choose the **Dual** source layout. Unambiguous Left/Right track titles determine assignment; otherwise the first track is left and the second right. Unsynchronised half-images produce an error instead of an incomplete stereo output. MP4 is the default and MKV remains selectable.
 
 BD-3D and Dual previews show both half-images using parallel view, cross-view or red/cyan anaglyph. Check spatial depth; if reversed, change **Swap L/R**. Preview views do not alter output options.
 
@@ -131,3 +131,4 @@ Release packages include the matching application source. Build instructions: [B
 ## License
 
 Copyright Christoph Müller. TransCora uses the MIT License; supplied third-party tools retain their own licences. See [LICENSE](LICENSE) and [THIRD_PARTY.md](THIRD_PARTY.md).
+
