@@ -32,8 +32,8 @@ def decoder_diagnostics(ffmpeg, source, folder, originals):
     return checks
 
 
-def run(args, log=None):
-    result = subprocess.run(list(map(str, args)), capture_output=True, timeout=120)
+def run(args, log=None, input_data=None):
+    result = subprocess.run(list(map(str, args)), input=input_data, capture_output=True, timeout=120)
     if log is not None:
         log.write_bytes(result.stderr)
     if result.returncode:
@@ -53,21 +53,22 @@ def main():
     report = {'development_probe': True, 'x265_source': 'e9b88125dc21393b3fd8d68e98083bdfb89778a8',
               'status': 'blocked', 'checks': [], 'not_checked': ['Apple device playback', 'production integration']}
     try:
+        frames = 36
         originals = []
         for index, colour in enumerate(((65, 95, 200), (130, 190, 80))):
             pixels = b''.join(bytes([colour[0]+n])*128*64 + bytes([colour[1]])*64*32
-                              + bytes([colour[2]])*64*32 for n in range(12))
+                              + bytes([colour[2]])*64*32 for n in range(frames))
             originals.append(pixels); (folder/f'{index}.yuv').write_bytes(pixels)
         config = folder/'multiview.cfg'
         config.write_text('--num-views 2\n--format 0\n'+''.join(
             f'--input "{(folder / f"{index}.yuv").as_posix()}"\n' for index in range(2)), 'utf-8')
         raw = folder/'stereo.hevc'
-        run([x265, '--multiview-config', config, '--input-res', '128x64', '--fps', '25', '--frames', '12',
+        run([x265, '--multiview-config', config, '--input-res', '128x64', '--fps', '25', '--frames', str(frames),
              '--input-csp', 'i420', '--input-depth', '8', '--preset', 'ultrafast', '--lossless',
              '--bframes', '0', '--keyint', '12', '--repeat-headers', '--pools', 'none',
              '--frame-threads', '1', '--output', raw], folder/'encoder.log')
         initial_headers = folder/'stereo-initial-headers.hevc'
-        run([x265, '--multiview-config', config, '--input-res', '128x64', '--fps', '25', '--frames', '12',
+        run([x265, '--multiview-config', config, '--input-res', '128x64', '--fps', '25', '--frames', str(frames),
              '--input-csp', 'i420', '--input-depth', '8', '--preset', 'ultrafast', '--lossless',
              '--bframes', '0', '--keyint', '12', '--no-repeat-headers', '--pools', 'none',
              '--frame-threads', '1', '--output', initial_headers], folder/'initial-headers-encoder.log')
@@ -79,6 +80,20 @@ def main():
         paired.write_bytes(consolidate_headers(raw.read_bytes()))
         report['decoder_diagnostics']['headers_consolidated'] = decoder_diagnostics(ffmpeg, paired, folder, originals)
         report['decoder_diagnostics']['initial_headers_only'] = decoder_diagnostics(ffmpeg, initial_headers, folder, originals)
+        # A single packed SBS input can be streamed directly from FFmpeg. This
+        # avoids two uncompressed full-length intermediate video files.
+        packed = bytearray()
+        for n in range(frames):
+            for left,right,w,h in [(65+n,130+n,128,64),(95,190,64,32),(200,80,64,32)]:
+                packed.extend((bytes([left])*w+bytes([right])*w)*h)
+        pipe_config = folder/'multiview-stdin.cfg'
+        pipe_config.write_text('--num-views 2\n--format 1\n--input -\n', 'utf-8')
+        streamed = folder/'stereo-streamed.hevc'
+        run([x265,'--multiview-config',pipe_config,'--input-res','128x64','--fps','25',
+             '--input-csp','i420','--input-depth','8','--preset','ultrafast','--lossless',
+             '--bframes','0','--keyint','12','--no-repeat-headers','--output',streamed],
+            folder/'streamed-encoder.log',bytes(packed))
+        report['decoder_diagnostics']['sbs_stdin_auto_threads'] = decoder_diagnostics(ffmpeg,streamed,folder,originals)
         tagged = folder/'stereo-lr.hevc'
         tagged.write_bytes(signal_stereo(initial_headers.read_bytes()))
         report['decoder_diagnostics']['stereo_signalled'] = decoder_diagnostics(ffmpeg, tagged, folder, originals)
@@ -87,8 +102,8 @@ def main():
         reversed_tag.write_bytes(signal_stereo(initial_headers.read_bytes(),1,0))
         audio = folder/'audio.wav'
         run([ffmpeg, '-v', 'error', '-f', 'lavfi', '-i', 'sine=frequency=700:sample_rate=48000',
-             '-t', '0.48', '-c:a', 'pcm_s16le', audio])
-        candidates = [raw, initial_headers, paired, tagged]
+             '-t', str(frames/25), '-c:a', 'pcm_s16le', audio])
+        candidates = [raw, initial_headers, streamed, paired, tagged]
         for name, source, tag in [('hev1', raw, 'hev1'), ('hvc1', raw, 'hvc1'), ('stereo-lr', tagged, 'hvc1'),
                                   ('stereo-rl', reversed_tag, 'hvc1')]:
             path = folder/f'{name}.mp4'
@@ -137,7 +152,7 @@ def main():
                 if path.suffix == '.mp4':
                     timestamps = json.loads(run([ffprobe, '-v', 'error', '-select_streams', 'v:0',
                                                  '-show_packets', '-of', 'json', path]))['packets']
-                    assert len(timestamps) == 12
+                    assert len(timestamps) == frames
                     assert all(abs(float(packet['pts_time'])-n/25) < .0001 for n, packet in enumerate(timestamps))
                     assert any(stream['codec_type'] == 'audio' for stream in streams)
                     check['apple_decoder_records'] = b'lhvC' in path.read_bytes()
