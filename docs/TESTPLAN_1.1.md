@@ -10,6 +10,7 @@ erst nach den Anwendungstests und den Prüfungen der tatsächlich gepackten Prog
 | Dateinamenszusätze | Klammerzuordnung in DE/EN, nur rohe Kennung im Dateinamen, eigene Zusätze bleiben unverändert; alte zusammengesetzte Namen weiter erkennen. |
 | Warnungen | Gewöhnliche Hinweise neutral; nur Klärung/Fehler gold/fett mit Dreieck; keine Duplikate. |
 | Zeit/Journal | Video und Bilder, numerische Sortierung, Wiederimport unveränderter Abschlüsse, mehrere Ausgaben, geänderte Quelle/Optionen/Ergebnisse, beschädigte und nicht schreibbare Journale, parallele Schreiber. |
+| Restzeit | Nach Dauer gewichteter Laufdurchschnitt, gemischte Auflösungen/Bildraten/Codecs, erste Meldung unter 1 %, Dateiwechsel und Pause, verspätete Fortschrittsmeldungen, Fehler ausschließen, BD-Abschlusszeit. |
 | Listen/Pause | Sichtbare Reihenfolge und Fokus nach Entfernen; Fertige entfernen; Pause nach Dateiabschluss/Journal, Fortsetzen, Wunsch zurücknehmen, Abbruch auch während Pause. |
 | Mono/Zeilen | Asymmetrische Halbbilder, beide Zuordnungen, Tausch; Stereo-Zeilen vor Skalierung trennen, kein zeitlicher Deinterlacer. |
 | Frame sequential | 48/50/59,94/120 Einzelbilder/s, Paarbildrate, letzte Paare, ungepaartes Schlussbild, variable Zeitstempel und Ton. |
@@ -19,12 +20,12 @@ erst nach den Anwendungstests und den Prüfungen der tatsächlich gepackten Prog
 
 ## Prüfstand
 
-Der vorherige Stand `6b8e071` bestand die vollständige CI und Paketprüfung:
-https://github.com/muelli1975/TransCora/actions/runs/38369823814
+Der Stand `fbdc3b5` bestand die vollständige CI und Paketprüfung auf Windows,
+Linux und macOS, einschließlich HEIF, Dual und der nativen Windows-BD-3D-/MVC-/MV-HEVC-Prüfungen:
+https://github.com/muelli1975/TransCora/actions/runs/38377284871
 
-Die ergänzten lokalen Dual- und Menütests sind bestanden. Die vollständige
-Abnahme des abschließenden Standes und die Paketprüfungen laufen nach dem Commit.
-Ergebnisse werden hier mit dem zugehörigen Lauf dokumentiert.
+Die ergänzte Restzeitkorrektur wird durch Rechen- und GUI-Regressionstests geprüft.
+Der zugehörige neue CI-Lauf prüft anschließend die vollständige Suite und Pakete.
 
 Auf dem lokalen Windows-Testhost verhindern zwei ExifTool-Starts einen vollständigen
 Bildmetadatentest (WinError 623). Dafür sind die unabhängigen CI- und Paketläufe maßgeblich.
@@ -42,3 +43,4 @@ unter Linux/macOS den ausführbaren Pfad ohne `.exe`. Kleine synthetische
 Testmedien werden erzeugt; echte Kamera-Fixtures haben dokumentierte Herkunft.
 
 MV-HEVC-Encoding und Geräte-Zertifizierung gehören nicht zu dieser Abnahme.
+

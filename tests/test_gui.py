@@ -347,19 +347,18 @@ class GuiTests(unittest.TestCase):
         job = window.jobs[0]
         job.options = replace(job.options, target='bd3d', container='iso')
         window.run_started = 10
-        window.events.put(('batch', [(100, 'bd', True), (200, 'bd', True)]))
+        window.events.put(('batch', [100, 200]))
         window.events.put(('current', (job.source.name, 1, 2)))
         with patch('transcora.gui.window.time.monotonic', return_value=100):
             window.poll()
         with patch('transcora.gui.window.time.monotonic', return_value=200):
-            window.events.put(('progress', (job.id, 1, 2, {'percent': 37.5, 'phase_percent': 50})))
+            window.events.put(('progress', (job.id, 1, 2, {'percent': 37.5})))
             window.poll()
         self.assertIn('Restzeit: Datei ca.', window.elapsed.get())
         self.assertIn(' · Stapel ca.', window.elapsed.get())
         file_left,batch_left = window.remaining_time.remaining(200)
         self.assertGreater(batch_left,file_left)
         with patch('transcora.gui.window.time.monotonic', return_value=300):
-            window.events.put(('estimate', (job.id, 1, 2, {'encoding_complete': True})))
             window.events.put(('phase', (job.id, 1, 2, 'BD-3D: Blu-ray-ISO erstellen')))
             window.poll()
         self.assertIn('Datei ca.',window.elapsed.get())
@@ -1246,6 +1245,27 @@ class GuiTests(unittest.TestCase):
         self.root.update()
         self.assertFalse(self.window.title_frame.winfo_ismapped())
 
+    def test_batch_remaining_survives_mixed_settings_and_next_file(self):
+        from transcora.gui.remaining import RemainingTime
+        window = self.window
+        window.run_started = 0
+        window.remaining_time = RemainingTime([100, 200])
+        with patch('transcora.gui.window.time.monotonic', return_value=0):
+            window.remaining_time.start(1, 0)
+        with patch('transcora.gui.window.time.monotonic', return_value=50):
+            window.estimate_remaining(1, 2, 50)
+        self.assertEqual(window.elapsed.get(), 'Restzeit: Datei ca. 00:50 · Stapel ca. 04:10')
+        window.remaining_time.complete(100)
+        window.events.put(('current', ('second.mp4', 2, 2)))
+        with patch('transcora.gui.window.time.monotonic', return_value=100):
+            window.poll()
+            window.update_elapsed()
+        self.assertEqual(window.elapsed.get(), 'Restzeit: Datei ca. 03:20 · Stapel ca. 03:20')
+        with patch('transcora.gui.window.time.monotonic', return_value=120):
+            window.update_elapsed()
+        self.assertIn('Stapel ca.', window.elapsed.get())
+        window.set_busy(False)
+
     def test_remaining_estimate_uses_progress_and_freezes_after_finish(self):
         with patch('transcora.gui.window.time.monotonic', return_value=100):
             self.window.run_started = 30
@@ -1287,7 +1307,6 @@ class GuiTests(unittest.TestCase):
         self.window.close_audio_options()
         self.assertFalse(self.window.audio_dialog.winfo_ismapped())
         self.window.run_started = time.monotonic()-30
-        self.window.remaining_time.finish = time.monotonic()+100
         self.window.speed.set('Alte Geschwindigkeit')
         text = 'BD-3D: Blu-ray-ISO erstellen'
         self.window.events.put(('phase', ('job', 1, 1, text)))
@@ -1427,3 +1446,4 @@ class GuiTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+

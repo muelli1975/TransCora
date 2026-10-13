@@ -1298,15 +1298,15 @@ class Window:
             return self.t('ca. ') + PreviewWindow.time_text(value) if value is not None else '—'
         self.elapsed.set(f'Restzeit: Datei {label(file_left)} · Stapel {label(batch_left)}')
 
-    def estimate_remaining(self, index, count, percent, phase_percent=None, remaining=None):
+    def estimate_remaining(self, index, count, percent, remaining=None):
         if self.run_started is None:
             return
         now = time.monotonic()
         if not self.remaining_time.items:
             weights = self.estimate_weights if len(self.estimate_weights) == count else [1]*count
-            self.remaining_time = RemainingTime([(w, 'video', False) for w in weights])
+            self.remaining_time = RemainingTime(weights)
         self.remaining_time.start(index, self.run_started if self.remaining_time.index is None else now)
-        self.remaining_time.progress(now, percent, phase_percent, remaining)
+        self.remaining_time.progress(now, percent, remaining)
         self.update_elapsed()
 
     def background(self, work, phase, track_time=False):
@@ -1396,10 +1396,7 @@ class Window:
             if not run:
                 self.events.put(("notice", f"Test abgeschlossen: {len(ready)} bereit · {blocked} blockiert."))
                 return
-            self.events.put(("batch", [(max(1, plan.duration),
-                (plan.options.target, plan.options.codec, plan.options.profile, plan.size,
-                 plan.options.bd_mode if plan.options.target == 'bd3d' else plan.options.target_fps if plan.options.fps_mode == 'custom' else plan.info['video'].get('avg_frame_rate')),
-                plan.options.target == 'bd3d') for _, plan in ready]))
+            self.events.put(("batch", [max(1, plan.duration) for _, plan in ready]))
             if ready:
                 log_path = new_run_log(app_root())
             counts = {"completed": 0, "failed": 0, "cancelled": 0}
@@ -1623,19 +1620,15 @@ class Window:
                     self.add_paths(*payload)
                 elif kind == "batch":
                     self.remaining_time = RemainingTime(payload)
-                    self.estimate_weights = [item[0] for item in payload]
+                    self.estimate_weights = list(payload)
                 elif kind == "progress":
                     _, index, count, value = payload
                     if value["percent"] is not None:
                         self.estimate_remaining(index, count, value['percent'],
-                            value.get('phase_percent'), value.get('remaining_seconds'))
+                            value.get('remaining_seconds'))
                         self.progress.stop()
                         self.progress.configure(mode="determinate")
                         self.progress["value"] = ((index - 1) + value["percent"] / 100) / count * 100
-                elif kind == 'estimate':
-                    if payload[3].get('encoding_complete'):
-                        self.remaining_time.end_encoding(time.monotonic())
-                        self.update_elapsed()
                 elif kind == "speed":
                     value = payload[3]
                     parts = []
@@ -1652,7 +1645,6 @@ class Window:
                     self.progress.stop()
                     self.progress.configure(mode='indeterminate')
                     self.progress.start(15)
-                    self.remaining_time.phase(time.monotonic())
                     self.update_elapsed()
                 elif kind == "preview":
                     viewer, png, plan = payload
@@ -1702,3 +1694,4 @@ class Window:
             # Read-only application folders must not prevent exit or conversion to a writable destination.
             messagebox.showwarning(self.t("Einstellungen"), self.t("Der Programmordner ist schreibgeschützt; Einstellungen konnten nicht gespeichert werden."), parent=self.root)
         self.root.destroy()
+

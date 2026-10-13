@@ -7,6 +7,7 @@ Stand: 13. Oktober 2026. Testfassung im Zweig `prepare/v1.1`; noch keine öffent
 | Dual | Ein- und Ausgabe mit zwei getrennten L/R-Videospuren. MP4 voreingestellt, MKV wählbar; Größe je Halbbild, L/R-Tausch, Tonoptionen, Fortschritt und Abbruch. `-dual` ermöglicht automatische Erkennung; sonst Quelllayout ausdrücklich wählen. Zeitlich abweichende Spuren werden gemeldet. |
 | Kontrollbild | BD-3D und Dual zeigen beide Halbbilder als Parallelblick, Kreuzblick oder Rot/Cyan-Anaglyph. Die Ansicht verändert keine Ausgabeoptionen. |
 | Dateinamenszusätze | Playernamen in Klammern im Auswahlmenü: Kodi, Bino bzw. Bino/Stereoscopic Player. Dateinamen enthalten nur die Kennung. Zusammengesetzte Vorschläge wie `.3D.HTAB-tbh` entfallen; bestehende Namen bleiben lesbar. |
+| Restzeit | Gemeinsamer, nach Videodauer gewichteter Verarbeitungsdurchschnitt für den Stapel. Die Schätzung bleibt bei Dateiwechseln und verspäteten Meldungen erhalten; unterschiedliche Auflösungen und Bildraten sperren sie nicht. |
 | Bearbeitungszeit | Feste Spalte hinter Status, numerisch sortierbar. Warteschlange und Pausen zählen nicht mit. |
 | Abschlussjournal | `TransCora-Journal.json` je Ausgabeordner erkennt unveränderte erfolgreiche Aufträge wieder und stellt Zeit und Ergebnisse wieder her. Parallele Abschlüsse werden zusammengeführt. |
 | Journalfehler | Beschädigte oder fehlende Nachweise verhindern keinen Import. Schreibfehler werden gemeldet; fertige Medien bleiben erhalten. |
@@ -40,3 +41,4 @@ HEIC/AVIF-Ausgabe, Spatial-Photo-Erstellung und AVIF-Import gehören nicht zu 1.
 Die bestehende Veröffentlichung 1.0 wird nicht überschrieben.
 
 Prüfungen und Paketstatus: [TESTPLAN_1.1.md](TESTPLAN_1.1.md).
+
