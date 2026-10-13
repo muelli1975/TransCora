@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 import subprocess
 from mvhevc_probe_tools import picture_counts, signal_stereo, stereo_sei, consolidate_headers, annexb_nals
-from mvhevc_mp4_probe import configure_stereo_mp4, boxes
+from mvhevc_mp4_probe import configure_stereo_mp4_file
 
 
 def decoder_diagnostics(ffmpeg, source, folder, originals):
@@ -113,12 +113,9 @@ def main():
                 candidates.append(path)
                 if name in ('stereo-lr','stereo-rl'):
                     configured = folder/(name+'-apple-config.mp4')
-                    before = path.read_bytes()
                     sei = stereo_sei(1,0) if name=='stereo-rl' else stereo_sei()
-                    after = configure_stereo_mp4(before, sei, annexb_nals(source.read_bytes()))
-                    media = lambda data: next(payload for _,kind,payload in boxes(data) if kind == b'mdat')
-                    assert media(before) == media(after), 'Media data changed during configuration'
-                    configured.write_bytes(after); candidates.append(configured)
+                    configure_stereo_mp4_file(path, configured, sei, annexb_nals(source.read_bytes()))
+                    candidates.append(configured)
                     before_audio = run([ffmpeg,'-v','error','-i',path,'-map','0:a:0','-f','s16le','-'])
                     after_audio = run([ffmpeg,'-v','error','-i',configured,'-map','0:a:0','-f','s16le','-'])
                     assert before_audio == after_audio, 'Decoded audio changed during configuration'
@@ -173,3 +170,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+

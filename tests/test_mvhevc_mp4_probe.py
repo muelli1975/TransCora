@@ -1,10 +1,11 @@
 """Separate layer configs preserve media and adjust fast-start chunk addresses."""
-import sys,struct
+import sys,struct,tempfile
 from pathlib import Path
 import unittest
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'scripts'))
 from mvhevc_probe_tools import stereo_sei,layer
-from mvhevc_mp4_probe import box,boxes,pack_arrays,arrays,split_configuration,configure_stereo_mp4
+from mvhevc_mp4_probe import (box,boxes,pack_arrays,arrays,split_configuration,
+    configure_stereo_mp4,configure_stereo_mp4_file)
 
 
 def configuration():
@@ -37,12 +38,12 @@ class MP4ProbeTests(unittest.TestCase):
         self.assertEqual({flag&63 for flag,_ in parts},{33,34})
         self.assertTrue(all(layer(n)==1 for _,n in parts))
 
-    def movie(self,fast_start=True,wide=False):
+    def movie(self,fast_start=True,wide=False,payload=b'VIDEO-AUDIO-PAYLOAD'):
         cfg,secondary,_=configuration()
         entry=box(b'hvc1',b'\0'*78+box(b'hvcC',cfg))
         stsd=box(b'stsd',b'\0'*4+struct.pack('>I',1)+entry)
         ftyp=box(b'ftyp',b'isom'+b'\0'*4)
-        media=box(b'mdat',b'VIDEO-AUDIO-PAYLOAD')
+        media=box(b'mdat',payload)
         def moov(address):
             table=box(b'co64' if wide else b'stco',b'\0'*4+struct.pack('>I',1)+address.to_bytes(8 if wide else 4,'big'))
             inner=box(b'stbl',stsd+table)
@@ -67,6 +68,28 @@ class MP4ProbeTests(unittest.TestCase):
                 self.assertEqual(after[actual:actual+len(media_before)],media_before)
                 self.assertIn(b'lhvC',after)
 
+    def test_file_writer_matches_memory_writer_and_supports_in_place_update(self):
+        before,secondary,_=self.movie(payload=b'large-media-block-'*200000)
+        expected=configure_stereo_mp4(before,stereo_sei(),secondary)
+        with tempfile.TemporaryDirectory(dir=Path(__file__).resolve().parents[1]) as folder:
+            source=Path(folder)/'source.mp4'; target=Path(folder)/'target.mp4'
+            source.write_bytes(before)
+            configure_stereo_mp4_file(source,target,stereo_sei(),secondary,chunk_size=97)
+            self.assertEqual(target.read_bytes(),expected)
+            self.assertEqual(source.read_bytes(),before)
+            configure_stereo_mp4_file(source,source,stereo_sei(),secondary,chunk_size=101)
+            self.assertEqual(source.read_bytes(),expected)
+
+    def test_stco_is_promoted_when_adjusted_offset_exceeds_32_bits(self):
+        before,secondary,address=self.movie()
+        near_limit=0xfffffff0
+        before=before.replace(address.to_bytes(4,'big'),near_limit.to_bytes(4,'big'),1)
+        after=configure_stereo_mp4(before,stereo_sei(),secondary)
+        table=find(after,b'co64')
+        self.assertIsNotNone(table)
+        self.assertGreater(int.from_bytes(table[8:],'big'),0xffffffff)
+
     def test_missing_layer_configuration_is_reported(self):
         data,_,_=configuration()
         with self.assertRaises(ValueError):split_configuration(data,stereo_sei())
+
