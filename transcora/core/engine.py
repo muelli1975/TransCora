@@ -43,7 +43,7 @@ def capture(args: list[str], cancel: threading.Event | None = None, timeout: flo
             if cancel and cancel.is_set():
                 raise Cancelled()
             if timeout is not None and time.monotonic() - start > timeout:
-                raise ValueError("Die technische Pr�fung hat zu lange gedauert.")
+                raise ValueError("Die technische Prüfung hat zu lange gedauert.")
             try:
                 out, err = process.communicate(timeout=.15)
                 break
@@ -137,7 +137,7 @@ def color_spec(video: dict, layout=None) -> tuple[dict, list[str]]:
     if fields["transfer"] in {"smpte2084", "arib-std-b67"} or any(
             any(hint in str(side.get("side_data_type", "")).lower() for hint in hdr_side_data)
             for side in video.get("side_data_list", [])):
-        raise ValueError("HDR-Quelle: Diese Version verarbeitet gepr�ftes SDR, ohne automatische HDR-/SDR-Wandlung.")
+        raise ValueError("HDR-Quelle: Diese Version verarbeitet geprüftes SDR, ohne automatische HDR-/SDR-Wandlung.")
     warnings = []
     supported = {"matrix": {"bt709", "bt470bg", "smpte170m", "gbr"},
                  "primaries": {"bt709", "bt470bg", "smpte170m"},
@@ -169,12 +169,12 @@ def color_spec(video: dict, layout=None) -> tuple[dict, list[str]]:
     if fields["range"] in missing_values:
         if rgb or pixel_format.startswith("yuvj"):
             fields["range"] = "pc"
-            explanation = "Vollbereich f�r RGB/JPEG-YUV"
+            explanation = "Vollbereich für RGB/JPEG-YUV"
         elif pixel_format.startswith(("yuv", "nv12", "nv21", "p010", "p012", "p016")):
             fields["range"] = "tv"
-            explanation = "�blicher begrenzter YUV-Videobereich; Quelle bei abweichendem Kontrast pr�fen"
+            explanation = "üblicher begrenzter YUV-Videobereich; Quelle bei abweichendem Kontrast prüfen"
         else:
-            raise ValueError("Helligkeitswertebereich fehlt und ist f�r dieses Pixelformat nicht bestimmbar.")
+            raise ValueError("Helligkeitswertebereich fehlt und ist für dieses Pixelformat nicht bestimmbar.")
         warnings.append(f"Farbannahme range={fields['range']} ({explanation})")
     return fields, warnings
 
@@ -214,20 +214,20 @@ class Plan:
     def stereo_summary(self) -> str:
         if self.options.target == 'row_interleaved':
             return ('Zeilenverschachtelt: ' + ('R/L' if self.options.row_first == 'right' else 'L/R') +
-                    (' � MKV-StereoMode' if self.options.container == 'mkv' else ' � MP4 ohne Stereo-Kennzeichnung'))
+                    (' · MKV-StereoMode' if self.options.container == 'mkv' else ' · MP4 ohne Stereo-Kennzeichnung'))
         if self.options.target == 'cross_sbs' and self.options.container == 'mp4':
             return 'Kreuzblick: R/L-Anordnung; MP4 ohne Stereo-Kennzeichnung.'
         if self.options.target == 'framerate' and self.swap and self.options.container == 'mp4':
             return 'Umgekehrte Augenreihenfolge bleibt erhalten; MP4 ohne Stereo-Kennzeichnung.'
         if self.options.target == "bd3d":
-            return "3D-Kennzeichnung: AVC-Basis + zweites MVC-Halbbild � Linkes Halbbild zuerst"
+            return "3D-Kennzeichnung: AVC-Basis + zweites MVC-Halbbild · Linkes Halbbild zuerst"
         if not self.stereo:
             return "3D-Kennzeichnung: Keine SBS/OU-Kennzeichnung"
         axis, inverted = self.stereo
         flags = "MKV-StereoMode" if self.options.container == "mkv" else "MP4-st3d"
         if self.options.codec == "h264" and not inverted:
-            flags += f" � H.264 Frame-Packing {dict(sbs='3', ou='4', rows='2')[axis]}"
-        return f"3D-Kennzeichnung: {flags} � {dict(sbs='SBS', ou='OU', rows='Zeilenverschachtelt')[axis]} � " + ("R/L" if inverted else "L/R")
+            flags += f" · H.264 Frame-Packing {dict(sbs='3', ou='4', rows='2')[axis]}"
+        return f"3D-Kennzeichnung: {flags} · {dict(sbs='SBS', ou='OU', rows='Zeilenverschachtelt')[axis]} · " + ("R/L" if inverted else "L/R")
 
     @property
     def summary(self) -> str:
@@ -245,16 +245,16 @@ class Plan:
         timing = ""
         if requested_rate(self.options):
             target = requested_rate(self.options)
-            timing = f"  {float(target):.3f} fps ({target}) � Laufzeit unver�ndert"
+            timing = f" → {float(target):.3f} fps ({target}) · Laufzeit unverändert"
         if self.options.target == "bd3d":
             from .bd3d import prepare, BD_RATE
             config = prepare(video, self.layout, self.swap, self.options.bd_mode)
-            timing = f"  {float(config.rate):.3f} fps ({config.rate}) � " + (
+            timing = f" → {float(config.rate):.3f} fps ({config.rate}) · " + (
                 t("Video und Ton um 0,1 % verlangsamen") if config.speed != 1
-                else t("Bildzeiten bei Bedarf anpassen") + " � " + t("Laufzeit erhalten"))
+                else t("Bildzeiten bei Bedarf anpassen") + " · " + t("Laufzeit erhalten"))
         codec = "AVC/MVC" if self.options.target == "bd3d" else self.options.codec.upper()
-        return (f"{video['width']} � {video['height']} � {video.get('codec_name', '?')} � "
-                f"{fps} fps ({rate}){timing}  {self.size[0]} � {self.size[1]} � "
+        return (f"{video['width']} × {video['height']} · {video.get('codec_name', '?')} · "
+                f"{fps} fps ({rate}){timing} → {self.size[0]} × {self.size[1]} · "
                 f"{codec} / {self.pixel_format}\n{self.layout_reason}\n"
                 f"{self.stereo_summary}\n{audio_summary(self.info, self.options, translate)}\n{self.output}")
 
@@ -390,7 +390,7 @@ def build_graph(video: dict, options: Options, layout: str, swap: bool, colors: 
     if options.target == 'row_interleaved' or options.target == "anaglyph" and options.profile != "compatible":
         pixel_format = "yuv444p10le" if options.profile == "quality10" else "yuv444p"
     if pixel_format == "yuv420p" and (size[0] % 2 or size[1] % 2):
-        raise ValueError("4:2:0 ben�tigt gerade Ausgabema�e; diese Quelle muss zuerst passend vorbereitet werden.")
+        raise ValueError("4:2:0 benötigt gerade Ausgabemaße; diese Quelle muss zuerst passend vorbereitet werden.")
     # Matroska DisplayWidth/Height describe one reconstructed half-image.
     # FFmpeg divides the display axis by two when StereoMode is present.
     output_sar = ('2' if options.target == 'half_sbs' else '1/2') if (
@@ -410,7 +410,7 @@ def plan_job(tools: Toolchain, job: Job, output_root: Path, reserved: set[str],
     options = Options.from_dict(vars(job.options))  # Freeze decisions for execution.
     catalog = methods()
     if options.method not in catalog:
-        raise ValueError("Anaglyphenverfahren nicht im gepr�ften Batch-Katalog.")
+        raise ValueError("Anaglyphenverfahren nicht im geprüften Batch-Katalog.")
     before = job.source.stat() if job.source.is_file() else None
     from .multiview import inspect_source, graph_prefix
     def stage(text):
@@ -419,7 +419,7 @@ def plan_job(tools: Toolchain, job: Job, output_root: Path, reserved: set[str],
     info = inspect_source(tools, job.source, cancel, options.layout, phase=stage)
     after = job.source.stat()
     if not before or (before.st_mtime_ns, before.st_size) != (after.st_mtime_ns, after.st_size):
-        raise ValueError("Die Quelldatei wurde w�hrend der Pr�fung ge�ndert.")
+        raise ValueError("Die Quelldatei wurde während der Prüfung geändert.")
     info["source_mtime_ns"] = after.st_mtime_ns
     info["source_size"] = after.st_size
     video = info["video"]
@@ -428,7 +428,7 @@ def plan_job(tools: Toolchain, job: Job, output_root: Path, reserved: set[str],
     video["_start_offset"] = max(0, float(video.get("start_time") or 0) - float(info.get("format", {}).get("start_time") or 0))
     width, height = video.get("width", 0), video.get("height", 0)
     if not width or not height:
-        raise ValueError("Keine g�ltige Videoaufl�sung.")
+        raise ValueError("Keine gültige Videoauflösung.")
     sar = video.get("sample_aspect_ratio", "1:1")
     for side in video.get("side_data_list", []):
         if side.get("side_data_type") in {"Spherical Mapping", "Display Matrix"}:
@@ -458,78 +458,78 @@ def plan_job(tools: Toolchain, job: Job, output_root: Path, reserved: set[str],
         review('Manuelle Quellinterpretation ersetzt abweichende Stereo-Metadaten.')
     if multiview:
         if options.layout not in {'auto', 'mvc', 'mvhevc'}:
-            raise ValueError('Diese Quelle enth�lt echte Multiview-Halbbilder. Automatisch oder das passende Multiview-Format w�hlen.')
+            raise ValueError('Diese Quelle enthält echte Multiview-Halbbilder. Automatisch oder das passende Multiview-Format wählen.')
         if options.target == 'framerate':
-            raise ValueError('Layout beibehalten erh�lt gepackte SBS/OU-Quellen. F�r MVC/MV-HEVC zuerst das gew�nschte Ausgabe-Layout w�hlen.')
+            raise ValueError('Layout beibehalten erhält gepackte SBS/OU-Quellen. Für MVC/MV-HEVC zuerst das gewünschte Ausgabe-Layout wählen.')
         layout, swap = 'full_sbs', options.swap ^ bool(multiview.get('base_view_right', False))
-        warnings.append('Zwei vollst�ndige Multiview-Halbbilder werden dekodiert.')
+        warnings.append('Zwei vollständige Multiview-Halbbilder werden dekodiert.')
         if multiview['kind'] == 'mvc':
             warnings.append('MVC: Basis-Halbbild laut Blu-ray-Playlist '+('rechts' if multiview['base_view_right'] else 'links')+'.'
                 if 'base_view_right' in multiview else
-                'MVC: Basis-Halbbild als links angenommen. Reihenfolge im Kontrollbild pr�fen; L/R tauschen ist verf�gbar.')
+                'MVC: Links/rechts nicht gekennzeichnet; Basis-Halbbild wird als links verwendet. Bei umgekehrter Tiefenwirkung L/R tauschen.')
             if 'base_view_right' not in multiview:
                 review_warnings.append(warnings[-1])
         if multiview.get('playlist'):
-            warnings.append('Blu-ray-ISO: L�ngste Film-Playlist '+multiview['playlist']+' ausgew�hlt.')
+            warnings.append('Blu-ray-ISO: Längste Film-Playlist '+multiview['playlist']+' ausgewählt.')
     elif options.layout == "auto":
         if not hint:
             hint = geometry_hint
         if not hint:
-            raise ValueError("Full/Half-Layout nicht eindeutig erkennbar. Quelllayout f�r diese Datei ausw�hlen.")
+            raise ValueError("Full/Half-Layout nicht eindeutig erkennbar. Quelllayout für diese Datei auswählen.")
         layout, swapped = hint
         if metadata and metadata != (layout_axis(layout), swapped):
-            raise ValueError("Dateiname und Stereo-Metadaten widersprechen sich. Quelllayout bewusst ausw�hlen.")
+            raise ValueError("Dateiname und Stereo-Metadaten widersprechen sich. Quelllayout bewusst auswählen.")
         swap = swapped ^ options.swap
     else:
         if options.layout in {'mvc', 'mvhevc'}:
-            raise ValueError('Die Quelle enth�lt nicht das gew�hlte Multiview-Format.')
+            raise ValueError('Die Quelle enthält nicht das gewählte Multiview-Format.')
         layout, swap = options.layout, options.swap
         if hint and hint != (layout, swap):
-            review("Manuell gew�hltes Layout/L/R weicht vom Dateinamen ab.")
+            review("Manuell gewähltes Layout/L/R weicht vom Dateinamen ab.")
         if metadata and metadata != (layout_axis(layout), swap):
             review("Manuelle Quellinterpretation ersetzt abweichende Stereo-Metadaten.")
     if interlaced(video) and layout != 'row_interleaved':
-        warnings.append("Interlaced: Ein progressives Bild je Halbbildzeit; die zeitliche Aufl�sung bleibt erhalten. BD-3D und die Zielbildrate passen die Bildfolge anschlie�end an.")
+        warnings.append("Interlaced: Ein progressives Bild je Halbbildzeit; die zeitliche Auflösung bleibt erhalten. BD-3D und die Zielbildrate passen die Bildfolge anschließend an.")
     if layout == 'frame_sequential':
         if options.target == 'framerate':
-            raise ValueError('Frame sequential: Ausgabe-Layout w�hlen; die Zielbildrate gilt f�r vollst�ndige Stereobildpaare.')
+            raise ValueError('Frame sequential: Ausgabe-Layout wählen; die Zielbildrate gilt für vollständige Stereobildpaare.')
         warnings.append('Frame sequential: Je zwei aufeinanderfolgende Halbbilder bilden ein Stereobildpaar. Die Paarbildrate ist die halbe Quellbildrate; ein ungepaartes Schlussbild wird ausgelassen.')
     elif layout == 'row_interleaved':
-        warnings.append('Zeilenquelle: Stereo-Zeilen werden vor Skalierung getrennt. Die halbe vertikale Detailaufl�sung je Halbbild bleibt erhalten.')
+        warnings.append('Zeilenquelle: Stereo-Zeilen werden vor Skalierung getrennt. Die halbe vertikale Detailauflösung je Halbbild bleibt erhalten.')
     if options.target != 'framerate' and sar not in {'1:1', '0:1', 'N/A', None}:
         if (layout, sar) in {('half_sbs', '2:1'), ('half_ou', '1:2')}:
             video['sample_aspect_ratio'] = '1:1'
             warnings.append('Half-Layout: Gestauchte Achse wird je Halbbild rekonstruiert.')
         else:
-            raise ValueError(f'Nichtquadratische Pixel (SAR {sar}): Quelllayout und Stereo-Metadaten pr�fen.')
+            raise ValueError(f'Nichtquadratische Pixel (SAR {sar}): Quelllayout und Stereo-Metadaten prüfen.')
     if layout == "mono" and options.target != "framerate":
-        raise ValueError("Mono/2D ist als Quelle f�r 'Layout beibehalten' verf�gbar; andere Ziele ben�tigen SBS/OU.")
+        raise ValueError("Mono/2D ist als Quelle für ‚Layout beibehalten‘ verfügbar; andere Ziele benötigen SBS/OU.")
     if options.target == "framerate":
         if options.swap:
-            raise ValueError("Layout beibehalten erh�lt die Halbbildreihenfolge. L/R tauschen ausschalten.")
+            raise ValueError("Layout beibehalten erhält die Halbbildreihenfolge. L/R tauschen ausschalten.")
         orientation = layout_axis(layout)
         swap = metadata[1] if metadata and metadata[0] == orientation else hint[1] if hint and hint[0] == layout else False
         if layout == "mono":
             if metadata or hint:
-                raise ValueError("Stereo-Kennzeichnung an einer als Mono/2D gew�hlten Quelle; Quelllayout pr�fen.")
+                raise ValueError("Stereo-Kennzeichnung an einer als Mono/2D gewählten Quelle; Quelllayout prüfen.")
             swap = False
         if swap and options.container == "mp4":
             warnings.append('Umgekehrte Augenreihenfolge bleibt erhalten; MP4 ohne Stereo-Kennzeichnung.')
     if requested_rate(options):
-        warnings.append("Ganze Bilder werden ausgelassen/wiederholt; keine �berblendung oder Bewegungsinterpolation. "
+        warnings.append("Ganze Bilder werden ausgelassen/wiederholt; keine Überblendung oder Bewegungsinterpolation. "
                         "Video wird neu kodiert; Ton und Wiedergabegeschwindigkeit bleiben erhalten.")
     if layout not in {"mono", "frame_sequential"} and (width if layout.endswith("sbs") else height) % 2:
-        raise ValueError("Das gepackte Raster l�sst sich nicht in zwei gleich gro�e Halbbilder teilen.")
+        raise ValueError("Das gepackte Raster lässt sich nicht in zwei gleich große Halbbilder teilen.")
     colors, color_warnings = color_spec(video, layout)
     warnings.extend(color_warnings)
     # Established SDR defaults are explanations, not requests for user action.
     # Unsupported/ambiguous input still reports its existing actionable error.
     if layout.startswith('half_') and options.target in {'full_sbs', 'full_ou', 'cross_sbs'}:
-        warnings.append('Half  Full: Die gestauchte Achse wird hochskaliert. Verlorene Bilddetails werden nicht wiederhergestellt.')
+        warnings.append('Half → Full: Die gestauchte Achse wird hochskaliert. Verlorene Bilddetails werden nicht wiederhergestellt.')
     if any(s.get("codec_type") == "subtitle" for s in info["streams"]):
-        warnings.append("Untertitel werden nicht �bernommen.")
+        warnings.append("Untertitel werden nicht übernommen.")
     from .audio import validate
-    stage('Aufl�sung, Bildrate und Tonoptionen pr�fen')
+    stage('Auflösung, Bildrate und Tonoptionen prüfen')
     audios = validate(info, options)
     if options.target == "anaglyph":
         warnings.append(COMPATIBILITY_NOTE
@@ -543,7 +543,7 @@ def plan_job(tools: Toolchain, job: Job, output_root: Path, reserved: set[str],
         preparation = prepare(video, layout, swap, options.bd_mode)
         validate_audio(audios)
         warnings.extend(preparation.warnings)
-        warnings.append('BD-3D: FFmpeg bereitet die Quelle vor, FRIM kodiert AVC/MVC und tsMuxeR erstellt die Ausgabe. Gew�hlter Ton wird als LPCM gespeichert.')
+        warnings.append('BD-3D: FFmpeg bereitet die Quelle vor, FRIM kodiert AVC/MVC und tsMuxeR erstellt die Ausgabe. Gewählter Ton wird als LPCM gespeichert.')
         graph, size, pixel_format = preparation.graph, preparation.size, 'yuv420p'
     else:
         graph, size, pixel_format = build_graph(video, options, layout, swap, colors, catalog[options.method])
@@ -554,9 +554,9 @@ def plan_job(tools: Toolchain, job: Job, output_root: Path, reserved: set[str],
         output_colors["matrix"] = "bt709"
     if capabilities and options.target != "bd3d":
         if options.codec == "h265" and not capabilities.get("h265"):
-            raise ValueError("Dieser FFmpeg-Build enth�lt keinen H.265-Encoder.")
+            raise ValueError("Dieser FFmpeg-Build enthält keinen H.265-Encoder.")
         if pixel_format not in capabilities.get(options.codec + "_formats", ""):
-            raise ValueError("Der Encoder unterst�tzt das gew�hlte Pixelformat nicht.")
+            raise ValueError("Der Encoder unterstützt das gewählte Pixelformat nicht.")
     folder = output_root.resolve()
     if job.source_root:
         try:
@@ -572,9 +572,9 @@ def plan_job(tools: Toolchain, job: Job, output_root: Path, reserved: set[str],
             duration = 0.0
     except (ValueError, TypeError):
         pass
-    reason = (f"{multiview['kind'].upper()} � Zwei vollst�ndige Halbbilder aus dem Bitstream" if multiview else
-              f"{LAYOUTS[layout]} � " + ((f"erkannt am Dateizusatz in {job.source.name}" if filename_layout(job.source.stem)
-                  else 'erkannt an Stereo-Metadaten und Halbbildgeometrie') if options.layout == "auto" else "manuell gew�hlt"))
+    reason = (f"{multiview['kind'].upper()} · Zwei vollständige Halbbilder aus dem Bitstream" if multiview else
+              f"{LAYOUTS[layout]} · " + ((f"erkannt am Dateizusatz in {job.source.name}" if filename_layout(job.source.stem)
+                  else 'erkannt an Stereo-Metadaten und Halbbildgeometrie') if options.layout == "auto" else "manuell gewählt"))
     warnings = list(dict.fromkeys(warnings))
     review_warnings = list(dict.fromkeys(review_warnings))
     return Plan(job.source.resolve(), output, options, info, layout, swap, size, pixel_format, graph, duration, warnings, output_colors, reason, review_warnings)
@@ -622,12 +622,12 @@ def verify(tools: Toolchain, plan: Plan, path: Path, cancel: threading.Event) ->
     info = probe(tools, path, cancel)
     video = info["video"]
     if (video.get("width"), video.get("height")) != plan.size or str(video.get("pix_fmt", "")).replace("yuvj", "yuv") != plan.pixel_format:
-        raise ValueError("Ausgabema�e oder Pixelformat entsprechen nicht dem gepr�ften Plan.")
+        raise ValueError("Ausgabemaße oder Pixelformat entsprechen nicht dem geprüften Plan.")
     if video.get("codec_name") != ("h264" if plan.options.codec == "h264" else "hevc"):
         raise ValueError("Unerwarteter Ausgabecodec.")
     if any(video.get(k) != plan.colors[v] for k, v in (
             ("color_space", "matrix"), ("color_transfer", "transfer"), ("color_primaries", "primaries"), ("color_range", "range"))):
-        raise ValueError("Die Farbkennzeichnung der Ausgabe stimmt nicht mit dem Plan �berein.")
+        raise ValueError("Die Farbkennzeichnung der Ausgabe stimmt nicht mit dem Plan überein.")
     from .video import interlaced
     if interlaced(plan.info['video']) and video.get('field_order') not in (None, 'unknown', 'progressive'):
         raise ValueError('Die deinterlacte Ausgabe ist nicht progressiv gekennzeichnet.')
@@ -636,12 +636,12 @@ def verify(tools: Toolchain, plan: Plan, path: Path, cancel: threading.Event) ->
     expected_audio = [codec(s, plan.options) for s in tracks]
     actual_audio = [s.get("codec_name") for s in info["streams"] if s.get("codec_type") == "audio"]
     if actual_audio != expected_audio:
-        raise ValueError("Die Audio�bernahme stimmt nicht mit der Quelle �berein.")
+        raise ValueError("Die Audioübernahme stimmt nicht mit der Quelle überein.")
     actual_channels = [s.get('channels') for s in info['streams'] if s.get('codec_type') == 'audio']
     if actual_channels != [channels(s, plan.options) for s in tracks]:
-        raise ValueError('Die Kanalzahl des ausgegebenen Tons stimmt nicht mit dem Plan �berein.')
+        raise ValueError('Die Kanalzahl des ausgegebenen Tons stimmt nicht mit dem Plan überein.')
     if metadata_layout(video) != plan.stereo:
-        raise ValueError("Die Stereo-Kennzeichnung der Ausgabe stimmt nicht mit dem Plan �berein: " + json.dumps(video.get('side_data_list', [])))
+        raise ValueError("Die Stereo-Kennzeichnung der Ausgabe stimmt nicht mit dem Plan überein: " + json.dumps(video.get('side_data_list', [])))
     if plan.options.container == "mp4" and plan.stereo:
         if packed_stereo_boxes(path) != [2 if plan.stereo[0] == "sbs" else 1]:
             raise ValueError("Die explizite MP4-st3d-Kennzeichnung fehlt oder ist falsch.")
@@ -660,7 +660,7 @@ def verify(tools: Toolchain, plan: Plan, path: Path, cancel: threading.Event) ->
                                                                   'time_base', 'duration', 'nb_frames')}))
     if plan.options.target == "framerate":
         if video.get("sample_aspect_ratio", "1:1") != plan.info['video'].get("sample_aspect_ratio", "1:1"):
-            raise ValueError("Das Pixelseitenverh�ltnis wurde unerwartet ge�ndert.")
+            raise ValueError("Das Pixelseitenverhältnis wurde unerwartet geändert.")
     if path.stat().st_size == 0:
         raise ValueError("Die Ausgabe ist leer.")
 
@@ -671,7 +671,7 @@ def publish_without_overwrite(temporary: Path, destination: Path, cancel: thread
     try:
         os.link(temporary, destination)  # Atomic, fails if a destination already exists.
     except FileExistsError:
-        raise ValueError("Das Ausgabeziel wurde zwischenzeitlich angelegt; es wird nicht �berschrieben.") from None
+        raise ValueError("Das Ausgabeziel wurde zwischenzeitlich angelegt; es wird nicht überschrieben.") from None
     except OSError:
         # FAT/exFAT cannot hard-link: exclusive creation still protects existing files.
         owned = False
@@ -724,7 +724,7 @@ def execute_prepared(tools: Toolchain, plan: Plan, cancel: threading.Event, emit
                 raise Cancelled()
             stat = plan.source.stat()
             if (stat.st_mtime_ns, stat.st_size) != (plan.info["source_mtime_ns"], plan.info["source_size"]):
-                raise ValueError("Quelle seit der Pr�fung ge�ndert. Erneut pr�fen.")
+                raise ValueError("Quelle seit der Prüfung geändert. Erneut prüfen.")
             process = subprocess.Popen(args, stdin=decoder.stdout if decoder else None, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                        text=True, encoding="utf-8", errors="replace", bufsize=1, **process_options())
             def read_errors():
@@ -786,11 +786,11 @@ def execute_prepared(tools: Toolchain, plan: Plan, cancel: threading.Event, emit
                 log.write("REMUX " + json.dumps(remux, ensure_ascii=False) + "\n")
                 capture(remux + [str(temporary)], cancel, timeout=3600)
                 packed_stereo_boxes(temporary, normalize=True)
-            emit("phase", "Ausgabe pr�fen")
+            emit("phase", "Ausgabe prüfen")
             verify(tools, plan, temporary, cancel)
             if plan.source.stat().st_mtime_ns != plan.info["source_mtime_ns"]:
-                raise ValueError("Die Quelldatei wurde w�hrend der Verarbeitung ge�ndert.")
-            emit("phase", "Abschlie�en")
+                raise ValueError("Die Quelldatei wurde während der Verarbeitung geändert.")
+            emit("phase", "Abschließen")
             publish_without_overwrite(temporary, plan.output, cancel)
             log.write("VERIFIED " + plan.stereo_summary + "\nCOMPLETED " + str(plan.output) + "\n")
             emit("progress", {"percent": 100.0, "seconds": plan.duration})
@@ -808,7 +808,7 @@ def execute_prepared(tools: Toolchain, plan: Plan, cancel: threading.Event, emit
 
 def preview(tools: Toolchain, plan: Plan, cancel: threading.Event, seconds: float = 0) -> bytes:
     if not math.isfinite(seconds) or seconds < 0 or (plan.duration and seconds >= plan.duration):
-        raise ValueError("Zeitstelle liegt au�erhalb des Videos.")
+        raise ValueError("Zeitstelle liegt außerhalb des Videos.")
     from .multiview import runtime, input_args
     with runtime(tools, plan, cancel, seconds) as (working, decoder):
         graph = working.graph + (";[right]nullsink;[left]null[v]" if plan.options.target == "bd3d" else "") + ";[v]format=rgb24[preview]"
@@ -839,5 +839,3 @@ def preview(tools: Toolchain, plan: Plan, cancel: threading.Event, seconds: floa
             return out
         finally:
             stop_process(process)
-
-

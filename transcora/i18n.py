@@ -661,22 +661,7 @@ EN = {'Log':'Log', 'Kopieren':'Copy', 'Video':'Video', 'Audio':'Audio', 'Bitrate
                                                                                            'required.',
  'MVC-Decoder an beiden Halbbildern testen': 'Test MVC decoder with both half-images',
  'MVC-Kennzeichnung der Quelle prüfen': 'Check MVC source metadata',
- 'MVC: Basis-Halbbild als links angenommen. Reihenfolge im Kontrollbild prüfen; L/R tauschen ist verfügbar.': 'MVC: '
-                                                                                                              'base '
-                                                                                                              'half-image '
-                                                                                                              'assumed '
-                                                                                                              'to '
-                                                                                                              'be '
-                                                                                                              'left. '
-                                                                                                              'Check '
-                                                                                                              'order '
-                                                                                                              'in '
-                                                                                                              'the '
-                                                                                                              'preview; '
-                                                                                                              'Swap '
-                                                                                                              'L/R '
-                                                                                                              'is '
-                                                                                                              'available.',
+ 'MVC: Links/rechts nicht gekennzeichnet; Basis-Halbbild wird als links verwendet. Bei umgekehrter Tiefenwirkung L/R tauschen.': 'MVC: Left/right is not labelled; the base half-image is used as left. If depth appears reversed, swap L/R.',
  'MVC: Basis-Halbbild laut Blu-ray-Playlist ': 'MVC: base half-image according to Blu-ray playlist ',
  'MVC: Beide Halbbilder dekodieren · ': 'MVC: decode both half-images · ',
  'MVC: Beschädigter oder verschlüsselter Transportstrom.': 'MVC: damaged or encrypted transport stream.',

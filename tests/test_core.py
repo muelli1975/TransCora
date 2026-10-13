@@ -46,7 +46,7 @@ class CoreTests(unittest.TestCase):
             self.assertTrue(any(note.startswith('Farbannahme') for note in inferred_plan.warnings))
             self.assertEqual(inferred_plan.review_warnings, [])
             subtitle_plan=planned(Options(layout='full_sbs'),extra_streams=[dict(index=1,codec_type='subtitle')])
-            self.assertIn('Untertitel werden nicht �bernommen.',subtitle_plan.warnings)
+            self.assertIn('Untertitel werden nicht übernommen.',subtitle_plan.warnings)
             self.assertEqual(subtitle_plan.review_warnings, [])
 
     def test_catalog_is_exactly_batch_without_cielab(self):
@@ -266,5 +266,3 @@ class CoreTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
-
-

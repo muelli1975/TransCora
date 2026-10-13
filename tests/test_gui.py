@@ -38,7 +38,7 @@ class GuiTests(unittest.TestCase):
                 measured = font.Font(font=ttk.Style().lookup('Treeview', 'font')).measure('Frame sequential')
                 self.assertGreaterEqual(window.tree.column('layout', 'width'), measured+16)
                 self.assertEqual(window.attention.get(), '')
-                self.assertNotIn('?', window.file_notes.get())
+                self.assertNotIn('⚠', window.file_notes.get())
 
     def test_video_pause_preserves_completed_export_and_freezes_elapsed(self):
         import threading
@@ -184,7 +184,7 @@ class GuiTests(unittest.TestCase):
         job = window.jobs[0]
         _, messages = color_spec(dict(width=3840, height=1080, pix_fmt='yuv420p'), 'full_sbs')
         self.assertTrue(messages)
-        action = 'Manuell gew�hltes Layout/L/R weicht vom Dateinamen ab.'
+        action = 'Manuell gewähltes Layout/L/R weicht vom Dateinamen ab.'
         job.plan = SimpleNamespace(summary='Summary\n' + messages[0], warnings=messages + messages + [action],
                                    review_warnings=[action], layout='full_sbs', output=Path('test.mp4'), duration=1,
                                    info={'video': {'width': 3840, 'height': 1080, 'avg_frame_rate': '30/1'}})
@@ -289,7 +289,7 @@ class GuiTests(unittest.TestCase):
         self.window.variables['screen_height'].set('1440'); self.window.option_changed('screen_height')
         self.assertEqual((job.options.screen_width,job.options.screen_height),(2560,1440))
         self.assertEqual(str(self.window.combos['target_fps'].cget('state')),'disabled')
-        self.window.variables['fps_mode'].set('Zielbildrate w�hlen'); self.window.option_changed('fps_mode')
+        self.window.variables['fps_mode'].set('Zielbildrate wählen'); self.window.option_changed('fps_mode')
         self.assertEqual(str(self.window.combos['target_fps'].cget('state')),'normal')
         panel=self.window.images
         panel.variables['target'].set('Zeilenverschachtelt (Polfilter)'); panel.changed('target')
@@ -355,7 +355,7 @@ class GuiTests(unittest.TestCase):
             window.events.put(('progress', (job.id, 1, 2, {'percent': 37.5, 'phase_percent': 50})))
             window.poll()
         self.assertIn('Restzeit: Datei ca.', window.elapsed.get())
-        self.assertIn(' � Stapel ca.', window.elapsed.get())
+        self.assertIn(' · Stapel ca.', window.elapsed.get())
         file_left,batch_left = window.remaining_time.remaining(200)
         self.assertGreater(batch_left,file_left)
         with patch('transcora.gui.window.time.monotonic', return_value=300):
@@ -366,7 +366,7 @@ class GuiTests(unittest.TestCase):
         self.assertNotIn('Schritt',window.elapsed.get())
         window.language='en';window.apply_language()
         self.assertIn('Remaining: file approx.',window.elapsed.get())
-        self.assertIn(' � batch approx.',window.elapsed.get())
+        self.assertIn(' · batch approx.',window.elapsed.get())
 
     def test_bd_modes_keep_bitrate_and_survive_language_list_and_target_changes(self):
         from transcora.core.model import BD_MODES
@@ -458,7 +458,7 @@ class GuiTests(unittest.TestCase):
             self.assertEqual(self.window.language, 'de')
 
     def test_cross_view_gui_keeps_mp4_and_image_preview_preserves_original_pixels(self):
-        self.window.variables['target'].set('Kreuzblick � Full-SBS R/L')
+        self.window.variables['target'].set('Kreuzblick · Full-SBS R/L')
         self.window.option_changed('target')
         self.assertEqual(self.window.defaults.container, 'mp4')
         self.assertEqual(self.window.variables['container'].get(), 'MP4')
@@ -473,7 +473,7 @@ class GuiTests(unittest.TestCase):
         self.root.update()
         self.assertFalse(self.window.advanced.winfo_ismapped())
         self.assertTrue(self.window.video_dimensions.winfo_ismapped())
-        self.assertEqual(self.window.video_size_caption.get(), 'Ausgabegr��e')
+        self.assertEqual(self.window.video_size_caption.get(), 'Ausgabegröße')
         self.window.variables['video_width'].set('1920'); self.window.option_changed('video_width')
         self.window.variables['video_height'].set('540'); self.window.option_changed('video_height')
         self.assertEqual((self.window.defaults.video_width, self.window.defaults.video_height), (1920,540))
@@ -552,7 +552,7 @@ class GuiTests(unittest.TestCase):
         from transcora.core.model import BD_BITRATES
         self.assertEqual(BD_BITRATES, (20, 25, 30, 35, 40))
         self.assertEqual(Options.from_dict({'target': 'row_interleaved', 'profile': 'quality10'}).profile, 'quality')
-        self.window.variables['profile'].set(self.window.t('Hohe Farbtiefe � 10 Bit / 4:4:4'))
+        self.window.variables['profile'].set(self.window.t('Hohe Farbtiefe · 10 Bit / 4:4:4'))
         self.window.option_changed('profile')
         self.window.variables['target'].set(self.window.t('Zeilenverschachtelt (Polfilter)'))
         self.window.option_changed('target')
@@ -653,7 +653,7 @@ class GuiTests(unittest.TestCase):
                 panel.current_file.set('Beginning_'+'long_filename_'*70+'ending.mp4',7,20)
                 self.root.update()
                 text=panel.current_file.label.cget('text')
-                self.assertIn('.',text); self.assertTrue(text.endswith('ending.mp4'))
+                self.assertIn('…',text); self.assertTrue(text.endswith('ending.mp4'))
                 self.assertIn('7/20',text)
                 face=font.Font(root=self.root,font=ttk.Style().lookup('TLabel','font') or 'TkDefaultFont')
                 self.assertLessEqual(face.measure(text),panel.current_file.label.winfo_width())
@@ -682,7 +682,7 @@ class GuiTests(unittest.TestCase):
             self.assertEqual(job.options.target,'anaglyph')
             self.assertEqual(panel.defaults.target,'keep')
         for panel in (self.window,panel):
-            buttons=[widget for widget,_ in panel.controls if isinstance(widget,ttk.Button) and widget.cget('text')=='Ausw�hlen']
+            buttons=[widget for widget,_ in panel.controls if isinstance(widget,ttk.Button) and widget.cget('text')=='Auswählen']
             self.assertEqual(len(buttons),1)
 
     def test_late_timing_bar_keeps_footer_and_list_inside_small_window(self):
@@ -694,7 +694,7 @@ class GuiTests(unittest.TestCase):
         self.root.update()
         height=self.window.tree.winfo_height();detail=self.window.detail_text.winfo_height()
         self.window.elapsed_time.set('Vergangene Zeit: 02:34')
-        self.window.elapsed.set('Restzeit: Datei ca. 05:12 � Stapel ca. 01:42:00');self.root.update()
+        self.window.elapsed.set('Restzeit: Datei ca. 05:12 · Stapel ca. 01:42:00');self.root.update()
         self.window.toggle_advanced();self.root.update()
         self.assertEqual(self.window.tree.winfo_height(),height)
         self.assertEqual(self.window.detail_text.winfo_height(),detail)
@@ -771,7 +771,7 @@ class GuiTests(unittest.TestCase):
 
     def test_file_warnings_are_highlighted_and_follow_selection_and_language(self):
         from types import SimpleNamespace
-        message='Full/Half-Layout nicht eindeutig erkennbar. Quelllayout f�r diese Datei ausw�hlen.'
+        message='Full/Half-Layout nicht eindeutig erkennbar. Quelllayout für diese Datei auswählen.'
         self.window.add_paths([Path('unclear.mp4'),Path('good_full_sbs.mp4')])
         first,second=self.window.jobs
         first.status,first.detail='blocked',message
@@ -779,7 +779,7 @@ class GuiTests(unittest.TestCase):
         for language in ('de','en'):
             self.window.language=language; self.window.apply_language(); self.root.update()
             text=self.window.detail_text
-            self.assertTrue(text.get('1.0','end').startswith('? '+self.window.t(message)))
+            self.assertTrue(text.get('1.0','end').startswith('⚠ '+self.window.t(message)))
             self.assertIn('attention',text.tag_names('1.0'))
             self.assertEqual(text.tag_cget('attention','foreground'),GOLD_LIGHT)
         self.window.tree.selection_set(second.id); self.window.selection_changed()
@@ -788,14 +788,14 @@ class GuiTests(unittest.TestCase):
                                     info={'video':{'width':3840,'height':1080}},duration=10)
         self.window.events.put(('job',(second.id,'ready','Check your player',second.plan)))
         self.window.poll()
-        self.assertTrue(self.window.detail_text.get('1.0','end').startswith('? Check your player'))
+        self.assertTrue(self.window.detail_text.get('1.0','end').startswith('⚠ Check your player'))
         self.assertEqual(self.window.detail_text.get('1.0','end').count('Check your player'),1)
 
     def test_unclassified_notes_do_not_request_user_action(self):
         from types import SimpleNamespace
         self.window.add_paths([Path('good_full_sbs.mp4')])
         job=self.window.jobs[0]
-        note='Untertitel werden nicht �bernommen.'
+        note='Untertitel werden nicht übernommen.'
         job.plan=SimpleNamespace(summary='Summary',warnings=[note],layout='full_sbs',output=Path('test.mp4'),
                                  info={'video':{'width':3840,'height':1080}},duration=10)
         job.status='ready'; job.detail=note
@@ -804,7 +804,7 @@ class GuiTests(unittest.TestCase):
             self.window.show_job_details(job); self.root.update()
             text=self.window.detail_text; body=text.get('1.0','end')
             self.assertIn(self.window.t(note),body)
-            self.assertNotIn('?',body)
+            self.assertNotIn('⚠',body)
             self.assertFalse(text.tag_ranges('attention'))
 
     def test_english_check_log_translates_audio_labels_and_keeps_track_metadata(self):
@@ -816,10 +816,10 @@ class GuiTests(unittest.TestCase):
         job=window.jobs[0]
         video=dict(width=3840,height=1080,index=0,codec_name='h264',avg_frame_rate='30/1')
         audio=dict(index=1,codec_type='audio',codec_name='aac',channels=2,
-                   tags={'language':'und','title':'Fertig � Wartet; Original'})
+                   tags={'language':'und','title':'Fertig · Wartet; Original'})
         plan=Plan(job.source,Path('C:/Output/film.mp4'),job.options,
                   dict(video=video,streams=[video,audio]),'full_sbs',False,(1920,1080),
-                  'yuv420p','',60,[],{},'Full-SBS � manuell gew�hlt',[])
+                  'yuv420p','',60,[],{},'Full-SBS · manuell gewählt',[])
         with patch('transcora.gui.window.Toolchain.find',return_value=SimpleNamespace(inspect=lambda:{'version':'Fixture tools'})), \
              patch('transcora.gui.window.plan_job',return_value=plan), \
              patch('transcora.gui.window.threading.Thread') as thread:
@@ -828,9 +828,9 @@ class GuiTests(unittest.TestCase):
         text='\n'.join(window.log_lines)
         self.assertIn('Audio: Track 1:',text)
         self.assertIn('2 channels',text)
-        self.assertIn('und � Fertig � Wartet; Original',text)
+        self.assertIn('und · Fertig · Wartet; Original',text)
         self.assertNotIn('Spur 1:',text)
-        self.assertEqual(window.status.get(),'Check finished: 1 ready � 0 blocked.')
+        self.assertEqual(window.status.get(),'Check finished: 1 ready · 0 blocked.')
 
     def test_notes_are_distinct_from_review_warnings_and_selection_has_contrast(self):
         from types import SimpleNamespace
@@ -849,19 +849,19 @@ class GuiTests(unittest.TestCase):
                 self.window.selection_changed(); self.root.update()
                 text=self.window.detail_text; body=text.get('1.0','end')
                 self.assertEqual(body.count(self.window.t(note)),1)
-                self.assertEqual('?' in body,profile!='compatible')
+                self.assertEqual('⚠' in body,profile!='compatible')
                 if profile=='quality10':self.assertIn(self.window.t('10 Bit: Feinere Abstufungen; kein HDR-Modus.'),body)
-            info='29.970  23,976 fps: Ganze Stereobildpaare werden ausgelassen oder wiederholt. Laufzeit und Ton bleiben erhalten; Bewegungen k�nnen ungleichm��iger werden. Keine Bewegungsinterpolation; Video wird nur einmal kodiert.'
-            process='BD-3D: FFmpeg bereitet die Quelle vor, FRIM kodiert AVC/MVC und tsMuxeR erstellt die Ausgabe. Gew�hlter Ton wird als LPCM gespeichert.'
+            info='29.970 → 23,976 fps: Ganze Stereobildpaare werden ausgelassen oder wiederholt. Laufzeit und Ton bleiben erhalten; Bewegungen können ungleichmäßiger werden. Keine Bewegungsinterpolation; Video wird nur einmal kodiert.'
+            process='BD-3D: FFmpeg bereitet die Quelle vor, FRIM kodiert AVC/MVC und tsMuxeR erstellt die Ausgabe. Gewählter Ton wird als LPCM gespeichert.'
             job.options=replace(job.options,target='bd3d',container='iso')
             job.plan=SimpleNamespace(summary='Summary',warnings=[info,process],review_warnings=[],layout='full_sbs',output=Path('slideshow.iso'))
             job.detail='\n'.join(job.plan.warnings)
             self.window.selection_changed(); self.root.update()
             body=text.get('1.0','end')
-            self.assertNotIn('?',body)
+            self.assertNotIn('⚠',body)
             self.assertIn(self.window.t(info),body);self.assertIn(self.window.t(process),body)
             self.assertFalse(text.tag_ranges('attention'))
-        job.status='blocked';job.plan=None;job.detail='Quelllayout f�r diese Datei ausw�hlen.'
+        job.status='blocked';job.plan=None;job.detail='Quelllayout für diese Datei auswählen.'
         self.window.selection_changed(); self.root.update()
         text.tag_add('sel','1.0','1.end')
         self.assertEqual(text.tag_names()[-1],'sel')
@@ -891,7 +891,7 @@ class GuiTests(unittest.TestCase):
         click(window,'fps');self.assertEqual(window.tree.get_children(),(two.id,ten.id,one.id))
         click(window,'fps');self.assertEqual(window.tree.get_children(),(ten.id,two.id,one.id))
         click(window,'duration');self.assertEqual(window.tree.get_children(),(two.id,ten.id,one.id))
-        for language,label in [('en','Duration '),('de','Dauer ')]:
+        for language,label in [('en','Duration ▲'),('de','Dauer ▲')]:
             window.language=language;window.apply_language();self.root.update()
             self.assertEqual(window.tree.heading('duration','text'),label)
         window.set_busy(True);click(window,'file')
@@ -1037,7 +1037,7 @@ class GuiTests(unittest.TestCase):
         self.assertFalse(self.window.jobs[0].options.swap)
         self.assertFalse(self.window.variables['swap'].get())
         self.assertEqual(str(self.window.swap_control.cget('state')), 'disabled')
-        self.window.variables['fps_mode'].set('Zielbildrate w�hlen')
+        self.window.variables['fps_mode'].set('Zielbildrate wählen')
         self.window.option_changed('fps_mode')
         self.assertIn('Film_30fps-tbh.mkv', self.window.output_name.get())
         self.window.variables['target_fps'].set('29,97')
@@ -1067,7 +1067,7 @@ class GuiTests(unittest.TestCase):
         self.assertEqual(location, (bitrate.winfo_rootx(), bitrate.winfo_rooty(), self.window.progress.winfo_rooty()))
         self.window.variables['bitrate_mbps'].set('24')
         self.window.option_changed('bitrate_mbps')
-        self.window.variables['rate_mode'].set('Qualit�t (CRF)')
+        self.window.variables['rate_mode'].set('Qualität (CRF)')
         self.window.option_changed('rate_mode')
         self.root.update()
         self.assertEqual(self.window.defaults.crf, 19.5)
@@ -1169,20 +1169,20 @@ class GuiTests(unittest.TestCase):
         self.root.update()
         self.assertTrue(self.window.title_frame.winfo_ismapped())
         with tempfile.TemporaryDirectory() as tmp, patch('transcora.gui.window.app_root', return_value=Path(tmp)):
-            self.window.store_preset('Blu-ray Qualit�t')
+            self.window.store_preset('Blu-ray Qualität')
             data = json.loads((Path(tmp)/'user-presets.json').read_text(encoding='utf-8'))
-            self.assertNotIn('disc_title', data['presets']['Blu-ray Qualit�t'])
-            self.assertNotIn('source', data['presets']['Blu-ray Qualit�t'])
+            self.assertNotIn('disc_title', data['presets']['Blu-ray Qualität'])
+            self.assertNotIn('source', data['presets']['Blu-ray Qualität'])
             self.window.presets = load_presets(Path(tmp)/'user-presets.json')
             self.window.tree.selection_set(second.id)
-            self.window.apply_preset('Blu-ray Qualit�t')
+            self.window.apply_preset('Blu-ray Qualität')
             self.assertEqual(second.options.target, 'bd3d')
             self.assertIsNone(second.options.disc_title)
             self.assertEqual(first.options.disc_title, 'Mein Film')
             self.window.tree.selection_remove(second.id)
-            self.window.apply_preset('Blu-ray Qualit�t')
+            self.window.apply_preset('Blu-ray Qualität')
             self.assertEqual(self.window.defaults.target, 'bd3d')
-            self.window.delete_preset('Blu-ray Qualit�t')
+            self.window.delete_preset('Blu-ray Qualität')
             self.assertEqual(load_presets(Path(tmp)/'user-presets.json'), {})
         self.window.variables['target'].set('Anaglyph')
         self.window.option_changed('target')
@@ -1195,16 +1195,16 @@ class GuiTests(unittest.TestCase):
             self.window.run_started = 30
             self.window.set_busy(True)
             self.window.update_elapsed()
-            self.assertEqual(self.window.elapsed.get(), 'Restzeit: Datei - � Stapel -')
+            self.assertEqual(self.window.elapsed.get(), 'Restzeit: Datei — · Stapel —')
             self.window.estimate_remaining(1, 1, 50)
-            self.assertEqual(self.window.elapsed.get(), 'Restzeit: Datei ca. 01:10 � Stapel ca. 01:10')
+            self.assertEqual(self.window.elapsed.get(), 'Restzeit: Datei ca. 01:10 · Stapel ca. 01:10')
             self.assertEqual(self.window.elapsed_time.get(), 'Vergangene Zeit: 01:10')
             self.window.abort()
             self.assertIsNotNone(self.window.run_started)
             self.window.set_busy(False)
         with patch('transcora.gui.window.time.monotonic', return_value=9999):
             self.window.update_elapsed()
-        self.assertEqual(self.window.elapsed.get(), 'Restzeit: Datei - � Stapel -')
+        self.assertEqual(self.window.elapsed.get(), 'Restzeit: Datei — · Stapel —')
         self.assertEqual(self.window.elapsed_time.get(), 'Vergangene Zeit: 01:10')
         self.assertEqual(PreviewWindow.time_text(3661), '01:01:01')
 
@@ -1223,9 +1223,9 @@ class GuiTests(unittest.TestCase):
         self.assertTrue(self.window.audio_dialog.winfo_ismapped())
         self.assertEqual(str(self.window.combos['codec'].cget('state')), 'disabled')
         self.assertEqual(str(self.window.combos['audio_format'].cget('state')), 'disabled')
-        self.assertEqual(self.window.variables['audio_format'].get(), 'LPCM � 24 Bit')
+        self.assertEqual(self.window.variables['audio_format'].get(), 'LPCM · 24 Bit')
         self.assertEqual(str(self.window.combos['audio_tracks'].cget('state')), 'readonly')
-        self.window.variables['audio_tracks'].set('Ausgew�hlte Spuren')
+        self.window.variables['audio_tracks'].set('Ausgewählte Spuren')
         self.window.option_changed('audio_tracks')
         self.assertEqual(str(self.window.combos['audio_selection'].cget('state')), 'normal')
         self.window.close_audio_options()
@@ -1238,13 +1238,13 @@ class GuiTests(unittest.TestCase):
         self.window.poll()
         self.assertEqual(self.window.status.get(), text)
         self.assertEqual(self.window.speed.get(), '')
-        self.assertEqual(self.window.elapsed.get(), 'Restzeit: Datei - � Stapel -')
+        self.assertEqual(self.window.elapsed.get(), 'Restzeit: Datei — · Stapel —')
         self.assertEqual(str(self.window.progress.cget('mode')), 'indeterminate')
         self.window.events.put(('progress', ('job', 1, 1,
             {'percent': 94, 'seconds': 100, 'remaining_seconds': 120})))
         with patch('transcora.gui.window.time.monotonic', return_value=100):
             self.window.poll()
-        self.assertEqual(self.window.elapsed.get(), 'Restzeit: Datei ca. 02:00 � Stapel ca. 02:00')
+        self.assertEqual(self.window.elapsed.get(), 'Restzeit: Datei ca. 02:00 · Stapel ca. 02:00')
         self.assertEqual(str(self.window.progress.cget('mode')), 'determinate')
         self.window.set_busy(False)
 
@@ -1363,7 +1363,7 @@ class GuiTests(unittest.TestCase):
             viewer.time_var.set('00:02')
             viewer.request()
             self.assertFalse(self.window.busy)
-            self.assertIn('au�erhalb', viewer.note.cget('text'))
+            self.assertIn('außerhalb', viewer.note.cget('text'))
             self.window.close_preview(viewer.dialog, viewer.time_entry, viewer.scale)
             self.window.set_busy(True)
             self.window.set_busy(False)
@@ -1371,5 +1371,3 @@ class GuiTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
-
-
