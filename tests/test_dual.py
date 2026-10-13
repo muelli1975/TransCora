@@ -108,7 +108,8 @@ class DualTests(unittest.TestCase):
             folder=Path(tmp);source=self.fixture(folder,tools)
             generic=folder/'Two camera tracks.mkv'
             capture([str(tools.ffmpeg),'-v','error','-i',str(source),'-map','0:v:1',
-                     '-map','0:v:0','-map','0:a','-c','copy',str(generic)])
+                     '-map','0:v:0','-map','0:a','-c','copy',
+                     '-metadata:s:v:1','title=',str(generic)])
             with self.assertRaisesRegex(ValueError,'Dual'):
                 plan_job(tools,Job(generic,Options(target='mono')),folder/'out',set())
             options=Options(layout='dual',target='mono',container='mkv')

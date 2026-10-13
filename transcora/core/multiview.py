@@ -241,9 +241,10 @@ def dual_source(info, videos):
         title=str(video.get('tags',{}).get('title','')).strip().casefold()
         return 'left' if title in {'left','l','links','linkes halbbild'} else 'right' if title in {'right','r','rechts','rechtes halbbild'} else None
     eyes=[eye(v) for v in videos]
-    if eyes==['right','left']: videos=videos[::-1]
-    elif eyes[0] and eyes[0]==eyes[1]:
+    if eyes[0] and eyes[0]==eyes[1]:
         raise ValueError('Dual: Beide Videospuren sind demselben Halbbild zugeordnet.')
+    if eyes[0]=='right' or eyes[1]=='left':
+        videos=videos[::-1]
     for video in videos:
         color_spec(video)  # The existing SDR policy also applies to the second track.
         if any(s.get('side_data_type') in {'Display Matrix','Spherical Mapping'} for s in video.get('side_data_list',[])):
