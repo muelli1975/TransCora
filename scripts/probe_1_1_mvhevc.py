@@ -4,6 +4,31 @@ import hashlib
 import json
 from pathlib import Path
 import subprocess
+from mvhevc_probe_tools import picture_counts, signal_stereo, consolidate_headers
+
+
+def decoder_diagnostics(ffmpeg, source, folder, originals):
+    """Compare a shared decoder with independent requests and thread counts."""
+    checks = []
+    for threads in (0, 1):
+        stem = source.stem+f'-threads-{threads}'
+        outputs = [folder/f'{stem}-view-{i}.yuv' for i in range(2)]
+        command = [ffmpeg, '-y', '-v', 'warning', '-threads', str(threads), '-i', source]
+        for index, target in enumerate(outputs):
+            command += ['-map', f'0:v:0:vidx:{index}', '-fps_mode', 'passthrough',
+                        '-pix_fmt', 'yuv420p', '-f', 'rawvideo', target]
+        check = {'threads': threads, 'shared_decoder': True, 'views': []}
+        try:
+            run(command, folder/(stem+'.log'))
+            for i, target in enumerate(outputs):
+                pixels = target.read_bytes()
+                check['views'].append({'index': i, 'frames': len(pixels)/(128*64*3/2),
+                    'pixel_exact': pixels == originals[i],
+                    'first_luma_per_frame': list(pixels[::128*64*3//2])})
+        except Exception as error:
+            check['reason'] = str(error)
+        checks.append(check)
+    return checks
 
 
 def run(args, log=None):
@@ -40,15 +65,31 @@ def main():
              '--input-csp', 'i420', '--input-depth', '8', '--preset', 'ultrafast', '--lossless',
              '--bframes', '0', '--keyint', '12', '--repeat-headers', '--pools', 'none',
              '--frame-threads', '1', '--output', raw], folder/'encoder.log')
+        initial_headers = folder/'stereo-initial-headers.hevc'
+        run([x265, '--multiview-config', config, '--input-res', '128x64', '--fps', '25', '--frames', '12',
+             '--input-csp', 'i420', '--input-depth', '8', '--preset', 'ultrafast', '--lossless',
+             '--bframes', '0', '--keyint', '12', '--no-repeat-headers', '--pools', 'none',
+             '--frame-threads', '1', '--output', initial_headers], folder/'initial-headers-encoder.log')
         report['encoder'] = 'passed'
+        report['coded_pictures_per_layer'] = picture_counts(raw.read_bytes())
+        report['decoder_diagnostics'] = {
+            'original': decoder_diagnostics(ffmpeg, raw, folder, originals)}
+        paired = folder/'stereo-paired.hevc'
+        paired.write_bytes(consolidate_headers(raw.read_bytes()))
+        report['decoder_diagnostics']['headers_consolidated'] = decoder_diagnostics(ffmpeg, paired, folder, originals)
+        report['decoder_diagnostics']['initial_headers_only'] = decoder_diagnostics(ffmpeg, initial_headers, folder, originals)
+        tagged = folder/'stereo-lr.hevc'
+        tagged.write_bytes(signal_stereo(initial_headers.read_bytes()))
+        report['decoder_diagnostics']['stereo_signalled'] = decoder_diagnostics(ffmpeg, tagged, folder, originals)
+        report['signalled_streams'] = json.loads(run([ffprobe, '-v', 'error', '-show_streams', '-of', 'json', tagged]))['streams']
         audio = folder/'audio.wav'
         run([ffmpeg, '-v', 'error', '-f', 'lavfi', '-i', 'sine=frequency=700:sample_rate=48000',
              '-t', '0.48', '-c:a', 'pcm_s16le', audio])
-        candidates = [raw]
-        for tag in ('hev1', 'hvc1'):
-            path = folder/f'{tag}.mp4'
+        candidates = [raw, initial_headers, paired, tagged]
+        for name, source, tag in [('hev1', raw, 'hev1'), ('hvc1', raw, 'hvc1'), ('stereo-lr', tagged, 'hvc1')]:
+            path = folder/f'{name}.mp4'
             try:
-                run([ffmpeg, '-v', 'error', '-r', '25', '-i', raw, '-i', audio, '-map', '0:v',
+                run([ffmpeg, '-v', 'error', '-r', '25', '-i', source, '-i', audio, '-map', '0:v',
                      '-map', '1:a', '-c:v', 'copy', '-tag:v', tag, '-c:a', 'aac', '-movflags', '+faststart', path])
                 candidates.append(path)
             except Exception as error:
@@ -83,6 +124,8 @@ def main():
                     assert len(timestamps) == 12
                     assert all(abs(float(packet['pts_time'])-n/25) < .0001 for n, packet in enumerate(timestamps))
                     assert any(stream['codec_type'] == 'audio' for stream in streams)
+                    check['apple_decoder_records'] = b'lhvC' in path.read_bytes()
+                    assert check['apple_decoder_records'], 'Separate base/enhancement decoder configuration missing'
                 check['result'] = 'passed'
             except Exception as error:
                 check['reason'] = str(error)
