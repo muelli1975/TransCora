@@ -8,6 +8,7 @@
 - Optional close or computer shutdown after a successful video/image batch; cancellable 30-second shutdown countdown and session-only selection.
 - Neutral control-preview hint for both BD-3D and Dual.
 - Completed-file details display stereo information and the output path once.
+- The information field omits the inapplicable "no SBS/OU flag" note for outputs such as anaglyph and mono.
 - Selectable mono half-image, row-interleaved inputs and frame-sequential half-image pairing.
 - SDR HEIC/HEIF input, including tagged stereo images and Spatial Photos, with orientation and colour-profile handling.
 - Neutral routine messages; highlighted warnings reserved for required decisions and errors.

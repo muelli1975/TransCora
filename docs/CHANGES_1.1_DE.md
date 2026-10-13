@@ -21,4 +21,5 @@ Version 1.1 · 13. Oktober 2026.
 | Hinweise | Farbannahmen, Abläufe und Formatfolgen neutral. Gold/Fettschrift/Warndreieck nur für erforderliche Klärung oder zu behebende Fehler. Doppelte Hinweise und pauschale Warnungseinstufung entfallen. |
 | Bedienung | Unveränderte Eingaben setzen fertige Aufträge nicht zurück. Beschriftungen und Spalten berücksichtigen Deutsch/Englisch. |
 | Dateiinformationen | Nach einem erfolgreichen Export erscheinen Stereoangaben und Ausgabepfad einmal statt erneut mit „Gespeichert“ vorangestellt. |
+| Informationsfeld | Bei Ausgaben ohne SBS/OU-Kennzeichnung entfällt der Hinweis „Keine SBS/OU-Kennzeichnung“. Angaben zu tatsächlich geschriebenen 3D-Kennzeichnungen bleiben sichtbar. |
 | MV-HEVC | Eingabe mit Dekodierung beider gekennzeichneter Halbbilder. |

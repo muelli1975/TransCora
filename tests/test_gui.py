@@ -18,6 +18,33 @@ from tkinter import ttk
 
 
 class GuiTests(unittest.TestCase):
+    def test_information_omits_inapplicable_stereo_note_but_keeps_written_metadata(self):
+        from transcora.core.engine import Plan
+        window = self.window
+        window.add_paths([Path('clip_full_sbs.mp4')]); job = window.jobs[0]
+        window.tree.selection_set(job.id)
+        video = dict(width=3840, height=1080, index=0, codec_type='video',
+                     codec_name='h264', avg_frame_rate='25/1')
+        for language in ('de', 'en'):
+            window.language = language
+            for target in ('anaglyph', 'mono', 'half_sbs'):
+                job.options = replace(Options(), target=target)
+                output = Path('converted_'+target+'.mp4')
+                job.plan = Plan(job.source, output, job.options, dict(video=video, streams=[video]),
+                    'full_sbs', False, (1920,1080), 'yuv444p' if target=='anaglyph' else 'yuv420p',
+                    '', 1, [], {}, 'Full-SBS · manuell gewählt')
+                for status in ('ready', 'completed'):
+                    job.status = status
+                    job.detail = ('Gespeichert · '+job.plan.stereo_summary+'\nGespeichert: '+str(output)
+                                  if status=='completed' else '')
+                    window.apply_language(); window.show_job_details(job); self.root.update()
+                    body = window.detail_text.get('1.0','end')
+                    self.assertNotIn(window.t('3D-Kennzeichnung: Keine SBS/OU-Kennzeichnung'), body)
+                    self.assertIn(str(output), body)
+                    self.assertIn('1920', body)
+                    if target == 'half_sbs':
+                        self.assertIn('MP4-st3d', body)
+
     def test_completed_details_do_not_repeat_stereo_summary_and_output_path(self):
         from types import SimpleNamespace
         window = self.window

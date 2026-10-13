@@ -371,10 +371,11 @@ class Window:
             seen = set()
             def insert(source, attention=False):
                 for line in source.splitlines():
-                    translated = self.t(line).strip()
                     # Completion messages repeat the plan's stereo summary and
                     # output path with a "Saved" prefix. Compare their content.
                     identity_source = line.removeprefix('Gespeichert · ').removeprefix('Gespeichert: ')
+                    if identity_source.strip() == '3D-Kennzeichnung: Keine SBS/OU-Kennzeichnung':
+                        continue
                     identity = self.t(identity_source).strip().removeprefix('⚠').strip()
                     if identity and identity not in seen:
                         seen.add(identity)
