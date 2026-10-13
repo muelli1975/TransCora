@@ -1,62 +1,42 @@
 # TransCora 1.1: Änderungen gegenüber 1.0
 
-Stand: 13. Oktober 2026. Entwicklungszweig `prepare/v1.1`; noch keine veröffentlichte 1.1.
-
-## In der Anwendung umgesetzt
+Stand: 13. Oktober 2026. Testfassung im Zweig `prepare/v1.1`; noch keine öffentliche Veröffentlichung.
 
 | Bereich | Änderung |
 | --- | --- |
-| Bearbeitungszeit | Feste Spalte hinter Status für Videos und Bilder; HH:MM:SS und numerische Sortierung. Umfasst Vorbereitung, Kodierung, Ton und Veröffentlichung; Warteschlange und Pausen zählen nicht. |
-| Abschlussjournal | TransCora-Journal.json pro Ausgabeordner. Erfolgreiche Aufträge werden nach Wiederimport anhand Quelle, wirksamer Einstellungen und aller unverändert vorhandenen Ausgaben wiedererkannt. Status, Ausgabepfade und Bearbeitungszeit werden wiederhergestellt. |
-| Journalfehler | Fehlender, beschädigter oder nicht schreibbarer Journalnachweis blockiert den Medienimport nicht. Fertige Ausgaben bleiben erhalten; Schreibfehler werden gemeldet. Parallele Abschlüsse werden zusammengeführt. |
-| Dateilisten | Fertige entfernen für Videos und Bilder; Medien und Journal bleiben erhalten. Nach Entfernen per Button oder Entf folgt die Auswahl der sichtbaren Reihenfolge. Sortierung und Fokus bleiben erhalten. |
-| Pause | Start wird während der Konvertierung zu Nach Datei pausieren. Wunsch kann zurückgenommen werden. Pause erfolgt nach vollständigem Dateiabschluss und Journal; Fortsetzen beginnt beim nächsten Auftrag. Abbruch auch in der Pause. |
-| Mono-Video | Linkes oder rechtes Halbbild direkt wählbar, mit _mono_l bzw. _mono_r. L/R-Tausch wird berücksichtigt. |
-| Zeilenverschachtelte Eingaben | Videos und Bilder: Stereo-Zeilen werden getrennt rekonstruiert, bevor skaliert wird. Erste Zeile und L/R-Zuordnung werden berücksichtigt; keine Vermischung durch einen zeitlichen Deinterlacer. |
-| Frame sequential | Video: benachbarte Halbbilder werden vor Größen-/Bildratenanpassung zu Stereopaaren verbunden. Laufzeit und Ton bleiben erhalten. Einzelbild- und Paarbildrate werden unterschieden; ungepaartes Schlussbild ist im Hinweis dokumentiert. |
-| HEIC/HEIF | SDR-Import normaler Fotos und gekennzeichneter Stereo-/Apple-Spatial-Photos über separaten gepackten Leser. Stereo-Gruppe statt beliebiger erster zwei Bildobjekte; Orientierung und ICC/NCLX werden berücksichtigt. HDR wird erkannt und nicht still als gewöhnliches SDR ausgegeben. |
-| Hinweise | Gewöhnliche Farbannahmen, Abläufe und Formatfolgen erscheinen neutral. Doppelte Hinweise entfallen. Gold/Fettschrift/Warndreieck nur für ausdrücklich zur Klärung eingestufte Hinweise und zu behebende Fehler. |
-| Bedienung | Unverändert bestätigte Eingaben setzen fertige Aufträge nicht zurück. Spaltenbreiten und Pausenbeschriftungen berücksichtigen Deutsch/Englisch und neue Quelllayouts. |
-| Paket-/Releaseweg | Gemeinsame Versionsquelle, Entwicklungsname 1.1-dev, gepackter HEIF-Leser mit Quellen und Lizenzen. Stabile Veröffentlichung über ausdrücklich ausgelösten Workflow; bestehendes v1.0 bleibt erhalten. |
+| Dual | Ein- und Ausgabe mit zwei getrennten L/R-Videospuren. MP4 voreingestellt, MKV wählbar; Größe je Halbbild, L/R-Tausch, Tonoptionen, Fortschritt und Abbruch. `-dual` ermöglicht automatische Erkennung; sonst Quelllayout ausdrücklich wählen. Zeitlich abweichende Spuren werden gemeldet. |
+| Kontrollbild | BD-3D und Dual zeigen beide Halbbilder als Parallelblick, Kreuzblick oder Rot/Cyan-Anaglyph. Die Ansicht verändert keine Ausgabeoptionen. |
+| Dateinamenszusätze | Playernamen in Klammern im Auswahlmenü: Kodi, Bino bzw. Bino/Stereoscopic Player. Dateinamen enthalten nur die Kennung. Zusammengesetzte Vorschläge wie `.3D.HTAB-tbh` entfallen; bestehende Namen bleiben lesbar. |
+| Bearbeitungszeit | Feste Spalte hinter Status, numerisch sortierbar. Warteschlange und Pausen zählen nicht mit. |
+| Abschlussjournal | `TransCora-Journal.json` je Ausgabeordner erkennt unveränderte erfolgreiche Aufträge wieder und stellt Zeit und Ergebnisse wieder her. Parallele Abschlüsse werden zusammengeführt. |
+| Journalfehler | Beschädigte oder fehlende Nachweise verhindern keinen Import. Schreibfehler werden gemeldet; fertige Medien bleiben erhalten. |
+| Dateilisten | Fertige entfernen für Videos/Bilder. Entfernen per Button oder Entf folgt der sichtbaren Sortierreihenfolge und erhält den Fokus. |
+| Pause | Nach Datei pausieren, Wunsch zurücknehmen, Fortsetzen und Abbrechen. Pause nach vollständigem Export und Journaleintrag. |
+| Mono-Video | Linkes oder rechtes Halbbild direkt wählen; L/R-Tausch wird berücksichtigt. |
+| Zeilenquellen | Stereo-Zeilen werden vor Skalierung getrennt rekonstruiert. Erste Zeile und L/R-Zuordnung bleiben erhalten. |
+| Frame sequential | Aufeinanderfolgende Halbbilder werden vor Größen-/Bildratenanpassung zu Paaren verbunden. Einzelbildrate und Paarbildrate werden unterschieden; Ton und Laufzeit bleiben erhalten. |
+| HEIC/HEIF | SDR-Fotos, gekennzeichnete Stereo-HEIC und Spatial Photos. Stereo-Gruppe bestimmt L/R; Orientierung und ICC/NCLX werden berücksichtigt. Zusatzbilder werden nicht als zweites Halbbild gewählt. |
+| Hinweise | Farbannahmen, Abläufe und Formatfolgen neutral. Gold/Fettschrift/Warndreieck nur für erforderliche Klärung oder zu behebende Fehler. Doppelte Hinweise und pauschale Warnungseinstufung entfallen. |
+| Bedienung | Unveränderte Eingaben setzen fertige Aufträge nicht zurück. Beschriftungen und Spalten berücksichtigen Deutsch/Englisch. |
+| Bereinigung | Zusätzlicher MV-HEVC-Encoderprototyp, zugehörige Prüfungen und überholte Planungsdokumente entfernt. MV-HEVC-Dekodierung bleibt erhalten. Versionsquelle vereinheitlicht. |
 
-## Ergebnis der Warnungsprüfung
+## Warnungsprüfung
 
-In der veröffentlichten 1.0 wurden automatische SDR-Farbannahmen ausdrücklich in
-`review_warnings` übernommen und deshalb gold/fett mit Warndreieck angezeigt.
-Die bisherige 1.1 hatte dies bereits korrigiert. Die aktuelle Nachprüfung ergänzt:
-Untertitelverlust ist ein neutraler Hinweis, da TransCora keine Untertitelübernahme
-zur Auswahl anbietet. Pläne ohne ausdrückliche `review_warnings` stufen ihre Hinweise
-nicht mehr pauschal als Warnung ein.
+In 1.0 wurden automatische SDR-Farbannahmen als Benutzerwarnungen dargestellt.
+In 1.1 bleiben sie neutral, ebenso Untertitelverlust, Bildratenanpassung,
+Deinterlacing, Stereo-Rekonstruktion, LPCM und Blu-ray-Playlistwahl.
+Hervorgehoben bleiben unbekannte oder widersprüchliche Quelllayouts,
+zu klärende MVC-L/R-Zuordnung, manuelle Interpretation gegen Quellhinweise,
+4:4:4-Playerkompatibilität und zu behebende Fehler.
 
-Neutral bleiben insbesondere SDR-Farbannahmen, Bildratenanpassung, Deinterlacing,
-Half-/Full-Rekonstruktion, Zeilen-/Paarbildung, BD-3D-Verarbeitung, LPCM und die
-automatische Wahl der längsten Blu-ray-Playlist. Auch der Hinweis auf die geringere
-Farbauflösung des bereits gewählten Kompatibilitätsprofils bleibt neutral.
+Bei unbekannter MVC-Reihenfolge dient das Kontrollbild zum Prüfen der Tiefe:
+Parallelblick, Kreuzblick oder Rot/Cyan-Brille verwenden und bei umgekehrter
+Tiefe L/R tauschen. Die Anwendung erfindet keine fehlenden Quellangaben.
 
-Hervorgehoben bleiben unbekanntes/widersprüchliches Quelllayout, zu prüfende
-L/R-Zuordnung bei fehlenden MVC-Angaben, manuelle Interpretation gegen andere
-Quellhinweise, 4:4:4-Playerkompatibilität sowie Fehler, die vor einem erneuten
-Versuch behoben werden müssen.
+## Umfang
 
-Fünf gezielte Kern-/GUI-Regressionen für Einstufung, Deutsch/Englisch,
-Warnsymbol, Formatierung und Duplikate bestehen lokal. Der letzte vollständige
-Stand vor dieser kleinen Nachkorrektur bestand jeweils 159 Tests auf Windows,
-Linux und macOS und alle Paketprüfungen:
-https://github.com/muelli1975/TransCora/actions/runs/38356176846
+MV-HEVC ist ausschließlich Eingabe, kein Ausgabeziel. HDR-Tonemapping,
+HEIC/AVIF-Ausgabe, Spatial-Photo-Erstellung und AVIF-Import gehören nicht zu 1.1.
+Die bestehende Veröffentlichung 1.0 wird nicht überschrieben.
 
-## Technisch geprüft, noch kein neues Anwendungsausgabeziel
-
-MV-HEVC mit x265 4.3 Multiview und FFmpeg 7.1.1: 36 pixelgleiche Bilder je View über
-drei GOPs, L/R und R/L, Zeitstempel, Ton und getrennte hvcC/lhvC-Konfigurationen.
-Gepacktes SBS über stdin sowie blockweise, atomare MP4-Containeranpassung sind
-geprüft. Der Writer hält nur moov-Metadaten im Speicher und korrigiert stco/co64.
-Lauf: https://github.com/muelli1975/TransCora/actions/runs/38356177448
-
-Noch offen: Encoder-Paketierung mit Quellen/Lizenzen, Integration als Ausgabeziel,
-Fortschritt, Abbruch, Tonoptionen, Einstellungen, Journal und Pakettests des Ziels.
-Apple-Gerätewiedergabe ist ungeprüft; räumliche Kameradaten werden nicht erfunden.
-
-AVIF ist derzeit nicht aktiviert. HDR-Tonemapping/volle HDR-Erhaltung,
-HEIC/AVIF-Ausgabe und Spatial-Photo-Erstellung gehören nicht zum umgesetzten Umfang.
-
-Details: [PLAN_1.1.md](PLAN_1.1.md) und [TESTPLAN_1.1.md](TESTPLAN_1.1.md).
+Prüfungen und Paketstatus: [TESTPLAN_1.1.md](TESTPLAN_1.1.md).

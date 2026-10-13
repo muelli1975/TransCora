@@ -100,8 +100,7 @@ def main():
               "fixture_generation": "independent raw YUV generator",
               "host_dependencies": dependency_versions(), "checks": [],
               "not_checked": ["TransCora GUI or import integration", "audio synchronization",
-                              "HEIC/HEIF/AVIF decoding and stereo metadata",
-                              "MV-HEVC encoding and device playback"]}
+                              "HEIC/HEIF/AVIF decoding and stereo metadata"]}
     original, left, right = fixture()
     with tempfile.TemporaryDirectory(prefix="transcora-1-1-input-probe-") as temporary:
         folder = Path(temporary)

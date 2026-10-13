@@ -1,4 +1,4 @@
-# TransCora 1.1 — Entwicklung
+# TransCora 1.1 — Testfassung
 
 [English](README.md)
 
@@ -19,7 +19,7 @@ einschließlich gekennzeichneter Stereo-HEIC und Spatial Photos. Die Stereo-Grup
 bestimmt die L/R-Zuordnung; Tiefenkarten und Gainmaps werden nicht als zweites
 Halbbild verwendet. Orientierung und Farbprofile werden berücksichtigt. Die
 vorhandenen Bildziele und das Kontrollbild stehen auch dafür zur Verfügung.
-HDR-Tonwertwandlung, HEIC-Ausgabe und MV-HEVC-Ausgabe sind noch nicht freigegeben.
+MV-HEVC bleibt eine Eingabe zum Dekodieren; Version 1.1 enthält keinen zusätzlichen MV-HEVC-Encoder. HDR-Tonwertwandlung und HEIC-Ausgabe gehören nicht zum Umfang.
 
 ## Schnellstart
 
@@ -33,7 +33,7 @@ Standardmäßig landen Ergebnisse im Ordner `output` neben dem Programm. Bei Ord
 
 Bei Videos zeigt der Status die geschätzte Restzeit für **Datei** und **Stapel**. Die Schätzung nutzt den laufenden Fortschritt und die Laufzeiten vergleichbarer fertiger Dateien. Bei BD-3D fließen auch die gemessenen Abschlusszeiten für Ton und Multiplexing ein; beim ersten Titel ist die Schätzung gröber. Für noch nicht vergleichbare Formate oder fehlenden Fortschritt steht ein Strich.
 
-Fotos und Videos verwenden dieselben Bereiche **Quelle**, **Ausgabe**, **Format** und **Speichern**. Unter **Ausgabegröße** stehen die Maße direkt beim Größenmenü. Videomaße beziehen sich auf das gesamte Ausgabebild; BD-3D zeigt die Maße je Halbbild. Bilder lassen sich proportional nach langer oder kurzer Seite skalieren.
+Fotos und Videos verwenden dieselben Bereiche **Quelle**, **Ausgabe**, **Format** und **Speichern**. Unter **Ausgabegröße** stehen die Maße direkt beim Größenmenü. Videomaße beziehen sich auf das gesamte Ausgabebild; BD-3D und Dual zeigen die Maße je Halbbild. Bilder lassen sich proportional nach langer oder kurzer Seite skalieren.
 
 **Erweitert** klappt zusätzliche Einstellungen im Fenster auf. **Standardeinstellungen** stellt die Vorgaben für neue Dateien wieder her; bestehende Einträge behalten ihre Einstellungen. Bei kleinen Fenstern scrollen die Einstellungen, während Dateiliste, Informationsfeld und Verarbeitungsschaltflächen Platz behalten. Wähle den Ausgabeordner mit **Auswählen**.
 
@@ -55,6 +55,7 @@ Während eines Stapels wird **Start** zu **Nach Datei pausieren**. Erneutes Klic
 | Half-SBS / Half-OU | Kompakte Stereoformate für passende Player und Bildschirme |
 | Kreuzblick · Full-SBS R/L | Freies Betrachten: rechtes Halbbild links, linkes Halbbild rechts |
 | Anaglyph | Stereo mit Farbbrille; 17 Verfahren aus AnaglyphBatch |
+| Dual · L/R-Spuren | Zwei getrennte Videospuren im selben MP4 oder MKV; Maße je Halbbild |
 | Mono | Gewähltes linkes oder rechtes Halbbild als gewöhnliches Video ausgeben |
 | Layout beibehalten | Anordnung erhalten und neu kodieren, optional mit anderer Bildrate |
 | Zeilenverschachtelt | Direkte Ausgabe für einen passenden Polfilter-Monitor |
@@ -62,9 +63,16 @@ Während eines Stapels wird **Start** zu **Nach Datei pausieren**. Erneutes Klic
 
 **MP4 ist voreingestellt; MKV bleibt wählbar**, auch für Kreuzblick. MKV erhält die passende Stereo-Kennzeichnung. Kreuzblick-MP4 behält die R/L-Anordnung ohne irreführenden L/R-Marker. Die Player-Unterstützung unterscheidet sich; prüfe die erste Ausgabe auf dem vorgesehenen Gerät.
 
+
+Dual-Eingaben enthalten zwei gleich große Videospuren. `-dual` kennzeichnet sie für die automatische Erkennung; sonst wähle das Quelllayout **Dual** ausdrücklich. Eindeutige Spurtitel Left/Right bestimmen die Zuordnung, sonst gilt erste Spur links, zweite rechts. Zeitlich abweichende Halbbilder führen zu einer Meldung statt einer unvollständigen Stereoausgabe. MP4 ist voreingestellt, MKV bleibt wählbar.
+
+Für BD-3D und Dual zeigt das Kontrollbild beide Halbbilder als Parallelblick, Kreuzblick oder Rot/Cyan-Anaglyph. Prüfe die räumliche Tiefe; ist sie umgekehrt, ändere **L/R tauschen**. Die Kontrollansicht verändert keine Ausgabeoptionen.
+
+Das Menü für Dateinamenszusätze nennt die zugehörigen Player in Klammern: Kodi, Bino bzw. Bino/Stereoscopic Player. Die Klammern erscheinen nur im Menü. Kodi und Bino verwenden eigene Kennungen; zusammengesetzte Vorschläge wie `.3D.HTAB-tbh` entfallen. Bestehende Namen werden weiterhin erkannt.
+
 ### Auflösung und Kreuzblick
 
-Wähle **Original**, **1080p**, **2160p** oder **Benutzerdefiniert**. Automatisch erhält bei vollständigen Layouts die rekonstruierte Quellgröße und verwendet bei Half-Layouts 1080p. Frei eingegebene Breite und Höhe bezeichnen immer das **gesamte Ausgabebild**. Das Seitenverhältnis bleibt erhalten; falls nötig entstehen Ränder.
+Wähle **Original**, **1080p**, **2160p** oder **Benutzerdefiniert**. Automatisch erhält bei vollständigen Layouts die rekonstruierte Quellgröße und verwendet bei Half-Layouts 1080p. Frei eingegebene Breite und Höhe bezeichnen bei gepackten Layouts das **gesamte Ausgabebild**, bei Dual die Maße **je Halbbild**. Das Seitenverhältnis bleibt erhalten; falls nötig entstehen Ränder.
 
 | Beispiel | Gesamtes Bild | Gespeicherte Pixel je Halbbild |
 | --- | --- | --- |
@@ -103,7 +111,7 @@ Bei Bildwandlungen werden Orientierung und Farbprofile angewendet. Die optionale
 
 Gepacktes Full-/Half-SBS und Full-/Half-OU werden unterstützt. Die automatische Erkennung nutzt Stereo-Metadaten oder eindeutige Dateikürzel. Bei uneindeutigen Quellen wählst du das Layout selbst. Übliche Player-Kürzel sind `-lr`, `-rl`, `-lrh`, `-rlh`, `-ab`, `-ba`, `-abq` und `-baq`.
 
-Windows liest außerdem unverschlüsseltes MVC/Blu-ray 3D und SDR-MV-HEVC. Bei einer Blu-ray-ISO wird die Haupt-Stereo-Playlist gewählt. Das Programm entfernt keinen Kopierschutz. HDR-Wandlung, animierte/mehrseitige Bilder und die Wandlung von 16-Bit-Bildern gehören nicht zu Version 1.0.
+Windows liest außerdem unverschlüsseltes MVC/Blu-ray 3D und SDR-MV-HEVC. Bei einer Blu-ray-ISO wird die Haupt-Stereo-Playlist gewählt. Das Programm entfernt keinen Kopierschutz. HDR-Wandlung, animierte/mehrseitige Bilder und die Wandlung von 16-Bit-Bildern gehören nicht zu Version 1.1.
 
 Speichere **Listen**, um einen Stapel mit seinen Einstellungen je Datei fortzusetzen. Listen enthalten Pfade und Einstellungen, nicht die Medien selbst. **Voreinstellungen** speichern wiederverwendbare Wandlungsoptionen. Sprache und gewählte Ordner werden lokal gemerkt.
 

@@ -56,7 +56,7 @@ def capture(args: list[str], cancel: threading.Event | None = None, timeout: flo
         stop_process(process)
 
 
-def probe(tools: Toolchain, path: Path, cancel: threading.Event | None = None) -> dict:
+def probe(tools: Toolchain, path: Path, cancel: threading.Event | None = None, expected_videos: int = 1) -> dict:
     if not path.is_file():
         raise ValueError(f"Datei fehlt: {path}")
     args = [str(tools.ffprobe), "-v", "error", "-protocol_whitelist", "file,pipe",
@@ -66,8 +66,8 @@ def probe(tools: Toolchain, path: Path, cancel: threading.Event | None = None) -
               and not s.get("disposition", {}).get("attached_pic")]
     if not videos:
         raise ValueError("Keine nutzbare Videospur gefunden.")
-    if len(videos) > 1:
-        raise ValueError("Mehrere Videospuren: Getrennte L/R-Spuren sind in dieser Version noch nicht freigegeben.")
+    if len(videos) != expected_videos:
+        raise ValueError("Die Anzahl der Videospuren entspricht nicht dem Ausgabeziel.")
     result["video"] = videos[0]
     return result
 
@@ -219,6 +219,8 @@ class Plan:
             return 'Kreuzblick: R/L-Anordnung; MP4 ohne Stereo-Kennzeichnung.'
         if self.options.target == 'framerate' and self.swap and self.options.container == 'mp4':
             return 'Umgekehrte Augenreihenfolge bleibt erhalten; MP4 ohne Stereo-Kennzeichnung.'
+        if self.options.target == "dual":
+            return "Dual: Zwei eigenständige Videospuren · Links, dann rechts"
         if self.options.target == "bd3d":
             return "3D-Kennzeichnung: AVC-Basis + zweites MVC-Halbbild · Linkes Halbbild zuerst"
         if not self.stereo:
@@ -267,6 +269,14 @@ def build_graph(video: dict, options: Options, layout: str, swap: bool, colors: 
         working, packed, prefix = unpack(video, layout)
         graph, size, pixel = build_graph(working, options, packed, swap, colors, method)
         return attach(prefix, graph, video['index']), size, pixel
+    if options.target == 'dual':
+        packed=replace(options,target='full_sbs',
+                       video_width=options.video_width*2 if options.video_size=='custom' else options.video_width)
+        graph,size,pixel=build_graph(video,packed,layout,swap,colors,method)
+        width,height=size[0]//2,size[1]
+        graph=graph.removesuffix('[v]')+'[dualpacked];[dualpacked]split[dl][dr];'
+        graph+=f'[dl]crop={width}:{height}:0:0[left];[dr]crop={width}:{height}:{width}:0[right]'
+        return graph,(width,height),pixel
     if layout == 'row_interleaved':
         video = dict(video, field_order='progressive')
     width, height = video["width"], video["height"]
@@ -457,12 +467,12 @@ def plan_job(tools: Toolchain, job: Job, output_root: Path, reserved: set[str],
         metadata = geometry_hint = None
         review('Manuelle Quellinterpretation ersetzt abweichende Stereo-Metadaten.')
     if multiview:
-        if options.layout not in {'auto', 'mvc', 'mvhevc'}:
+        if options.layout not in {'auto', 'mvc', 'mvhevc', 'dual'}:
             raise ValueError('Diese Quelle enthält echte Multiview-Halbbilder. Automatisch oder das passende Multiview-Format wählen.')
         if options.target == 'framerate':
             raise ValueError('Layout beibehalten erhält gepackte SBS/OU-Quellen. Für MVC/MV-HEVC zuerst das gewünschte Ausgabe-Layout wählen.')
         layout, swap = 'full_sbs', options.swap ^ bool(multiview.get('base_view_right', False))
-        warnings.append('Zwei vollständige Multiview-Halbbilder werden dekodiert.')
+        warnings.append('Dual: Zwei eigenständige Videospuren werden als L/R-Paar dekodiert.' if multiview['kind']=='dual' else 'Zwei vollständige Multiview-Halbbilder werden dekodiert.')
         if multiview['kind'] == 'mvc':
             warnings.append('MVC: Basis-Halbbild laut Blu-ray-Playlist '+('rechts' if multiview['base_view_right'] else 'links')+'.'
                 if 'base_view_right' in multiview else
@@ -481,7 +491,7 @@ def plan_job(tools: Toolchain, job: Job, output_root: Path, reserved: set[str],
             raise ValueError("Dateiname und Stereo-Metadaten widersprechen sich. Quelllayout bewusst auswählen.")
         swap = swapped ^ options.swap
     else:
-        if options.layout in {'mvc', 'mvhevc'}:
+        if options.layout in {'mvc', 'mvhevc', 'dual'}:
             raise ValueError('Die Quelle enthält nicht das gewählte Multiview-Format.')
         layout, swap = options.layout, options.swap
         if hint and hint != (layout, swap):
@@ -547,6 +557,8 @@ def plan_job(tools: Toolchain, job: Job, output_root: Path, reserved: set[str],
         graph, size, pixel_format = preparation.graph, preparation.size, 'yuv420p'
     else:
         graph, size, pixel_format = build_graph(video, options, layout, swap, colors, catalog[options.method])
+    if options.target == 'dual':
+        warnings.append('Dual: Zwei eigenständige Videospuren; Ausgabegröße gilt je Halbbild. Links ist die erste Spur, rechts die zweite.')
     graph = graph_prefix(info, graph)
     output_colors = dict(colors) if options.target == "framerate" else {
         "matrix": "bt709", "primaries": "bt709", "transfer": "bt709", "range": "tv"}
@@ -583,12 +595,12 @@ def plan_job(tools: Toolchain, job: Job, output_root: Path, reserved: set[str],
 def command(tools: Toolchain, plan: Plan, temporary: Path) -> list[str]:
     from .multiview import input_args
     options = plan.options
-    mv = plan.info.get('multiview', {}).get('kind') == 'mvhevc'
+    mv = plan.info.get('multiview', {}).get('kind') in {'mvhevc','dual'}
     args = [str(tools.ffmpeg), "-hide_banner", "-nostdin", "-n", "-loglevel", "info" if mv else "warning",
             *(['-xerror', '-err_detect', 'explode'] if mv else []),
             "-progress", "pipe:1", "-stats_period", "0.3",
             "-protocol_whitelist", "file,pipe", "-noautorotate", *input_args(plan),
-            "-filter_complex", plan.graph, "-map", "[v]", "-sn", "-dn",
+            "-filter_complex", plan.graph, *(['-map', '[left]', '-map', '[right]'] if options.target=='dual' else ['-map', '[v]']), "-sn", "-dn",
             "-map_metadata", "-1", "-c:v", "libx264" if options.codec == "h264" else "libx265",
             "-preset", "slow", "-pix_fmt", plan.pixel_format,
             "-fps_mode", "passthrough", "-enc_time_base",
@@ -615,12 +627,14 @@ def command(tools: Toolchain, plan: Plan, temporary: Path) -> list[str]:
         value = plan.info.get("format", {}).get("tags", {}).get(name)
         if isinstance(value, str):
             args += ["-metadata", name + "=" + value]
+    if options.target == 'dual':
+        args += ['-metadata:s:v:0','title=Left','-metadata:s:v:1','title=Right',
+                 '-disposition:v:0','default','-disposition:v:1','0']
     return args + [str(temporary)]
 
 
-def verify(tools: Toolchain, plan: Plan, path: Path, cancel: threading.Event) -> None:
-    info = probe(tools, path, cancel)
-    video = info["video"]
+def verify_output_video(plan, video):
+    """Apply the existing output metadata checks independently to each view."""
     if (video.get("width"), video.get("height")) != plan.size or str(video.get("pix_fmt", "")).replace("yuvj", "yuv") != plan.pixel_format:
         raise ValueError("Ausgabemaße oder Pixelformat entsprechen nicht dem geprüften Plan.")
     if video.get("codec_name") != ("h264" if plan.options.codec == "h264" else "hevc"):
@@ -631,25 +645,8 @@ def verify(tools: Toolchain, plan: Plan, path: Path, cancel: threading.Event) ->
     from .video import interlaced
     if interlaced(plan.info['video']) and video.get('field_order') not in (None, 'unknown', 'progressive'):
         raise ValueError('Die deinterlacte Ausgabe ist nicht progressiv gekennzeichnet.')
-    from .audio import selected, codec, channels
-    tracks = selected(plan.info, plan.options)
-    expected_audio = [codec(s, plan.options) for s in tracks]
-    actual_audio = [s.get("codec_name") for s in info["streams"] if s.get("codec_type") == "audio"]
-    if actual_audio != expected_audio:
-        raise ValueError("Die Audioübernahme stimmt nicht mit der Quelle überein.")
-    actual_channels = [s.get('channels') for s in info['streams'] if s.get('codec_type') == 'audio']
-    if actual_channels != [channels(s, plan.options) for s in tracks]:
-        raise ValueError('Die Kanalzahl des ausgegebenen Tons stimmt nicht mit dem Plan überein.')
     if metadata_layout(video) != plan.stereo:
         raise ValueError("Die Stereo-Kennzeichnung der Ausgabe stimmt nicht mit dem Plan überein: " + json.dumps(video.get('side_data_list', [])))
-    if plan.options.container == "mp4" and plan.stereo:
-        if packed_stereo_boxes(path) != [2 if plan.stereo[0] == "sbs" else 1]:
-            raise ValueError("Die explizite MP4-st3d-Kennzeichnung fehlt oder ist falsch.")
-    if plan.stereo and plan.options.codec == "h264" and not plan.stereo[1]:
-        frame_info = json.loads(capture([str(tools.ffprobe), "-v", "error", "-select_streams", "v:0",
-            "-read_intervals", "%+#1", "-show_frames", "-of", "json", str(path)], cancel))
-        if not frame_info.get("frames") or metadata_layout(frame_info["frames"][0]) != plan.stereo:
-            raise ValueError("Die H.264-Frame-Packing-Kennzeichnung fehlt oder ist falsch.")
     if requested_rate(plan.options):
         if Fraction(video.get("r_frame_rate", "0/1")) != requested_rate(plan.options):
             raise ValueError("Die Zielbildrate wurde nicht korrekt gespeichert: " + json.dumps({k: video.get(k) for k in (
@@ -661,6 +658,32 @@ def verify(tools: Toolchain, plan: Plan, path: Path, cancel: threading.Event) ->
     if plan.options.target == "framerate":
         if video.get("sample_aspect_ratio", "1:1") != plan.info['video'].get("sample_aspect_ratio", "1:1"):
             raise ValueError("Das Pixelseitenverhältnis wurde unerwartet geändert.")
+
+
+def verify(tools: Toolchain, plan: Plan, path: Path, cancel: threading.Event) -> None:
+    info = probe(tools, path, cancel, expected_videos=2 if plan.options.target=='dual' else 1)
+    video = info["video"]
+    videos = [stream for stream in info['streams'] if stream.get('codec_type') == 'video'
+              and not stream.get('disposition',{}).get('attached_pic')]
+    for output_video in videos:
+        verify_output_video(plan, output_video)
+    from .audio import selected, codec, channels
+    tracks = selected(plan.info, plan.options)
+    expected_audio = [codec(s, plan.options) for s in tracks]
+    actual_audio = [s.get("codec_name") for s in info["streams"] if s.get("codec_type") == "audio"]
+    if actual_audio != expected_audio:
+        raise ValueError("Die Audioübernahme stimmt nicht mit der Quelle überein.")
+    actual_channels = [s.get('channels') for s in info['streams'] if s.get('codec_type') == 'audio']
+    if actual_channels != [channels(s, plan.options) for s in tracks]:
+        raise ValueError('Die Kanalzahl des ausgegebenen Tons stimmt nicht mit dem Plan überein.')
+    if plan.options.container == "mp4" and plan.stereo:
+        if packed_stereo_boxes(path) != [2 if plan.stereo[0] == "sbs" else 1]:
+            raise ValueError("Die explizite MP4-st3d-Kennzeichnung fehlt oder ist falsch.")
+    if plan.stereo and plan.options.codec == "h264" and not plan.stereo[1]:
+        frame_info = json.loads(capture([str(tools.ffprobe), "-v", "error", "-select_streams", "v:0",
+            "-read_intervals", "%+#1", "-show_frames", "-of", "json", str(path)], cancel))
+        if not frame_info.get("frames") or metadata_layout(frame_info["frames"][0]) != plan.stereo:
+            raise ValueError("Die H.264-Frame-Packing-Kennzeichnung fehlt oder ist falsch.")
     if path.stat().st_size == 0:
         raise ValueError("Die Ausgabe ist leer.")
 
@@ -713,7 +736,7 @@ def execute_prepared(tools: Toolchain, plan: Plan, cancel: threading.Event, emit
     process = None
     readers = []
     from .multiview import PairClock, check_decoder
-    pair_clock = PairClock() if plan.info.get('multiview', {}).get('kind') == 'mvhevc' else None
+    pair_clock = PairClock() if plan.info.get('multiview', {}).get('kind') in {'mvhevc','dual'} else None
     errors = []
     with log_path.open("a", encoding="utf-8") as log:
         log.write("\n" + json.dumps({"source": str(plan.source), "output": str(plan.output),
@@ -806,12 +829,21 @@ def execute_prepared(tools: Toolchain, plan: Plan, cancel: threading.Event, emit
                 encoded.unlink(missing_ok=True)
 
 
-def preview(tools: Toolchain, plan: Plan, cancel: threading.Event, seconds: float = 0) -> bytes:
+def preview(tools: Toolchain, plan: Plan, cancel: threading.Event, seconds: float = 0, view: str = 'parallel') -> bytes:
     if not math.isfinite(seconds) or seconds < 0 or (plan.duration and seconds >= plan.duration):
         raise ValueError("Zeitstelle liegt außerhalb des Videos.")
     from .multiview import runtime, input_args
     with runtime(tools, plan, cancel, seconds) as (working, decoder):
-        graph = working.graph + (";[right]nullsink;[left]null[v]" if plan.options.target == "bd3d" else "") + ";[v]format=rgb24[preview]"
+        if view not in {'parallel', 'cross', 'anaglyph'}:
+            raise ValueError('Ungültige Kontrollbildansicht.')
+        stereo = ''
+        if plan.options.target in {'bd3d','dual'}:
+            order = '[right][left]' if view == 'cross' else '[left][right]'
+            stereo = ';' + order + 'hstack=inputs=2'
+            if view == 'anaglyph':
+                stereo += ',stereo3d=sbsl:arcd'
+            stereo += '[v]'
+        graph = working.graph + stereo + ";[v]format=rgb24[preview]"
         if working.info.get('preview_trim'):
             index = working.info['video']['index']
             graph = graph.replace(f'[0:{index}]', f"[0:{index}]trim=start_frame={working.info['preview_trim']},", 1)

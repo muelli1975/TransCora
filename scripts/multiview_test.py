@@ -80,6 +80,15 @@ def main():
         assert plan.info['multiview']['kind'] == 'mvc'
         png = preview(tools, plan, cancel, .5)
         assert png.startswith(b'\x89PNG')
+        # BD-3D control views display both decoded half-images without changing export options.
+        import io
+        from PIL import Image
+        bd_preview=plan_job(tools,Job(source,Options(target='bd3d',container='iso')),OUT,set(),cancel)
+        for view,width in [('parallel',3840),('cross',3840),('anaglyph',1920)]:
+            with Image.open(io.BytesIO(preview(tools,bd_preview,cancel,.5,view=view))) as picture:
+                assert picture.size==(width,1080)
+        assert bd_preview.options.target=='bd3d' and bd_preview.options.container=='iso'
+        report['bd_control_views']=['parallel','cross','anaglyph']
         # Compare every decoded sample against an independent decoder, both views.
         with runtime(tools, plan, cancel) as (working, process), (OUT/'decoder.log').open('w') as log:
             args = working.info['runtime_input']['args']

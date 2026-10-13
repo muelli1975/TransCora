@@ -230,6 +230,33 @@ def check_decoder(process, cancel):
         raise ValueError('MVC: Dekodierung fehlgeschlagen · '+'\n'.join(process.mvc_errors))
 
 
+def dual_source(info, videos):
+    """Two independent streams form a pair only by an explicit input choice."""
+    from .engine import color_spec
+    first,second=videos
+    geometry=lambda v:(v['width'],v['height'],v.get('sample_aspect_ratio','1:1'))
+    if geometry(first)!=geometry(second):
+        raise ValueError('Dual: Beide Halbbilder benötigen gleiche Auflösung und gleiches Pixelseitenverhältnis.')
+    def eye(video):
+        title=str(video.get('tags',{}).get('title','')).strip().casefold()
+        return 'left' if title in {'left','l','links','linkes halbbild'} else 'right' if title in {'right','r','rechts','rechtes halbbild'} else None
+    eyes=[eye(v) for v in videos]
+    if eyes==['right','left']: videos=videos[::-1]
+    elif eyes[0] and eyes[0]==eyes[1]:
+        raise ValueError('Dual: Beide Videospuren sind demselben Halbbild zugeordnet.')
+    for video in videos:
+        color_spec(video)  # The existing SDR policy also applies to the second track.
+        if any(s.get('side_data_type') in {'Display Matrix','Spherical Mapping'} for s in video.get('side_data_list',[])):
+            raise ValueError('Gedrehte oder VR-projizierte Quelle: In dieser Version bitte vorher als normales SBS/OU vorbereiten.')
+    info['multiview']={'kind':'dual','source_index':videos[0]['index'],'videos':deepcopy(videos)}
+    virtual=deepcopy(videos[0])
+    virtual.update(width=virtual['width']*2,pix_fmt='gbrp16le',color_space='gbr',
+                   color_primaries='bt709',color_transfer='iec61966-2-1',color_range='pc')
+    virtual['side_data_list']=[]
+    info['video']=virtual
+    return info
+
+
 def inspect_source(tools, source, cancel=None, explicit='auto', phase=None):
     from .engine import capture
     from .mvc import annex_nals
@@ -246,6 +273,12 @@ def inspect_source(tools, source, cancel=None, explicit='auto', phase=None):
             iso_extract(source, disc, actual, cancel, sample=True)
         info, videos = raw_probe(tools, actual, cancel)
         valid = [v for v in videos if v.get('width') and v.get('height')]
+        if len(valid) == 2:
+            if explicit not in {'auto', 'dual'}:
+                raise ValueError('Zwei eigenständige Videospuren: Dual als Quelllayout wählen.')
+            if explicit == 'auto' and not re.search(r'-dual$', source.stem, re.I):
+                raise ValueError('Zwei eigenständige Videospuren: Für ein L/R-Paar Dual als Quelllayout wählen.')
+            return dual_source(info, valid)
         if len(valid) != 1:
             raise ValueError('Mehrere unabhängige Videospuren oder keine gültige Videoauflösung.')
         video = valid[0]
@@ -310,7 +343,7 @@ def inspect_source(tools, source, cancel=None, explicit='auto', phase=None):
                     desc['decoder'] = 'frim'
                 if not tested.get('mvc') or (tested['width'], tested['height']) != (video['width']*2, video['height']):
                     raise ValueError('MVC: Decoder-Geometrie stimmt nicht mit der Quelle überein.')
-        if explicit in {'mvc', 'mvhevc'} and (not desc or desc['kind'] != explicit):
+        if explicit in {'mvc', 'mvhevc', 'dual'} and (not desc or desc['kind'] != explicit):
             raise ValueError('Die Quelle enthält nicht das gewählte Multiview-Format.')
         if len(videos) > 1 and not desc:
             raise ValueError('Mehrere unabhängige Videospuren sind noch nicht freigegeben.')
@@ -334,6 +367,18 @@ def inspect_source(tools, source, cancel=None, explicit='auto', phase=None):
 
 def graph_prefix(info, graph):
     desc = info.get('multiview')
+    if desc and desc['kind'] == 'dual':
+        from .engine import color_spec
+        prefix = []
+        for side,video in zip(('left','right'),desc['videos']):
+            colors,_=color_spec(video)
+            rgb=(f"zscale=matrixin={colors['matrix']}:primariesin={colors['primaries']}:"
+                 f"transferin={colors['transfer']}:rangein={'full' if colors['range']=='pc' else 'limited'}:"
+                 "matrix=gbr:primaries=bt709:transfer=iec61966-2-1:range=full,format=gbrp16,")
+            prefix.append(f"[0:{video['index']}]" + rgb +
+                          f"settb=expr=1/1000000,showinfo@mv_{side}=checksum=0[d{side}]")
+        prefix.append('[dleft][dright]hstack=inputs=2[stereo]')
+        return ';'.join(prefix)+';'+graph.replace(f"[0:{info['video']['index']}]",'[stereo]')
     if not desc or desc['kind'] != 'mvhevc':
         return graph
     index = desc['source_index']

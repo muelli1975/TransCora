@@ -1,4 +1,4 @@
-# TransCora 1.0
+# TransCora 1.1
 
 Portabler, lokaler Konverter für 3D-Videos und Bilder mit Python-Oberfläche und FFmpeg.
 Videos und Bilder haben eigene Listen und Einstellungen. BD-3D-Ausgabe als ISO/M2TS,
@@ -91,7 +91,8 @@ Durchläufen erstellen. Fertige Jobs laufen erst nach bewusster Einstellungsänd
 | Half-SBS | 1920 × 1080, links/rechts gepackt |
 | Half-OU | 1920 × 1080, links oben/rechts unten |
 | Anaglyph | Volle rekonstruierte Auflösung eines Halbbildes; 17 AnaglyphBatch-Verfahren |
-| Mono | Linkes Halbbild; mit **L/R tauschen** das andere Halbbild |
+| Mono | Gewähltes linkes oder rechtes Halbbild, unter Berücksichtigung von L/R tauschen |
+| Dual | Zwei unabhängige L/R-Videospuren in MP4 oder MKV, Größe je Halbbild |
 | BD-3D · 1080p | AVC/MVC, 1920 × 1080 pro Halbbild, 23,976 fps; ISO oder M2TS |
 | Layout beibehalten | Gepacktes Layout, Halbbildreihenfolge, Auflösung und YUV-Farbaufteilung erhalten; Bildrate optional ändern |
 | Zeilenverschachtelt (Polfilter) | Exakte Monitorauflösung, abwechselnde Zeilen für linkes/rechtes Auge, 4:4:4 |
@@ -102,14 +103,14 @@ Full-Ausgaben erhalten die rekonstruierte Auflösung je Halbbild. Half → Full
 skaliert die gestauchte Achse hoch und gewinnt keine verlorenen Bilddetails zurück.
 Die Videogröße ist als **Standard / Original / 1080p / 2160p / Benutzerdefiniert** wählbar.
 Standard behält die bisherigen Größen bei. Original verwendet die rekonstruierte
-Quellgröße je Halbbild. Benutzerdefinierte Maße gelten bei allen Videoausgaben für
-das Gesamtbild. Kreuzblick mit 1920 × 540 enthält zwei unverzerrte 960 × 540-Halbbilder. Half-SBS in UHD bedeutet
+Quellgröße je Halbbild. Benutzerdefinierte Maße gelten bei gepackten Videoausgaben für
+das Gesamtbild, bei Dual je Halbbild. Kreuzblick mit 1920 × 540 enthält zwei unverzerrte 960 × 540-Halbbilder. Half-SBS in UHD bedeutet
 3840 × 2160 gesamt, Full-SBS mit UHD je Halbbild 7680 × 2160 gesamt.
 Eine größere Ausgabe stellt keine verlorenen Quelldetails wieder her.
 
 Full-/Half-SBS und Full-/Half-OU sind mögliche Quellen. Zusätzlich werden progressive
 H.264-MVC- und SDR-MV-HEVC-Quellen mit zwei vollständigen Ansichten verarbeitet.
-Anaglyphen, Frame-sequential und unabhängige Videospuren sind keine unterstützten Quellen.
+Frame sequential und zwei getrennte Videospuren (Dual) werden ebenfalls unterstützt; Anaglyphen sind keine Stereoquellen.
 
 **Dateinamenszusatz · frei editierbar** bietet zum Ziel passende konkrete Zusätze,
 **Keiner** und eigene Eingaben. Darunter steht unmittelbar der vollständige
@@ -117,8 +118,8 @@ Anaglyphen, Frame-sequential und unabhängige Videospuren sind keine unterstütz
 
 | Ziel | Vorgegebene Zusätze (Auswahl) |
 | --- | --- |
-| Half-SBS | `_half_sbs`, `-lrh`, `-lrq`, `.3D.HSBS`, `.3D.HSBS-lrh` |
-| Half-OU | `_half_ou`, `-tbh`, `-abq`, `.3D.HTAB`, `.3D.HTAB-tbh` |
+| Half-SBS | `_half_sbs`, `-lrh`, `-lrq`, `.3D.HSBS` |
+| Half-OU | `_half_ou`, `-tbh`, `-abq`, `.3D.HTAB` |
 | Anaglyph | Zusatz des gewählten Batch-Verfahrens, etwa `_dubois_lcd` |
 | Mono | `_mono_l`, `-2d` |
 | Layout beibehalten | Standard etwa `_30fps-tbh`; passende Layout-Kürzel und eigene Zusätze |
@@ -178,7 +179,7 @@ nummeriert, z. B. `Film_2_dubois_lcd.mkv`; auch nachträglich angelegte Ziele si
   Alle Tonspuren, ausgewählte Spurnummern oder kein Ton sind wählbar. Die Kanalzahl
   bleibt standardmäßig erhalten; Stereo-Downmix muss ausdrücklich gewählt werden.
   Für MP4 inkompatiblen Originalton unter Erweitert als AAC ausgeben oder MKV verwenden.
-  Untertitel, Kapitel, Daten und Anhänge werden in 1.0 nicht übernommen. Dateisystem-
+  Untertitel, Kapitel, Daten und Anhänge werden in 1.1 nicht übernommen. Dateisystem-
   Zeitstempel werden noch nicht übertragen; ausgewählte globale Metadaten wie
   `creation_time` und Titel werden übernommen.
 
@@ -242,9 +243,6 @@ lädt keine Tools/Updates aus dem Netz. Siehe `requirements-build.txt` und
 
 ## Grundlagen
 
-- [Konzept](https://github.com/muelli1975/TransCora/blob/main/docs/TransCora-Konzept.md)
-- [FFBatch-Auswertung](https://github.com/muelli1975/TransCora/blob/main/docs/ffmpeg-Parameter-Auswertung.md)
-- [Workflow, Player-Namen und Oberflächenplanung](https://github.com/muelli1975/TransCora/blob/main/docs/Video-Workflow-und-Oberflaeche.md)
 - [Originale Parameter](https://github.com/muelli1975/TransCora/blob/main/reference/FFBatch-Presets.txt)
 - [Unveränderte Batch-Referenz](https://github.com/muelli1975/TransCora/blob/main/reference/AnaglyphBatch_DE.bat)
 - [Methodenkatalog](presets/anaglyph_methods.reference.json)
@@ -344,7 +342,7 @@ anhand der beiden vom Decoder gemeldeten Ansichten. Manuelle Einträge
 - Blu-ray-3D-ISO: Unverschlüsselte UDF-2.50-Discs mit einer vollständigen
   einzelnen SSIF-Filmdatei. Die längste Film-Playlist wird gewählt und genannt.
   Seamless Branching, alternative Blickwinkel und Clip-Ausschnitte bleiben blockiert.
-- MV-HEVC: FFmpeg 7.1.1 dekodiert beide ausdrücklich als links/rechts
+- MV-HEVC: FFmpeg ab 7.1.1 dekodiert beide ausdrücklich als links/rechts
   gekennzeichneten Ansichten. Die Basis-Halbbild kann rechts oder links sein.
   Beide Bildzeitfolgen müssen zusammenpassen. SDR einschließlich 10-Bit-Quellen
   folgt dem bestehenden Farbpfad; HDR und immersive Projektionen bleiben blockiert.
@@ -354,8 +352,8 @@ Blu-ray-LPCM wird für MKV verlustfrei in FLAC gewandelt; andere freigegebene
 Audiospuren werden gemäß den Tonoptionen übernommen. Für MP4 wird die
 Kompatibilität des tatsächlich gewählten Tonformats geprüft. Layout beibehalten erhält weiterhin gepackte Quellen.
 
-MV-HEVC-Ausgabe für Apple-Geräte ist ein späteres eigenes Ausgabeziel. Beliebigem
-Stereomaterial werden keine erfundenen Spatial-Video-Kamerametadaten beigefügt.
+MV-HEVC wird ausschließlich als Eingabe dekodiert; ein zusätzlicher Encoder und
+MV-HEVC-Ausgabe gehören nicht zu 1.1.
 
 ## Matroska und 3D-Kennzeichnung
 
@@ -429,4 +427,39 @@ zu diesem Release.
 
 Die Videoliste zeigt Quell-fps und **Dauer** (HH:MM:SS) nach der Prüfung. Diese Werte
 bleiben bei Änderungen der Ausgabeoptionen sichtbar; unbekannte Angaben erscheinen
-als Strich. Die Oberfläche und das portable Paket tragen die Version **1.0**.
+als Strich. Die Oberfläche und das portable Paket tragen die Version **1.1**.
+
+
+## Dual und Kontrollbild in 1.1
+
+Dual enthält zwei eigenständige Videospuren. MP4 und MKV sind Ausgabecontainer,
+MP4 mit H.264 ist der Standard. Links wird zuerst gespeichert (Titel Left),
+rechts danach (Titel Right); gewählte Tonspuren folgen separat. Die Maße gelten je
+Halbbild. Beide Videos erhalten dieselben Qualitäts-, Größen- und Bildratenoptionen.
+Ein gewöhnlicher 2D-Player kann nur die erste Videospur anzeigen.
+
+Bei Eingaben erkennt -dual die Konvention; sonst Dual ausdrücklich auswählen.
+Zwei als Left/Right bezeichnete Spuren werden danach zugeordnet, anderenfalls
+gilt die Spurreihenfolge L/R. Die bestehende L/R-Vertauschung wirkt anschließend.
+Beide Spuren werden vor gemeinsamen Transformationen in denselben SDR-Farbraum
+gebracht. Während des Export-Dekodierens prüft die vorhandene Paar-Zeitbasis
+fehlende oder asynchrone Halbbilder. Es gibt keinen zusätzlichen Vollscan vor Start.
+
+BD-3D und Dual haben eine eigene Kontrollbildansicht für Parallelblick, Kreuzblick
+und Rot/Cyan-Anaglyph. Die Exportoptionen werden dabei nicht verändert.
+
+## Dateinamenszusätze
+
+| Kennung | Zuordnung |
+| --- | --- |
+| -lr, -lrq, -ab, -abq | Bino; Stereoscopic Player nach Peters Rückmeldung |
+| -lrh, -tb, -tbh, -rl und umgekehrte Varianten | Bino |
+| .3D.SBS, .3D.HSBS, .3D.TAB, .3D.HTAB | Kodi |
+| -dual | Dual-Konvention nach Peters Rückmeldung; keine allgemeine Player-Zertifizierung |
+| _full_sbs, _half_sbs, _full_ou, _half_ou | TransCora |
+
+Die Klammern mit Playernamen stehen ausschließlich im Auswahlmenü. Eigene Zusätze
+werden unverändert gespeichert. Zusammengesetzte Kodi/Bino-Kennungen werden nicht
+neu angeboten; bestehende Eingabedateien mit solchen Namen bleiben lesbar.
+
+Quellen: https://bino3d.org/bino-manual.html und https://kodi.wiki/view/3D .

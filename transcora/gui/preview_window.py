@@ -38,6 +38,17 @@ class PreviewWindow:
         self.scale.bind("<KeyRelease>", self.slider_released)
         self.position_label = ttk.Label(frame, text="Videodauer wird ermittelt …")
         self.position_label.grid(row=0, column=2, sticky="w")
+        self.view_frame = ttk.Frame(frame)
+        self.view_frame.grid(row=2, column=0, columnspan=3, sticky='ew', pady=(8,0))
+        ttk.Label(self.view_frame, text=self.t('Kontrollbildansicht')).pack(side='left', padx=(0,8))
+        self.view_choices = ('parallel', 'cross', 'anaglyph')
+        self.view_titles = ('Parallelblick · L/R', 'Kreuzblick · R/L', 'Anaglyph · Rot/Cyan')
+        self.view_combo = ttk.Combobox(self.view_frame, state='readonly', width=27,
+                                      values=[self.t(title) for title in self.view_titles])
+        self.view_combo.current(0); self.view_combo.pack(side='left')
+        self.view_combo.bind('<<ComboboxSelected>>', lambda event: self.request())
+        self.view_frame.grid_remove()
+        self.bd_preview = False
         self.image_view = ImageView(frame, self.localizer)
         self.image_view.grid(row=3, column=0, columnspan=3, pady=10, sticky="nsew")
         self.image_label = self.image_view.canvas
@@ -46,8 +57,12 @@ class PreviewWindow:
         self.note.grid(row=4, column=0, columnspan=3, sticky="w")
 
     def controls(self):
-        return [(self.time_entry, "normal"),
+        return [(self.view_combo, "readonly"), (self.time_entry, "normal"),
                 (self.scale, "normal" if self.duration > 0 else "disabled")]
+
+    @property
+    def preview_view(self):
+        return self.view_choices[max(0, self.view_combo.current())]
 
     @staticmethod
     def time_text(seconds):
@@ -97,7 +112,8 @@ class PreviewWindow:
         except ValueError:
             self.note.configure(text="Zeitstelle liegt außerhalb des Videos oder ist ungültig.")
             return
-        self.note.configure(text="Gleiche Filterkette wie im Export · 8-Bit-Anzeige, ohne Videokompression")
+        self.note.configure(text=self.t('Beide Halbbilder kontrollieren; die Ansicht ändert keine Ausgabeoptionen.') if self.bd_preview
+                            else self.t("Gleiche Filterkette wie im Export · 8-Bit-Anzeige, ohne Videokompression"))
         self.scale.set(min(seconds, float(self.scale.cget("to"))))
         # Preserve exact entry values, including values beyond the slider's last frame.
         self.time_var.set(entered)
@@ -107,6 +123,12 @@ class PreviewWindow:
         self.load_frame(seconds)
 
     def set_plan(self, plan):
+        self.bd_preview = plan.options.target in {'bd3d','dual'}
+        if self.bd_preview:
+            self.view_frame.grid()
+            self.note.configure(text=self.t('BD-3D: Beide Halbbilder kontrollieren; die Ansicht ändert keine Ausgabeoptionen.'))
+        else:
+            self.view_frame.grid_remove()
         self.duration = plan.duration
         try:
             frame_time = 1 / float(Fraction(plan.info["video"].get("avg_frame_rate", "0/0")))

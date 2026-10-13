@@ -769,6 +769,44 @@ class GuiTests(unittest.TestCase):
             self.window._load_settings()
             self.assertEqual(self.window.defaults.bd_bitrate_mbps,40)
 
+    def test_dual_target_keeps_containers_and_preview_choices_separate(self):
+        from types import SimpleNamespace
+        window=self.window
+        window.variables['target'].set(window.t('Dual · L/R-Spuren'))
+        window.option_changed('target')
+        self.assertEqual(window.defaults.target,'dual')
+        self.assertEqual(window.defaults.container,'mp4')
+        self.assertEqual(tuple(window.combos['container'].cget('values')),('MP4','MKV'))
+        self.assertEqual(window.video_size_caption.get(),window.t('Ausgabegröße je Halbbild'))
+        viewer=PreviewWindow(self.root,lambda seconds:None)
+        window.controls.extend(viewer.controls())
+        viewer.set_plan(SimpleNamespace(duration=1,options=window.defaults,
+                        info={'video':{'avg_frame_rate':'25/1'}}))
+        self.root.update()
+        self.assertTrue(viewer.view_frame.winfo_ismapped())
+        viewer.view_combo.current(1)
+        self.assertEqual(viewer.preview_view,'cross')
+        window.close_preview(viewer.dialog,viewer.time_entry,viewer.scale)
+        self.assertFalse(any(widget==viewer.view_combo for widget,_ in window.controls))
+
+    def test_player_suffix_labels_are_menu_only_and_custom_text_stays_literal(self):
+        window=self.window
+        for language in ('de','en'):
+            window.language=language; window.apply_language()
+            window.variables['target'].set(window.t('Half-SBS')); window.option_changed('target')
+            values=tuple(window.combos['suffix'].cget('values'))
+            self.assertIn('-lrq (Bino/Stereoscopic Player)',values)
+            self.assertIn('.3D.HSBS (Kodi)',values)
+            self.assertFalse(any('HSBS-lrh' in v for v in values))
+            window.variables['suffix'].set('-lrq (Bino/Stereoscopic Player)')
+            window.option_changed('suffix')
+            self.assertEqual(window.variables['suffix'].get(),'-lrq')
+            self.assertEqual(window.defaults.suffix,'-lrq')
+            self.assertTrue(window.output_name.get().endswith('-lrq.mp4'))
+            window.variables['suffix'].set('_My own (label)')
+            window.option_changed('suffix')
+            self.assertEqual(window.defaults.suffix,'_My own (label)')
+
     def test_file_warnings_are_highlighted_and_follow_selection_and_language(self):
         from types import SimpleNamespace
         message='Full/Half-Layout nicht eindeutig erkennbar. Quelllayout für diese Datei auswählen.'

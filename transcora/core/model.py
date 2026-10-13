@@ -11,12 +11,12 @@ import uuid
 VIDEO_EXTENSIONS = {".mp4", ".mkv", ".mk3d", ".mkv3d", ".mov", ".m2ts", ".mts", ".ts", ".ssif", ".iso", ".avi", ".wmv"}
 LAYOUTS = {"auto": "Automatisch", "full_sbs": "Full-SBS", "half_sbs": "Half-SBS",
            "full_ou": "Full-OU", "half_ou": "Half-OU", "mono": "Mono / 2D",
-           "mvc": "MVC / Blu-ray 3D", "mvhevc": "MV-HEVC",
+           "mvc": "MVC / Blu-ray 3D", "mvhevc": "MV-HEVC", "dual": "Dual (L/R-Spuren)",
            "row_interleaved": "Zeilenverschachtelt", "frame_sequential": "Frame sequential"}
 TARGETS = {"half_sbs": "Half-SBS", "half_ou": "Half-OU",
            "row_interleaved": "Zeilenverschachtelt (Polfilter)",
            "cross_sbs": "Kreuzblick · Full-SBS R/L", "full_sbs": "Full-SBS", "full_ou": "Full-OU",
-           "anaglyph": "Anaglyph", "mono": "Mono", "framerate": "Layout beibehalten", "bd3d": "BD-3D"}
+           "anaglyph": "Anaglyph", "dual": "Dual · L/R-Spuren", "mono": "Mono", "framerate": "Layout beibehalten", "bd3d": "BD-3D"}
 NAMING = {"original": "Kein Layout-Zusatz", "layout": "Layout-Zusatz",
           "players": "Player-Kürzel (Kodi/Bino)"}
 PROFILES = {"quality": "Qualität · 8 Bit / 4:4:4", "quality10": "Hohe Farbtiefe · 10 Bit / 4:4:4",

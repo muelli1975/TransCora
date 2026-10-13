@@ -10,9 +10,6 @@ on:
       - 'README_DE.md'
       - 'BUILD.md'
       - 'THIRD_PARTY.md'
-      - '.github/workflows/probe-1.1.yml'
-      - 'scripts/probe_1_1_mvhevc.py'
-      - 'scripts/prepare_mvhevc_probe.py'
   workflow_dispatch:
     inputs:
       publish_release:
@@ -115,6 +112,8 @@ jobs:
           Get-Content $report
       - name: Test the packaged HEIF reader with both tagged half-images
         run: python scripts/probe_1_1_heif.py --ffmpeg dist/TransCora/tools/ffmpeg/bin/ffmpeg.exe --reader dist/TransCora/tools/heif/TransCora-HEIF.exe --application dist/TransCora/TransCora.exe --folder work/heif-package-test --report work/heif-package-test/report.json
+      - name: Test Dual MP4 and MKV through the packaged application
+        run: python scripts/check_dual_package.py --application dist/TransCora/TransCora.exe
       - uses: actions/upload-artifact@v4
         with:
           name: TransCora-Release-Windows
@@ -214,6 +213,8 @@ jobs:
           dist/TransCora/TransCora.app/Contents/MacOS/TransCora --self-test smoke-app.json
       - name: Test the packaged HEIF reader
         run: python scripts/probe_1_1_heif.py --ffmpeg "$(command -v ffmpeg)" --reader dist/TransCora/tools/heif/TransCora-HEIF --application dist/TransCora/TransCora --folder work/heif-package-test --report work/heif-package-test/report.json
+      - name: Test Dual MP4 and MKV through the packaged application
+        run: python scripts/check_dual_package.py --application dist/TransCora/TransCora
       - uses: actions/upload-artifact@v4
         with:
           name: TransCora-Release-${{ matrix.label }}

@@ -22,7 +22,7 @@ from transcora.core.journal import Journal, Completion, JournalError, request, r
 from transcora.core.batch_pause import BatchPause
 from transcora.core.engine import Cancelled, execute, methods, plan_job, preview
 from transcora.core.model import Job, LAYOUTS, PROFILES, TARGETS, Options, VIDEO_EXTENSIONS, app_root, FPS_CHOICES, FPS_MODES, COMPATIBILITY_NOTE, ANAGLYPH_PLAYER_NOTE, AUDIO_FORMATS, AUDIO_TRACKS, AUDIO_CHANNELS, VIDEO_SIZES, BD_BITRATES, BD_MODES, ROW_ORDERS
-from transcora.core.naming import effective_suffix, suffix_choices, reserve_output, filename_layout, fps_suffix, default_disc_title
+from transcora.core.naming import effective_suffix, suffix_choices, reserve_output, filename_layout, fps_suffix, default_disc_title, suffix_label, suffix_value, suffix_player
 from transcora.core.storage import load_list, save_list, write_json, new_run_log, delete_run_logs, load_presets, save_presets, validate_preset_name
 from transcora.core.toolchain import Toolchain
 from transcora.gui.native import schedule_dark_titlebar
@@ -678,8 +678,11 @@ class Window:
     def update_row(self, job):
         layout = job.plan.layout if job.plan else job.options.layout
         if not job.plan and job.result:
-            layout = job.result.record.get('effective', {}).get('layout', layout)
+            effective = job.result.record.get('effective', {})
+            layout = 'dual' if effective.get('source_kind') == 'dual' else effective.get('layout', layout)
         if job.plan:
+            if job.plan.info.get('multiview',{}).get('kind') == 'dual':
+                layout = 'dual'
             job.source_fps = job.plan.info["video"].get("avg_frame_rate")
             job.source_duration = job.plan.duration or None
             video = job.plan.info['video']
@@ -797,7 +800,8 @@ class Window:
             if key == 'disc_title':
                 value = value.strip() or None
             if key == "suffix":
-                value = "" if value == self.t("Keiner") else value
+                value = "" if value == self.t("Keiner") else suffix_value(value,self.t)
+                self.variables["suffix"].set(value or self.t("Keiner"))
             if key in self.mappings:
                 value = next(k for k, label in self.mappings[key].items() if self.t(label) == value)
             elif key in {"video_width", "video_height", 'screen_width', 'screen_height'}:
@@ -814,8 +818,10 @@ class Window:
                     result.suffix = None
                     if value == 'bd3d':
                         result.container, result.codec = 'iso', 'h264'
+                    elif value == 'dual':
+                        result.container = 'mkv' if result.codec == 'h265' or options.container == 'mkv' else 'mp4'
                     elif options.target == 'bd3d':
-                        result.container = 'mp4'
+                        result.container = 'mkv' if result.codec == 'h265' else 'mp4'
                     if value == "framerate":
                         result.swap = False
                     if value == 'row_interleaved':
@@ -863,6 +869,7 @@ class Window:
         anaglyph = options.target == "anaglyph"
         framerate = options.target == "framerate"
         bd3d = options.target == 'bd3d'
+        dual = options.target == 'dual'
         rows = options.target == 'row_interleaved'
         self.screen_fields.pack(fill='x',pady=(4,0)) if rows else self.screen_fields.pack_forget()
         self.combos['row_first'].configure(state='readonly' if rows else 'disabled')
@@ -889,7 +896,7 @@ class Window:
             self.variables['video_size'].set(self.t('Monitorauflösung' if rows else 'Original'))
         self.video_dimensions.pack_forget() if rows else self.video_dimensions.pack(fill='x',pady=(4,0))
         custom_size = not bd3d and not framerate and not rows and options.video_size == "custom"
-        self.video_size_caption.set('Ausgabegröße je Halbbild' if bd3d else 'Ausgabegröße')
+        self.video_size_caption.set('Ausgabegröße je Halbbild' if bd3d or dual else 'Ausgabegröße')
         for key in ('video_width', 'video_height'):
             self.combos[key].configure(state='normal' if custom_size else 'disabled')
         self.refresh_dimensions()
@@ -897,7 +904,7 @@ class Window:
         self.combos["method"].configure(state="readonly" if anaglyph else "disabled")
         self.combos["profile"].configure(state="readonly" if anaglyph else "disabled",
             values=[self.t(value) for value in PROFILES.values()])
-        self.combos["suffix"].configure(values=[self.t(v) for v in self.available_suffixes(options, selected[0] if selected else None)])
+        self.combos["suffix"].configure(postcommand=self.fit_suffix_menu, values=[suffix_label(v,self.t) for v in self.available_suffixes(options, selected[0] if selected else None)])
         self.combos["container"].configure(state="disabled" if options.codec == "h265" else "readonly")
         self.combos['codec'].configure(state='disabled' if bd3d else 'readonly')
         self.combos['rate_mode'].configure(state='disabled' if bd3d else 'readonly')
@@ -944,10 +951,16 @@ class Window:
             text = "Kreuzblick: Full-SBS mit rechtem Halbbild zuerst."
         if rows:
             text = 'Polfilter: Vollbild ohne Skalierung. 4:4:4 erhält getrennte Farbzeilen; 4:2:0 würde die Farben beider Augen vermischen.'
+        if dual:
+            text = "Dual: Zwei eigenständige Videospuren; Ausgabegröße gilt je Halbbild. Links ist die erste Spur, rechts die zweite."
         if options.codec == "h265":
             text += " H.265: MKV, längere Rechenzeit und Zielplayer prüfen; CRF ist codecabhängig."
         if options.rate_mode == "abr" and not bd3d:
             text += " Zielbitrate = Videodurchschnitt, kein festes Dateigrößenlimit."
+        suffix=self.variables['suffix'].get()
+        player=suffix_player(suffix)
+        if player:
+            text += (" " if text else "") + self.t("Dateinamenszusatz: {0} ({1}).").format(suffix,self.t(player))
         self.option_attention.set(review_text)
         self.warning.set(text)
         self.update_output_name()
@@ -961,6 +974,25 @@ class Window:
             return effective_suffix(options, self.catalog[options.method]["suffix"], job.source) or self.t("Keiner")
         except ValueError:
             return options.suffix or fps_suffix(options.target_fps)
+
+    def fit_suffix_menu(self):
+        def resize():
+            try:
+                combo=self.combos['suffix']
+                if self.root.tk.call('tk','windowingsystem')=='aqua':
+                    return
+                popdown=self.root.tk.call('ttk::combobox::PopdownWindow',str(combo))
+                from tkinter import font
+                metrics=font.Font(root=self.root,font='TkTextFont')
+                width=max(combo.winfo_width(),max((metrics.measure(value) for value in combo.cget('values')),default=0)+36)
+                width=min(width,self.root.winfo_screenwidth()-20)
+                current=self.root.tk.call('wm','geometry',popdown)
+                match=__import__('re').match(r'\\d+x(\\d+)([+-]\\d+[+-]\\d+)',current)
+                if match:
+                    self.root.tk.call('wm','geometry',popdown,f'{width}x{match[1]}{match[2]}')
+            except tk.TclError:
+                pass
+        self.root.after_idle(resize)
 
     def available_suffixes(self, options, job=None):
         layout, swap = options.layout, False
@@ -1394,6 +1426,7 @@ class Window:
                             raise JournalError('Quelldaten für den Journalnachweis fehlen.')
                         completion = Journal(output).complete(receipts[job.id], (plan.output,), elapsed,
                             effective={'options': asdict(plan.options), 'layout': plan.layout, 'swap': plan.swap, 'size': plan.size,
+                                       'source_kind': plan.info.get('multiview', {}).get('kind'),
                                        'source_fps': plan.info['video'].get('avg_frame_rate'), 'source_duration': plan.duration,
                                        'source_geometry': [plan.info['video']['width'], plan.info['video']['height'], plan.layout]},
                             tools={'video': capabilities['version']})
@@ -1437,10 +1470,11 @@ class Window:
             if self.busy:
                 return
             output = self.output_path()
+            view = viewer.preview_view
             def work():
                 tools = Toolchain.find()
                 plan = plan_job(tools, job, output, set(), self.cancel, tools.inspect())
-                png = preview(tools, plan, self.cancel, seconds)
+                png = preview(tools, plan, self.cancel, seconds, view=view)
                 self.events.put(("preview", (viewer, png, plan)))
                 self.events.put(("notice", "Kontrollbild bereit."))
             self.background(work, "Kontrollbild berechnen")
@@ -1462,7 +1496,8 @@ class Window:
             self.check(True)
 
     def close_preview(self, dialog, *widgets):
-        self.controls = [(widget, state) for widget, state in self.controls if widget not in widgets]
+        self.controls = [(widget, state) for widget, state in self.controls
+                         if widget not in widgets and widget.winfo_toplevel() != dialog]
         dialog.destroy()
 
     def show_log(self):

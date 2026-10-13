@@ -7,9 +7,12 @@ import sys
 
 
 def main():
-    if len(sys.argv) == 4 and sys.argv[1] == '--self-test-heif':
+    if len(sys.argv) == 4 and sys.argv[1] in {'--self-test-heif','--self-test-dual'}:
         try:
-            from transcora.core.heif_check import check
+            if sys.argv[1]=='--self-test-heif':
+                from transcora.core.heif_check import check
+            else:
+                from transcora.core.dual_check import check
             report = check(Path(sys.argv[3]))
         except Exception as error:
             import traceback
