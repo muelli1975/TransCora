@@ -61,8 +61,9 @@ Chroma-Werte sind nach verlustfreier Kodierung vollständig pixelgleich.
 | Getrennte `hvcC`/`lhvC` und Basisprofil Main | MP4 wird mit beiden Views und expliziten L/R-Positionen erkannt. |
 | L/R und absichtlich vertauschte R/L-Kennzeichnung | `vidx` und `vpos:left/right` liefern jeweils das erwartete Halbbild. |
 | Container, Ton und Zeit | Kodierte Mediendaten unverändert; dekodierter Ton vor/nach Anpassung identisch; 36 Pakete mit 1/25-s-Abständen. |
-| Kleine gezielte Regressionen | Neun Tests für Signalisierung, NAL-Payloads und Container-/Chunk-Adressen bestanden. |
-| Aktuelle Linux-Anwendungssuite | 157 Tests bestanden; Windows-/macOS-Paketlauf für diesen Probe-Commit läuft separat. |
+| Speichersparende Containeranpassung | Nur `moov` bleibt im Speicher; Mediendaten werden blockweise und atomar kopiert. Fast Start, nachgestelltes `moov`, In-place-Aktualisierung und `stco`-Überlauf zu `co64` sind geprüft. |
+| Kleine gezielte Regressionen | Elf Tests für Signalisierung, NAL-Payloads, dateibasiertes Schreiben und Container-/Chunk-Adressen bestanden. |
+| Vollständige Anwendungssuite | Je 159 Tests auf Windows, Linux und macOS bestanden; alle drei Pakete, HEIF-Prüfungen sowie Windows-BD-3D/MVC/MV-HEVC waren erfolgreich. |
 
 Ursache der ursprünglichen 11-statt-12-Abweichung: x265 fügt mit
 `--repeat-headers` einen identischen Basis-Layer-Präfix zwischen Basis- und
@@ -72,13 +73,14 @@ doppelten Präfixe bestätigt die Ursache und bleibt ausschließlich eine
 Entwicklungsdiagnose.
 
 Vollständiger Bericht: [1.1-mvhevc-probe.json](verification/1.1-mvhevc-probe.json).
-Lauf: https://github.com/muelli1975/TransCora/actions/runs/38336666171
+Codec-Lauf: https://github.com/muelli1975/TransCora/actions/runs/38356177448
+Anwendungs-/Paketlauf: https://github.com/muelli1975/TransCora/actions/runs/38356176846
 
 **Noch offen:** Einbindung als Anwendungsausgabe, gepackter Multiview-Encoder,
-speichersparende Containeranpassung für große Videos sowie Fortschritt/Abbruch,
-Tonoptionen, Journal und Paketprüfungen des neuen Ziels. Kein Test auf einem
-Apple-Gerät; keine bestätigte Vision-Pro-Wiedergabe. Die Probe führt keine
-zusätzliche Produkt-Sperrprüfung oder vollständige Mediennachkontrolle ein.
+Fortschritt/Abbruch, Tonoptionen, Journal und Paketprüfungen des neuen Ziels.
+Kein Test auf einem Apple-Gerät; keine bestätigte Vision-Pro-Wiedergabe. Die
+Probe führt keine zusätzliche Produkt-Sperrprüfung oder vollständige
+Mediennachkontrolle ein.
 
 AVIF bleibt optional und ist für diesen Stand nicht aktiviert: Der Pillow-Leser
 liefert hier keine NCLX-/HDR-Transferkennzeichnung an die vorhandene Bildpipeline.

@@ -1410,8 +1410,8 @@
       }
     }
   ],
-  "workflow_run": "https://github.com/muelli1975/TransCora/actions/runs/38336666171",
-  "source_commit": "470789964cef91b46c359f24782d09cb12abd72c",
+  "workflow_run": "https://github.com/muelli1975/TransCora/actions/runs/38356177448",
+  "source_commit": "3eeb0bc018f791db3073463c7c0ade212677ed3c",
   "fixture": {
     "width_per_view": 128,
     "height": 64,

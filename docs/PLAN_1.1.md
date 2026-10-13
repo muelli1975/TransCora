@@ -207,15 +207,15 @@ unverändert. Ein gepackter SBS-Strom über stdin funktioniert ebenfalls mit
 automatischer Encoder-/Decoder-Threadzahl, ohne unkomprimierte Zwischenvideos.
 Unveränderte fehlerhafte Varianten bleiben als Negativkontrollen im Bericht.
 
-Der Bericht steht in `verification/1.1-mvhevc-probe.json`, der reproduzierbare
-Lauf unter https://github.com/muelli1975/TransCora/actions/runs/38336666171.
+Der Bericht steht in `verification/1.1-mvhevc-probe.json`. Der dateibasierte
+Folgelauf unter https://github.com/muelli1975/TransCora/actions/runs/38356177448
+bestätigt dieselben Stereoergebnisse mit der speichersparenden Containeranpassung.
+Sie hält nur die `moov`-Metadaten im Speicher, kopiert andere Boxen blockweise und
+atomar und korrigiert `stco`-/`co64`-Adressen auch bei Fast-Start-Dateien.
 Dies ist noch kein Ausgabeziel in der Anwendung. Vor dessen Einbindung fehlen
-der gepackte Encoder mit Herkunfts-/Lizenznachweisen, eine speichersparende
-Containeranpassung für große Dateien und die Anbindung an Fortschritt, Abbruch,
-Ton, Einstellungen und Journal. Der kleine Prototyp liest den gesamten MP4-Inhalt
-in den Speicher und darf nicht unverändert für lange Videos verwendet werden.
-Apple-Gerätewiedergabe ist weiterhin ungeprüft; räumliche Kameradaten werden nicht
-erfunden.
+der gepackte Encoder mit Herkunfts-/Lizenznachweisen und die Anbindung an
+Fortschritt, Abbruch, Ton, Einstellungen und Journal. Apple-Gerätewiedergabe ist
+weiterhin ungeprüft; räumliche Kameradaten werden nicht erfunden.
 
 ## 7. Reihenfolge und Freigabe
 
