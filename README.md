@@ -16,7 +16,7 @@ Everything runs locally, without an account, cloud or tracking. The interface ca
 
 The default output folder is `output` beside the program. Folder batches preserve relative subfolders. Existing files receive a numbered alternative name. A failed entry does not stop the remaining valid entries. **Cancel** stops the current operation; completed files remain available.
 
-Video status shows estimated remaining time for the **file** and **batch**. Estimates use live progress and durations of comparable completed files. BD-3D also learns audio and mux finishing times; the first title has a coarser estimate. A dash indicates an unmeasured format or missing progress.
+Video status shows estimated remaining time for the **file** and **batch**, based on remaining video duration and the duration-weighted processing average measured during the run. Different resolutions, frame rates and codecs do not suppress the batch estimate. Estimates remain available across file transitions and delayed progress updates. BD-3D includes total processing time, including audio and muxing. A dash appears before the first progress measurement.
 
 Videos and images share **Source**, **Output**, **Format** and **Save** sections. **Output size** shows dimensions beside the size menu. Video dimensions describe the complete output picture; BD-3D shows dimensions per eye image. Images can be scaled proportionally by their long or short edge.
 

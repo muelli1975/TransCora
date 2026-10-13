@@ -142,9 +142,7 @@ def encode(tools, bd, plan, base, dependent, cancel, emit, log, estimated_frames
                 try:
                     frames = int(value)
                     emit('progress', {'percent': min(70, 5+65*int(value)/estimated_frames) if estimated_frames else None,
-                                      'seconds': int(value)/float(output_rate),
-                                      'phase_percent': min(100, 100*int(value)/estimated_frames) if estimated_frames else None,
-                                      'remaining_scope': 'phase'})
+                                      'seconds': int(value)/float(output_rate)})
                 except ValueError:
                     pass
             elif progress and key == 'fps':
@@ -210,8 +208,7 @@ def decoded_digest(bd, base, dependent, frames, cancel, log, emit=None, *, mode=
                 elapsed = now-started
                 remaining = max(0, frames*frame_bytes-count)*elapsed/count if elapsed >= 2 else None
                 emit('progress', {'percent': 93+6*min(1, count/(frames*frame_bytes)),
-                                  'seconds': count/frame_bytes/float(output_rate), 'remaining_seconds': remaining,
-                                  'remaining_scope': 'phase'})
+                                  'seconds': count/frame_bytes/float(output_rate), 'remaining_seconds': remaining})
     run([bd.decoder, '-sw', '-i:mvc', base, dependent, '-sbs', '-o', '-'],
         cancel, log, bd.environment, pictures)
     if count != frames*frame_bytes:
@@ -302,7 +299,6 @@ def export(tools, plan, cancel, emit, log_path, decoder=None):
         base, dependent = folder/'base.avc', folder/'dependent.mvc'
         frames, video_start = encode(tools, bd, plan, base, dependent, cancel, emit, log, estimated_frames, decoder)
         duration = frames/float(output_rate)
-        emit('estimate', {'encoding_complete': True})
         phase('BD-3D: BT.709-Farbkennzeichnung in beiden Bildspuren setzen')
         for p in (base, dependent):
             log.write(f'BT709 {p.name}: {tag_generated_stream(p, lambda: check_cancel(cancel))} parameter sets\n')
@@ -336,3 +332,4 @@ def export(tools, plan, cancel, emit, log_path, decoder=None):
         log.write(f'PHASE COMPLETED {time.monotonic()-phase_started:.3f}s {previous_phase}\n')
         log.write(f'COMPLETED BD3D frames={frames} rate={output_rate}\nCOMPLETED {plan.output}\n')
         emit('progress', {'percent': 100, 'seconds': duration})
+

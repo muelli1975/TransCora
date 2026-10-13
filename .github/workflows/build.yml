@@ -1,8 +1,8 @@
-name: Test and build TransCora
+name: Repair existing TransCora 1.0
 
 on:
   push:
-    branches: [main]
+    branches: [maintenance/v1.0-restzeit]
   pull_request:
   workflow_dispatch:
 
@@ -206,7 +206,7 @@ jobs:
 
   publish:
     needs: [windows-portable, unix-packages]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: github.ref == 'refs/heads/maintenance/v1.0-restzeit' && github.event_name == 'push'
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -222,7 +222,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           python -c "from transcora import __version__; assert __version__ == '1.0'"
-          current_head=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')
+          current_head=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/maintenance/v1.0-restzeit" --jq '.object.sha')
           if [ "$current_head" != "$GITHUB_SHA" ]; then
             echo 'A newer revision is being tested; skipping this superseded publication.'
             exit 0
@@ -231,14 +231,14 @@ jobs:
             release_head=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v1.0" --jq '.object.sha')
             # Only replace the explicitly approved revisions of this release.
             case "$release_head" in
-              "$GITHUB_SHA"|35d7ea128d37358b847c1007d1b1f7bf20392986|b77593433e2495c1b89bf713e18ee0c70e069065|b1d6ff713a8ef7e92fd7d48d9881cdff21046c4f|9538f9faa7e9c5f0e3861c68205a3729fe60bec7|b315c91bc012261dea6f645496e9abc4b1c93aa9|6013949130cc1efeb6e4743132601fea287e3685) ;;
-              *) echo 'Release v1.0 belongs to a different revision; leaving it unchanged.'; exit 1 ;;
+              "$GITHUB_SHA"|c3f23155db3c56da8377bc7e4dd7bf9bc1eb35e8) ;;
+              *) echo 'Release v1.0 changed independently; leaving it unchanged.'; exit 1 ;;
             esac
             gh release upload v1.0 release-files/* --clobber
             if [ "$release_head" != "$GITHUB_SHA" ]; then
-              gh api --method PATCH "repos/$GITHUB_REPOSITORY/git/refs/tags/v1.0" -f sha="$GITHUB_SHA" -F force=true
+              gh api --method PATCH "repos/$GITHUB_REPOSITORY/git/refs/tags/v1.0" -f sha="$GITHUB_SHA" -F force=false
             fi
-            gh release edit v1.0 --title 'TransCora 1.0' --notes-file docs/RELEASE_NOTES_1.0.md --latest
+            gh release edit v1.0 --title 'TransCora 1.0' --notes-file docs/RELEASE_NOTES_1.0.md --latest=false
           else
             gh release create v1.0 release-files/* --target "$GITHUB_SHA" --title 'TransCora 1.0' --notes-file docs/RELEASE_NOTES_1.0.md --latest
           fi

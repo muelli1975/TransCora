@@ -108,7 +108,7 @@ das Gesamtbild. Kreuzblick mit 1920 × 540 enthält zwei unverzerrte 960 × 540-
 Eine größere Ausgabe stellt keine verlorenen Quelldetails wieder her.
 
 Full-/Half-SBS und Full-/Half-OU sind mögliche Quellen. Zusätzlich werden progressive
-H.264-MVC- und SDR-MV-HEVC-Quellen mit zwei vollständigen Ansichten verarbeitet.
+H.264-MVC- und SDR-MV-HEVC-Quellen mit zwei vollständigen Halbbildern verarbeitet.
 Anaglyphen, Frame-sequential und unabhängige Videospuren sind keine unterstützten Quellen.
 
 **Dateinamenszusatz · frei editierbar** bietet zum Ziel passende konkrete Zusätze,
@@ -276,16 +276,19 @@ ausgewählte Dateien an; ohne Auswahl gelten sie für neue Dateien. **Löschen**
 eine gespeicherte Voreinstellung. Dateiliste, Ordner und Disc-Titel sind nicht enthalten.
 Ein schon vorhandener Name wird beim Speichern ersetzt.
 
-Beim Fortschrittsbalken erscheinen **Vergangene Zeit** und die **geschätzte Restzeit**. Die vergangene Zeit bleibt nach dem Ende sichtbar. Sie wird anhand des
-tatsächlichen Fortschritts und der Videolaufzeiten laufend angepasst. Vor einer
-brauchbaren Messung und bei längeren Phasen ohne Fortschrittsmeldung steht dort
-**Wird ermittelt**. Insbesondere bei unterschiedlichen Konvertierungszielen und
-BD-3D-Prüfphasen ist die Anzeige eine ungefähre Schätzung.
+Beim Fortschrittsbalken erscheinen **Vergangene Zeit** und die geschätzte Restzeit
+für **Datei** und **Stapel**. Die vergangene Zeit bleibt nach dem Ende sichtbar.
+Die Restzeit ergibt sich aus der verbleibenden Videodauer und dem nach Videodauer
+gewichteten Verarbeitungsdurchschnitt des laufenden Stapels. Unterschiede bei
+Auflösung, Bildrate oder Codec sperren die Schätzung nicht. Dateiwechsel und
+verspätete Fortschrittsmeldungen lassen sie nicht verschwinden. Vor der ersten
+Fortschrittsmessung steht ein Strich. Pausen zwischen Dateien zählen nicht zum
+Durchschnitt; bei BD-3D zählen Ton und Multiplexing zur vollständigen Bearbeitungszeit.
 
 ## BD-3D-Ausgabe
 
 **BD-3D · 1080p** bietet **Blu-ray-ISO** (Standard) oder eine einzelne **M2TS (AVC/MVC)**.
-Beide enthalten zwei echte MVC-Augenansichten, kein SBS/OU-Video. ISO hat eine
+Beide enthalten zwei echte MVC-Halbbilder, kein SBS/OU-Video. ISO hat eine
 UDF-2.50-Struktur mit SSIF und startet einen Film ohne Menü. Der **Disc-Titel** wird
 vom Quellnamen abgeleitet und ist editierbar; er bestimmt auch den Ausgabenamen.
 Bei M2TS gibt es kein Disc-Dateisystem; die Titelangabe benennt dort die Datei.
@@ -332,7 +335,7 @@ führt zu einem Hinweis; es gibt keine automatische Disc-Aufteilung.
 ## MVC und MV-HEVC als Quelle
 
 Automatisch erkennt MVC anhand der tatsächlichen NAL-Erweiterungen und MV-HEVC
-anhand der beiden vom Decoder gemeldeten Ansichten. Manuelle Einträge
+anhand der beiden vom Decoder gemeldeten Halbbilder. Manuelle Einträge
 **MVC / Blu-ray 3D** und **MV-HEVC** prüfen ebenfalls den Bitstream.
 
 - MVC: Progressive 8-Bit-4:2:0-Stereoquellen in M2TS/TS/SSIF und einer kombinierten
@@ -345,7 +348,7 @@ anhand der beiden vom Decoder gemeldeten Ansichten. Manuelle Einträge
   einzelnen SSIF-Filmdatei. Die längste Film-Playlist wird gewählt und genannt.
   Seamless Branching, alternative Blickwinkel und Clip-Ausschnitte bleiben blockiert.
 - MV-HEVC: FFmpeg 7.1.1 dekodiert beide ausdrücklich als links/rechts
-  gekennzeichneten Ansichten. Die Basis-Halbbild kann rechts oder links sein.
+  gekennzeichneten Halbbildern. Das Basis-Halbbild kann rechts oder links sein.
   Beide Bildzeitfolgen müssen zusammenpassen. SDR einschließlich 10-Bit-Quellen
   folgt dem bestehenden Farbpfad; HDR und immersive Projektionen bleiben blockiert.
 

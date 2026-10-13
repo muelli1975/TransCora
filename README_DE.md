@@ -16,7 +16,7 @@ Alles läuft lokal, ohne Account, Cloud oder Tracking. Die Oberfläche lässt si
 
 Standardmäßig landen Ergebnisse im Ordner `output` neben dem Programm. Bei Ordnerstapeln bleiben relative Unterordner erhalten. Vorhandene Dateien erhalten einen nummerierten Alternativnamen. Ein fehlerhafter Eintrag hält die übrigen gültigen Dateien nicht auf. **Abbrechen** beendet die aktuelle Verarbeitung; bereits fertige Dateien bleiben erhalten.
 
-Bei Videos zeigt der Status die geschätzte Restzeit für **Datei** und **Stapel**. Die Schätzung nutzt den laufenden Fortschritt und die Laufzeiten vergleichbarer fertiger Dateien. Bei BD-3D fließen auch die gemessenen Abschlusszeiten für Ton und Multiplexing ein; beim ersten Titel ist die Schätzung gröber. Für noch nicht vergleichbare Formate oder fehlenden Fortschritt steht ein Strich.
+Bei Videos zeigt der Status die geschätzte Restzeit für **Datei** und **Stapel**. Grundlage sind die verbleibende Videodauer und der bisherige, nach Videodauer gewichtete Verarbeitungsdurchschnitt. Unterschiedliche Auflösungen, Bildraten oder Codecs verhindern die Stapelschätzung nicht. Sie bleibt bei Dateiwechseln und verspäteten Fortschrittsmeldungen erhalten. Bei BD-3D zählt die gesamte Bearbeitungszeit einschließlich Ton und Multiplexing. Vor der ersten Fortschrittsmessung steht ein Strich.
 
 Fotos und Videos verwenden dieselben Bereiche **Quelle**, **Ausgabe**, **Format** und **Speichern**. Unter **Ausgabegröße** stehen die Maße direkt beim Größenmenü. Videomaße beziehen sich auf das gesamte Ausgabebild; BD-3D zeigt die Maße je Halbbild. Bilder lassen sich proportional nach langer oder kurzer Seite skalieren.
 
