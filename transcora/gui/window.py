@@ -30,8 +30,8 @@ from transcora.gui.preview_window import PreviewWindow
 from transcora.gui.theme import checkbox, set_control_state, apply_theme, GOLD_LIGHT, MUTED, TEXT, PANEL_BG, APP_BG, SECONDARY_BG
 
 
-STATUS = {"queued": "Wartet", "checking": "Prüfung", "ready": "Bereit", "blocked": "Prüfen!",
-          "running": "Läuft", "completed": "Fertig", "failed": "Fehler", "cancelled": "Abgebrochen"}
+STATUS = {"queued": "Wartet", "checking": "Pr�fung", "ready": "Bereit", "blocked": "Pr�fen!",
+          "running": "L�uft", "completed": "Fertig", "failed": "Fehler", "cancelled": "Abgebrochen"}
 
 
 class Window:
@@ -101,7 +101,7 @@ class Window:
         try:
             self.persist_settings()
         except OSError:
-            self.status.set('Der Programmordner ist schreibgeschützt; Einstellungen konnten nicht gespeichert werden.')
+            self.status.set('Der Programmordner ist schreibgesch�tzt; Einstellungen konnten nicht gespeichert werden.')
 
     def apply_language(self):
         for panel in (self, self.images):
@@ -179,7 +179,7 @@ class Window:
         ttk.Label(header, text="Lokale 3D-Video-Konvertierung", foreground=MUTED).pack(side="right", padx=12)
         toolbar = ttk.Frame(outer)
         toolbar.grid(row=1, column=0, sticky="ew", pady=(0, 4))
-        for text, callback in (("Dateien hinzufügen", self.add_files), ("Ordner hinzufügen", self.add_folder),
+        for text, callback in (("Dateien hinzuf�gen", self.add_files), ("Ordner hinzuf�gen", self.add_folder),
                                ("Entfernen", self.remove), ("Liste laden", self.load), ("Liste speichern", self.save)):
             self.button(toolbar, text, callback).pack(side="left", padx=(0, 5))
         self.preset_button = ttk.Menubutton(toolbar, text="Voreinstellungen")
@@ -214,7 +214,7 @@ class Window:
         if self.root.tk.call('tk', 'windowingsystem') == 'aqua':
             self.tree.bind('<Command-a>', self.select_all)
             self.tree.bind('<Command-A>', self.select_all)
-        self.selection_text = TextVar(self.localizer, value="Vorgaben für neue Dateien")
+        self.selection_text = TextVar(self.localizer, value="Vorgaben f�r neue Dateien")
         scope = ttk.Frame(outer)
         scope.grid(row=3,column=0,sticky='ew',pady=(6,4))
         ttk.Label(scope,textvariable=self.selection_text,foreground=MUTED).pack(side='left')
@@ -238,7 +238,7 @@ class Window:
                          "method": {k: m["label"] for k, m in self.catalog.items()},
                          "container": {"mkv": "MKV", "mp4": "MP4", "iso": "Blu-ray-ISO", "m2ts": "M2TS (AVC/MVC)"},
                          "codec": {"h264": "H.264", "h265": "H.265 / HEVC"},
-                         "rate_mode": {"crf": "Qualität (CRF)", "abr": "Zielbitrate (Durchschnitt)"},
+                         "rate_mode": {"crf": "Qualit�t (CRF)", "abr": "Zielbitrate (Durchschnitt)"},
                          'video_size': dict(VIDEO_SIZES, default='Automatisch'), 'bd_bitrate_mbps': {n: str(n)+' Mbit/s' for n in BD_BITRATES},
                          'row_first': ROW_ORDERS, 'bd_mode': BD_MODES,
                          'fps_mode': FPS_MODES,
@@ -283,7 +283,7 @@ class Window:
         combo(fields, 1, 2, "container", "Dateiformat")
         suffix_frame = ttk.Frame(save_fields)
         suffix_frame.grid(row=1, column=0, sticky="ew", padx=(0, 8), pady=3)
-        ttk.Label(suffix_frame, text="Dateinamenszusatz · frei editierbar").pack(anchor="w")
+        ttk.Label(suffix_frame, text="Dateinamenszusatz � frei editierbar").pack(anchor="w")
         self.variables["suffix"] = tk.StringVar()
         suffix = ttk.Combobox(suffix_frame, textvariable=self.variables["suffix"], state="normal", width=22)
         suffix.pack(fill="x")
@@ -318,7 +318,7 @@ class Window:
             fps.bind(event, lambda e: self.option_changed("target_fps"))
         self.combos["target_fps"] = fps
         self.controls.append((fps, "normal"))
-        combo(fields, 2, 1, "video_size", "Ausgabegröße")
+        combo(fields, 2, 1, "video_size", "Ausgabegr��e")
         self.variables['bd_mode'] = tk.StringVar(value=self.t(BD_MODES[self.defaults.bd_mode]))
         self.combos['video_size'].bind('<<ComboboxSelected>>', lambda e: self.option_changed(
             'bd_mode' if (self.selected_jobs()[0].options if self.selected_jobs() else self.defaults).target == 'bd3d' else 'video_size'))
@@ -335,7 +335,7 @@ class Window:
         entry.grid(row=0, column=1, sticky="ew")
         entry.bind("<FocusOut>", lambda event: self.invalidate_all())
         self.controls.append((entry, "normal"))
-        self.button(output, "Auswählen", self.choose_output).grid(row=0, column=2, padx=(8, 0))
+        self.button(output, "Ausw�hlen", self.choose_output).grid(row=0, column=2, padx=(8, 0))
         folder_checks = ttk.Frame(output)
         folder_checks.grid(row=0, column=3, sticky="w", padx=(10, 0))
         self.recursive = tk.BooleanVar(value=self.recursive_value)
@@ -348,7 +348,7 @@ class Window:
         self.option_attention = TextVar(self.localizer, )
         self.file_notes = TextVar(self.localizer, )
 
-        self.details = TextVar(self.localizer, value="Dateien hinzufügen oder eine gespeicherte Liste laden.")
+        self.details = TextVar(self.localizer, value="Dateien hinzuf�gen oder eine gespeicherte Liste laden.")
         detail_frame = ttk.Frame(outer, style="Bordered.TFrame", padding=1)
         detail_frame.grid(row=7, column=0, sticky="ew")
         detail_frame.columnconfigure(0, weight=1)
@@ -369,10 +369,10 @@ class Window:
             def insert(source, attention=False):
                 for line in source.splitlines():
                     translated = self.t(line).strip()
-                    identity = translated.removeprefix('⚠').strip()
+                    identity = translated.removeprefix('?').strip()
                     if identity and identity not in seen:
                         seen.add(identity)
-                        self.detail_text.insert('end', ('⚠ ' if attention else '') + identity + '\n',
+                        self.detail_text.insert('end', ('? ' if attention else '') + identity + '\n',
                                                 ('attention',) if attention else ())
             insert(self.attention.source, True)
             represented = self.attention.source.splitlines()+self.file_notes.source.splitlines()
@@ -400,12 +400,12 @@ class Window:
         show_details()
         actions = ttk.Frame(outer)
         actions.grid(row=13, column=0, sticky="ew", pady=(8, 0))
-        self.advanced_button = self.button(actions, "Erweitert ▸", self.toggle_advanced)
+        self.advanced_button = self.button(actions, "Erweitert ?", self.toggle_advanced)
         self.advanced_button.pack(side="left")
         self.button(actions, "Kontrollbild", self.show_preview).pack(side="left", padx=5)
         ttk.Button(actions, text="Log", command=self.show_log).pack(side="left")
         combo(self.advanced, 0, 0, "codec", "Videocodec")
-        combo(self.advanced, 0, 1, "rate_mode", "Qualitätssteuerung")
+        combo(self.advanced, 0, 1, "rate_mode", "Qualit�tssteuerung")
         numeric = ttk.Frame(self.advanced)
         self.numeric_fields = numeric
         numeric.grid(row=0, column=2, sticky="ew", padx=(0, 8), pady=3)
@@ -438,7 +438,7 @@ class Window:
         self.video_dimensions.pack(fill='x', pady=(4, 0))
         for key in ('video_width', 'video_height'):
             if key == 'video_height':
-                ttk.Label(self.video_dimensions, text='×').pack(side='left', padx=4)
+                ttk.Label(self.video_dimensions, text='�').pack(side='left', padx=4)
             var = tk.StringVar(value=str(getattr(self.defaults, key)))
             self.variables[key] = var
             entry = ttk.Entry(self.video_dimensions, textvariable=var, width=7)
@@ -454,7 +454,7 @@ class Window:
         screen_values.pack(fill='x')
         for key in ('screen_width', 'screen_height'):
             if key == 'screen_height':
-                ttk.Label(screen_values, text='×').pack(side='left', padx=5)
+                ttk.Label(screen_values, text='�').pack(side='left', padx=5)
             self.variables[key] = tk.StringVar(value=str(getattr(self.defaults, key)))
             entry = ttk.Entry(screen_values, textvariable=self.variables[key], width=8)
             entry.pack(side='left', fill='x', expand=True)
@@ -467,13 +467,13 @@ class Window:
         self.audio_row.grid(row=1,column=0,columnspan=3,sticky='ew',pady=(6,3))
         self.audio_row.columnconfigure(2,weight=1)
         ttk.Label(self.audio_row,text='Audio',width=9).grid(row=0,column=0,sticky='w')
-        self.advanced_audio_button = self.button(self.audio_row, 'Tonoptionen …', self.show_audio_options)
+        self.advanced_audio_button = self.button(self.audio_row, 'Tonoptionen .', self.show_audio_options)
         self.advanced_audio_button.grid(row=0,column=1,sticky='w',padx=(0,8))
         self.audio_summary = TextVar(self.localizer, )
         audio_summary = ttk.Label(self.audio_row,textvariable=self.audio_summary,foreground=MUTED,width=1)
         audio_summary.grid(row=0,column=2,sticky='ew')
         audio_summary.bind('<Configure>',lambda e:audio_summary.configure(wraplength=max(1,e.width)))
-        self.format_audio_button = self.button(format_fields,'Tonoptionen …',self.show_audio_options)
+        self.format_audio_button = self.button(format_fields,'Tonoptionen .',self.show_audio_options)
         self.format_audio_button.grid(row=0,column=2,sticky='sw',padx=(0,8),pady=3)
         # Keep the main window usable at its minimum height. Audio controls live
         # in a reusable dialog so their values and state follow the same selection.
@@ -491,10 +491,10 @@ class Window:
             audio_fields.columnconfigure(col, weight=1, uniform='audio')
         combo(audio_fields, 0, 0, 'audio_format', 'Tonformat')
         combo(audio_fields, 0, 1, 'audio_tracks', 'Tonspuren')
-        combo(audio_fields, 0, 2, 'audio_channels', 'Tonkanäle')
+        combo(audio_fields, 0, 2, 'audio_channels', 'Tonkan�le')
         selection = ttk.Frame(audio_fields)
         selection.grid(row=1, column=0, sticky='ew', padx=(0, 8), pady=3)
-        ttk.Label(selection, text='Spurnummern · z. B. 1, 3 oder 2-4').pack(anchor='w')
+        ttk.Label(selection, text='Spurnummern � z. B. 1, 3 oder 2-4').pack(anchor='w')
         self.variables['audio_selection'] = tk.StringVar(value=self.defaults.audio_selection)
         audio_selection = ttk.Entry(selection, textvariable=self.variables['audio_selection'])
         audio_selection.pack(fill='x')
@@ -505,9 +505,9 @@ class Window:
         self.audio_note = TextVar(self.localizer, )
         ttk.Label(audio_fields, textvariable=self.audio_note, foreground=MUTED, wraplength=360).grid(
             row=1, column=1, columnspan=2, sticky='w', pady=3)
-        ttk.Label(audio_fields, text='Einstellungen werden sofort übernommen.', foreground=MUTED).grid(
+        ttk.Label(audio_fields, text='Einstellungen werden sofort �bernommen.', foreground=MUTED).grid(
             row=2, column=0, columnspan=2, sticky='w', pady=(12, 0))
-        ttk.Button(audio_fields, text='Schließen', command=self.close_audio_options).grid(
+        ttk.Button(audio_fields, text='Schlie�en', command=self.close_audio_options).grid(
             row=2, column=2, sticky='e', pady=(12, 0))
         self.status = TextVar(self.localizer, value="Bereit")
         progress_info = ttk.Frame(outer)
@@ -575,8 +575,8 @@ class Window:
             load.add_command(label=self.t('Keine gespeicherten Voreinstellungen'), state='disabled')
             delete.add_command(label=self.t('Keine gespeicherten Voreinstellungen'), state='disabled')
         menu.add_cascade(label=self.t('Laden'), menu=load)
-        menu.add_command(label=self.t('Speichern unter …'), command=self.preset_dialog)
-        menu.add_cascade(label=self.t('Löschen'), menu=delete)
+        menu.add_command(label=self.t('Speichern unter .'), command=self.preset_dialog)
+        menu.add_cascade(label=self.t('L�schen'), menu=delete)
 
     def store_preset(self, name):
         if self.busy:
@@ -585,7 +585,7 @@ class Window:
         selected = self.selected_jobs()
         options = selected[0].options if selected else self.defaults
         if any(replace(job.options, disc_title=None) != replace(options, disc_title=None) for job in selected):
-            raise ValueError('Zum Speichern Dateien mit gleichen Einstellungen auswählen.')
+            raise ValueError('Zum Speichern Dateien mit gleichen Einstellungen ausw�hlen.')
         updated = dict(self.presets, **{name: replace(options, disc_title=None)})
         save_presets(app_root()/'user-presets.json', updated)
         self.presets = updated
@@ -630,14 +630,14 @@ class Window:
             return
         options = self.presets[name]
         if options.method not in self.catalog:
-            self.status.set('Anaglyphenverfahren der Voreinstellung ist nicht verfügbar.')
+            self.status.set('Anaglyphenverfahren der Voreinstellung ist nicht verf�gbar.')
             return
         selected = self.selected_jobs()
         if selected:
             for job in selected:
                 job.options = replace(options, disc_title=job.options.disc_title)
                 job.plan = None
-                job.status, job.detail = 'queued', 'Voreinstellung geladen; erneut prüfen.'
+                job.status, job.detail = 'queued', 'Voreinstellung geladen; erneut pr�fen.'
                 job.result = None
                 self.restore_result(job)
                 self.update_row(job)
@@ -653,7 +653,7 @@ class Window:
             updated = {n: o for n, o in self.presets.items() if n != name}
             save_presets(app_root()/'user-presets.json', updated)
             self.presets = updated
-            self.status.set('Voreinstellung gelöscht: ' + name)
+            self.status.set('Voreinstellung gel�scht: ' + name)
         except OSError as error:
             self.status.set('Voreinstellungen: ' + str(error))
 
@@ -673,7 +673,7 @@ class Window:
         self.defaults = Options()
         self.tree.selection_remove(*self.tree.selection())
         self.selection_changed()
-        self.status.set("Standardeinstellungen für neue Dateien wiederhergestellt. Bestehende Jobs behalten ihre Einstellungen.")
+        self.status.set("Standardeinstellungen f�r neue Dateien wiederhergestellt. Bestehende Jobs behalten ihre Einstellungen.")
 
     def update_row(self, job):
         layout = job.plan.layout if job.plan else job.options.layout
@@ -690,15 +690,15 @@ class Window:
             from fractions import Fraction
             fps = f"{float(Fraction(rate)):.3f}".rstrip("0").rstrip(".")
         except (ValueError, ZeroDivisionError, TypeError):
-            fps = "—"
+            fps = "-"
         if job.source_duration is None:
             duration = "-"
         else:
             seconds = int(job.source_duration + .5)
             duration = f"{seconds//3600:02}:{seconds//60%60:02}:{seconds%60:02}"
         values = (job.source.name, self.t(LAYOUTS.get(layout, "?")), fps, duration,
-                  self.t(('BD-3D · ' + self.t(BD_MODES[job.options.bd_mode]) if job.options.target == 'bd3d' else
-                          'Mono · ' + self.t(self.mappings['mono_eye'][job.options.mono_eye]) if job.options.target == 'mono' else TARGETS[job.options.target])),
+                  self.t(('BD-3D � ' + self.t(BD_MODES[job.options.bd_mode]) if job.options.target == 'bd3d' else
+                          'Mono � ' + self.t(self.mappings['mono_eye'][job.options.mono_eye]) if job.options.target == 'mono' else TARGETS[job.options.target])),
                   self.t(STATUS[job.status]), processing_text(job.result))
         if self.tree.exists(job.id):
             self.tree.item(job.id, values=values)
@@ -726,8 +726,8 @@ class Window:
         if not selected:
             self.attention.set('')
             self.file_notes.set('')
-            self.details.set("Dateien hinzufügen oder eine gespeicherte Liste laden.")
-            self.selection_text.set("Vorgaben für neue Dateien")
+            self.details.set("Dateien hinzuf�gen oder eine gespeicherte Liste laden.")
+            self.selection_text.set("Vorgaben f�r neue Dateien")
             self.updating = True
             for key, var in self.variables.items():
                 value = getattr(self.defaults, key)
@@ -757,14 +757,14 @@ class Window:
         self.updating = False
         self.last_suffix_display = self.variables['suffix'].get()
         self.last_title_display = self.variables['disc_title'].get()
-        self.selection_text.set(f"Für {len(selected)} ausgewählte Datei(en)" + (" · Gemischte Werte" if any(any(getattr(j.options,k)!=getattr(selected[0].options,k) for j in selected[1:]) for k in self.variables) else ""))
+        self.selection_text.set(f"F�r {len(selected)} ausgew�hlte Datei(en)" + (" � Gemischte Werte" if any(any(getattr(j.options,k)!=getattr(selected[0].options,k) for j in selected[1:]) for k in self.variables) else ""))
         job = selected[0]
         self.show_job_details(job)
         self.refresh_controls()
 
     def show_job_details(self, job):
         warnings = list(dict.fromkeys(getattr(job.plan,'warnings',()))) if job.plan else []
-        review = list(dict.fromkeys(getattr(job.plan,'review_warnings',warnings))) if job.plan else []
+        review = list(dict.fromkeys(getattr(job.plan,'review_warnings',()))) if job.plan else []
         attention = job.detail if job.status in {'blocked','failed'} else '\n'.join(review)
         summary = (job.plan.summary_text(self.t) if hasattr(job.plan,'summary_text') else job.plan.summary) if job.plan else str(job.source)
         extra = job.detail if job.status not in {'blocked','failed'} and job.detail != '\n'.join(getattr(job.plan,'warnings',())) else ''
@@ -838,7 +838,7 @@ class Window:
                 job.options = options
                 job.plan = None
                 job.result = None
-                job.status, job.detail = "queued", "Einstellungen geändert; erneut prüfen."
+                job.status, job.detail = "queued", "Einstellungen ge�ndert; erneut pr�fen."
                 self.restore_result(job)
                 self.update_row(job)
             if key == "codec" and value == "h265":
@@ -846,11 +846,11 @@ class Window:
             if key in {"target", "method", "target_fps", "layout", "disc_title", "container", 'audio_channels', "video_size", 'bd_mode', 'row_first', 'fps_mode', 'mono_eye'}:
                 self.selection_changed()
             self.last_suffix_display = self.variables['suffix'].get()
-            self.status.set("Einstellungen übernommen. Vor dem Start wird erneut geprüft.")
+            self.status.set("Einstellungen �bernommen. Vor dem Start wird erneut gepr�ft.")
             self.refresh_controls()
             return True
         except (ValueError, StopIteration) as error:
-            self.status.set(str(error) or "Ungültige Eingabe.")
+            self.status.set(str(error) or "Ung�ltige Eingabe.")
             if key in {"crf", "bitrate_mbps", "target_fps", 'audio_selection', "video_width", "video_height", 'screen_width', 'screen_height'}:
                 self.combos[key].focus_set()
             return False
@@ -886,10 +886,10 @@ class Window:
             values=[self.t(v) for v in (BD_MODES if bd3d else self.mappings['video_size']).values()],
             state='disabled' if framerate or rows else 'readonly')
         if framerate or rows:
-            self.variables['video_size'].set(self.t('Monitorauflösung' if rows else 'Original'))
+            self.variables['video_size'].set(self.t('Monitoraufl�sung' if rows else 'Original'))
         self.video_dimensions.pack_forget() if rows else self.video_dimensions.pack(fill='x',pady=(4,0))
         custom_size = not bd3d and not framerate and not rows and options.video_size == "custom"
-        self.video_size_caption.set('Ausgabegröße je Halbbild' if bd3d else 'Ausgabegröße')
+        self.video_size_caption.set('Ausgabegr��e je Halbbild' if bd3d else 'Ausgabegr��e')
         for key in ('video_width', 'video_height'):
             self.combos[key].configure(state='normal' if custom_size else 'disabled')
         self.refresh_dimensions()
@@ -911,17 +911,17 @@ class Window:
         self.combos["bitrate_mbps"].configure(state="normal" if options.rate_mode == "abr" and not bd3d else "disabled")
         no_audio = options.audio_tracks == 'none'
         self.combos['audio_format'].configure(state='disabled' if bd3d or no_audio or options.audio_channels == 'stereo' else 'readonly')
-        formats = ['LPCM · 24 Bit' if o.target == 'bd3d' else AUDIO_FORMATS[
+        formats = ['LPCM � 24 Bit' if o.target == 'bd3d' else AUDIO_FORMATS[
             'aac' if o.audio_channels == 'stereo' else o.audio_format] for o in
             ([j.options for j in selected] if selected else [options])]
         self.variables['audio_format'].set(self.t(formats[0]) if len(set(formats)) == 1 else '')
         self.combos['audio_channels'].configure(state='disabled' if no_audio else 'readonly')
         self.combos['audio_selection'].configure(state='normal' if options.audio_tracks == 'selected' else 'disabled')
         self.audio_note.set('BD-3D: LPCM mit 48 kHz und 24 Bit.' if bd3d else (
-            'AAC wird neu kodiert. Stereo mischt vorhandene Kanäle zusammen.' if options.audio_format == 'aac' or options.audio_channels == 'stereo'
+            'AAC wird neu kodiert. Stereo mischt vorhandene Kan�le zusammen.' if options.audio_format == 'aac' or options.audio_channels == 'stereo'
             else 'Originalton wird kopiert. Blu-ray-LPCM wird in MKV verlustfrei als FLAC gespeichert.'))
         self.audio_summary.set('Ohne Ton' if no_audio else
-            self.t(formats[0])+' · '+self.t(AUDIO_TRACKS[options.audio_tracks])+' · '+self.t(AUDIO_CHANNELS[options.audio_channels]))
+            self.t(formats[0])+' � '+self.t(AUDIO_TRACKS[options.audio_tracks])+' � '+self.t(AUDIO_CHANNELS[options.audio_channels]))
         active_field = "bd_bitrate_mbps" if bd3d else "crf" if options.rate_mode == "crf" else "bitrate_mbps"
         for key, frame in self.rate_fields.items():
             frame.grid() if key == active_field else frame.grid_remove()
@@ -935,19 +935,19 @@ class Window:
                 if options.profile == "quality10":
                     text += " 10 Bit: Feinere Abstufungen; kein HDR-Modus."
         if framerate:
-            text = "Layout, Auflösung und Halbbildreihenfolge bleiben erhalten. Video wird neu kodiert; Ton gemäß Tonoptionen."
+            text = "Layout, Aufl�sung und Halbbildreihenfolge bleiben erhalten. Video wird neu kodiert; Ton gem�� Tonoptionen."
         if bd3d:
-            text = self.t(BD_MODES[options.bd_mode]) + self.t(" · AVC/MVC · Hohe Qualität.")
+            text = self.t(BD_MODES[options.bd_mode]) + self.t(" � AVC/MVC � Hohe Qualit�t.")
             if options.container == 'm2ts':
-                text += " M2TS enthält beide Halbbilder, jedoch keine Blu-ray-Disc-Struktur."
+                text += " M2TS enth�lt beide Halbbilder, jedoch keine Blu-ray-Disc-Struktur."
         if options.target == "cross_sbs":
             text = "Kreuzblick: Full-SBS mit rechtem Halbbild zuerst."
         if rows:
-            text = 'Polfilter: Vollbild ohne Skalierung. 4:4:4 erhält getrennte Farbzeilen; 4:2:0 würde die Farben beider Augen vermischen.'
+            text = 'Polfilter: Vollbild ohne Skalierung. 4:4:4 erh�lt getrennte Farbzeilen; 4:2:0 w�rde die Farben beider Augen vermischen.'
         if options.codec == "h265":
-            text += " H.265: MKV, längere Rechenzeit und Zielplayer prüfen; CRF ist codecabhängig."
+            text += " H.265: MKV, l�ngere Rechenzeit und Zielplayer pr�fen; CRF ist codecabh�ngig."
         if options.rate_mode == "abr" and not bd3d:
-            text += " Zielbitrate = Videodurchschnitt, kein festes Dateigrößenlimit."
+            text += " Zielbitrate = Videodurchschnitt, kein festes Dateigr��enlimit."
         self.option_attention.set(review_text)
         self.warning.set(text)
         self.update_output_name()
@@ -1007,7 +1007,7 @@ class Window:
                     self.output_name.set("Ausgabename: " + path.name)
                     break
         except (ValueError, OSError):
-            self.output_name.set("Ausgabename: Quelllayout prüfen")
+            self.output_name.set("Ausgabename: Quelllayout pr�fen")
 
     def invalidate_all(self, force=False):
         if self.busy:
@@ -1019,7 +1019,7 @@ class Window:
         for job in self.jobs:
             job.plan = None
             job.result = None
-            job.status, job.detail = "queued", "Ausgabeziel geändert; erneut prüfen."
+            job.status, job.detail = "queued", "Ausgabeziel ge�ndert; erneut pr�fen."
             self.restore_result(job)
             self.update_row(job)
         self.update_output_name()
@@ -1041,12 +1041,12 @@ class Window:
         if added:
             self.tree.selection_set(added)
         self.sorter.refresh()
-        self.status.set(f"{len(added)} hinzugefügt · {len(self.jobs)} Dateien insgesamt.")
+        self.status.set(f"{len(added)} hinzugef�gt � {len(self.jobs)} Dateien insgesamt.")
 
     def add_files(self):
         if self.busy:
             return
-        paths = filedialog.askopenfilenames(title=self.t("Videos hinzufügen"), initialdir=self.input_folder,
+        paths = filedialog.askopenfilenames(title=self.t("Videos hinzuf�gen"), initialdir=self.input_folder,
                  filetypes=[(self.t("Videos"), " ".join("*" + e for e in sorted(VIDEO_EXTENSIONS))), (self.t("Alle Dateien"), "*.*")])
         if paths:
             self.input_folder = str(Path(paths[0]).parent)
@@ -1055,7 +1055,7 @@ class Window:
     def add_folder(self):
         if self.busy:
             return
-        value = filedialog.askdirectory(title=self.t("Videoordner hinzufügen"), initialdir=self.input_folder)
+        value = filedialog.askdirectory(title=self.t("Videoordner hinzuf�gen"), initialdir=self.input_folder)
         if not value:
             return
         folder = Path(value).resolve()
@@ -1082,13 +1082,13 @@ class Window:
         if self.sorter.busy():
             return
         count = remove_entries(self, self.tree.selection())
-        self.status.set(f"{count} Listeneinträge entfernt; Quelldateien bleiben erhalten.")
+        self.status.set(f"{count} Listeneintr�ge entfernt; Quelldateien bleiben erhalten.")
 
     def remove_completed(self):
         if self.sorter.busy():
             return
         count = remove_entries(self, [j.id for j in self.jobs if j.status == 'completed'])
-        self.status.set(f"{count} Listeneinträge entfernt; Quelldateien bleiben erhalten.")
+        self.status.set(f"{count} Listeneintr�ge entfernt; Quelldateien bleiben erhalten.")
 
     def load(self):
         if self.busy:
@@ -1111,7 +1111,7 @@ class Window:
             if output:
                 self.output_var.set(str(output))
                 self.invalidate_all()
-            self.status.set("Jobliste ergänzt. Alle Quellen werden vor dem Start neu geprüft.")
+            self.status.set("Jobliste erg�nzt. Alle Quellen werden vor dem Start neu gepr�ft.")
             self.sorter.refresh()
         except (OSError, ValueError, TypeError) as error:
             messagebox.showerror(self.t("Jobliste"), self.t(str(error)), parent=self.root)
@@ -1131,7 +1131,7 @@ class Window:
                 messagebox.showerror(self.t("Speichern"), self.t(str(error)), parent=self.root)
 
     def choose_output(self):
-        value = filedialog.askdirectory(title=self.t("Ausgabeordner wählen"), initialdir=self.output_var.get())
+        value = filedialog.askdirectory(title=self.t("Ausgabeordner w�hlen"), initialdir=self.output_var.get())
         if value:
             self.output_var.set(value)
             self.invalidate_all()
@@ -1149,14 +1149,14 @@ class Window:
             return
         self.refresh_controls()
         self.advanced_section.grid()
-        self.advanced_button.configure(text='Erweitert ▾')
+        self.advanced_button.configure(text='Erweitert ?')
         self.settings_area.show_end(self.advanced)
 
     def close_advanced(self):
         if not self.commit_entries(('crf', 'bitrate_mbps')):
             return
         self.advanced_section.grid_remove()
-        self.advanced_button.configure(text='Erweitert ▸')
+        self.advanced_button.configure(text='Erweitert ?')
         self.settings_area.canvas.yview_moveto(0)
 
     def selected_options(self):
@@ -1250,7 +1250,7 @@ class Window:
         self.update_start_button()
         if not value:
             self.update_elapsed()
-            self.elapsed.set('Restzeit: Datei — · Stapel —')
+            self.elapsed.set('Restzeit: Datei - � Stapel -')
             self.run_started = None
             self.progress.stop()
             self.progress.configure(mode="determinate")
@@ -1264,8 +1264,8 @@ class Window:
         self.elapsed_time.set('Vergangene Zeit: ' + PreviewWindow.time_text(max(0, now-self.run_started)))
         file_left, batch_left = self.remaining_time.remaining(now)
         def label(value):
-            return self.t('ca. ') + PreviewWindow.time_text(value) if value is not None else '—'
-        self.elapsed.set(f'Restzeit: Datei {label(file_left)} · Stapel {label(batch_left)}')
+            return self.t('ca. ') + PreviewWindow.time_text(value) if value is not None else '-'
+        self.elapsed.set(f'Restzeit: Datei {label(file_left)} � Stapel {label(batch_left)}')
 
     def estimate_remaining(self, index, count, percent, phase_percent=None, remaining=None):
         if self.run_started is None:
@@ -1333,7 +1333,7 @@ class Window:
             with tempfile.TemporaryFile(dir=output):
                 pass
             tools = Toolchain.find()
-            self.events.put(('notice', 'Testen: Mitgelieferte Videowerkzeuge prüfen'))
+            self.events.put(('notice', 'Testen: Mitgelieferte Videowerkzeuge pr�fen'))
             capabilities = tools.inspect()
             self.events.put(("log", capabilities["version"]))
             reserved, ready, receipts = set(), [], {}
@@ -1342,7 +1342,7 @@ class Window:
                 if self.cancel.is_set():
                     raise Cancelled()
                 self.events.put(("current", (job.source.name,index,len(candidates))))
-                self.events.put(("job", (job.id, "checking", "Technische Prüfung", None)))
+                self.events.put(("job", (job.id, "checking", "Technische Pr�fung", None)))
                 self.events.put(("notice", f"Testen: Datei {index} von {len(candidates)}"))
                 try:
                     try:
@@ -1356,14 +1356,14 @@ class Window:
                     self.events.put(("job", (job.id, "ready", "\n".join(plan.warnings), plan)))
                     self.events.put(("log", plan.summary_text(self.t) + "\n" + "\n".join(plan.warnings)))
                 except Cancelled:
-                    self.events.put(("job", (job.id, "cancelled", "Prüfung abgebrochen", None)))
+                    self.events.put(("job", (job.id, "cancelled", "Pr�fung abgebrochen", None)))
                     raise
                 except (ValueError, OSError) as error:
                     blocked += 1
                     self.events.put(("job", (job.id, "blocked", str(error), None)))
                     self.events.put(("log", job.source.name + ": " + str(error)))
             if not run:
-                self.events.put(("notice", f"Test abgeschlossen: {len(ready)} bereit · {blocked} blockiert."))
+                self.events.put(("notice", f"Test abgeschlossen: {len(ready)} bereit � {blocked} blockiert."))
                 return
             self.events.put(("batch", [(max(1, plan.duration),
                 (plan.options.target, plan.options.codec, plan.options.profile, plan.size,
@@ -1391,7 +1391,7 @@ class Window:
                     completion = Completion((plan.output,), elapsed, {})
                     try:
                         if receipts[job.id] is None:
-                            raise JournalError('Quelldaten für den Journalnachweis fehlen.')
+                            raise JournalError('Quelldaten f�r den Journalnachweis fehlen.')
                         completion = Journal(output).complete(receipts[job.id], (plan.output,), elapsed,
                             effective={'options': asdict(plan.options), 'layout': plan.layout, 'swap': plan.swap, 'size': plan.size,
                                        'source_fps': plan.info['video'].get('avg_frame_rate'), 'source_duration': plan.duration,
@@ -1403,7 +1403,7 @@ class Window:
                         self.events.put(('notice', 'Ausgabe fertig; Journal nicht gespeichert.'))
                     self.events.put(('result', (job.id, completion)))
                     counts["completed"] += 1
-                    self.events.put(("job", (job.id, "completed", "Gespeichert · " + plan.stereo_summary + "\nGespeichert: " + str(plan.output), plan)))
+                    self.events.put(("job", (job.id, "completed", "Gespeichert � " + plan.stereo_summary + "\nGespeichert: " + str(plan.output), plan)))
                 except Cancelled:
                     counts["cancelled"] += 1
                     self.events.put(("job", (job.id, "cancelled", "Begonnene Ausgabe verworfen", plan)))
@@ -1415,10 +1415,10 @@ class Window:
                     self.events.put(("log", job.source.name + ": " + str(error)))
                 if index < len(ready):
                     self.pause.wait(self.cancel, lambda paused, value: self.events.put(('pause', (paused, value, index, len(ready)))))
-            summary = (f"{counts['completed']} erfolgreich · {counts['failed']} Fehler · {blocked} blockiert · "
+            summary = (f"{counts['completed']} erfolgreich � {counts['failed']} Fehler � {blocked} blockiert � "
                        f"{counts['cancelled']} abgebrochen. Log: {log_path or self.t('Kein Lauf gestartet')}")
             if journal_failures:
-                summary += ' · ' + self.t('Journal nicht gespeichert: ') + str(journal_failures)
+                summary += ' � ' + self.t('Journal nicht gespeichert: ') + str(journal_failures)
             self.events.put(("notice", summary))
             self.events.put(("log", summary))
             if ready and not self.cancel.is_set():
@@ -1428,7 +1428,7 @@ class Window:
     def show_preview(self):
         selected = self.selected_jobs()
         if self.busy or len(selected) != 1:
-            self.status.set("Für das Kontrollbild genau eine Datei auswählen.")
+            self.status.set("F�r das Kontrollbild genau eine Datei ausw�hlen.")
             return
         if not self.commit_entries():
             return
@@ -1467,7 +1467,7 @@ class Window:
 
     def show_log(self):
         dialog = tk.Toplevel(self.root)
-        dialog.title("TransCora · Log")
+        dialog.title("TransCora � Log")
         dialog.configure(background=APP_BG)
         schedule_dark_titlebar(dialog)
         holder = ttk.Frame(dialog, padding=8)
@@ -1512,7 +1512,7 @@ class Window:
         text.bind('<Control-A>',select_all)
         if self.root.tk.call('tk','windowingsystem')=='aqua':
             text.bind('<Command-a>',select_all)
-        button = self.button(dialog, 'Logs löschen', lambda: self.clear_logs(text))
+        button = self.button(dialog, 'Logs l�schen', lambda: self.clear_logs(text))
         button.pack(anchor='e', padx=8, pady=8)
         button.configure(state='disabled' if self.busy else 'normal')
         def forget(event):
@@ -1527,17 +1527,17 @@ class Window:
         try:
             count = delete_run_logs(app_root())
             self.log_lines.clear()
-            self.status.set(f'{count} Laufprotokolle gelöscht.')
+            self.status.set(f'{count} Laufprotokolle gel�scht.')
             if text is not None:
                 self.localizer.text(text, 'Keine technischen Meldungen.')
         except OSError as error:
-            self.status.set(f'Logs löschen: {error}')
+            self.status.set(f'Logs l�schen: {error}')
 
     def abort(self):
         if self.busy:
             self.cancel.set()
             self.abort_button.configure(state="disabled")
-            self.status.set("Abbruch angefordert; laufenden Prozess beenden …")
+            self.status.set("Abbruch angefordert; laufenden Prozess beenden .")
 
     def poll(self):
         if self.images.poll():
@@ -1606,11 +1606,11 @@ class Window:
                     value = payload[3]
                     parts = []
                     if value["speed"] != "N/A":
-                        numeric = value["speed"].replace("x", "×")
+                        numeric = value["speed"].replace("x", "�")
                         parts.append("Geschwindigkeit " + (numeric.replace(".", ",") if self.language == 'de' else numeric))
                     if value["fps"] not in (None, "N/A"):
                         parts.append((value["fps"].replace(".", ",") if self.language == 'de' else value["fps"]) + " fps")
-                    self.speed.set(" · ".join(parts))
+                    self.speed.set(" � ".join(parts))
                 elif kind == "phase":
                     self.status.set(payload[3])
                     self.log_lines.append(payload[3])
@@ -1650,7 +1650,7 @@ class Window:
 
     def close(self):
         if self.busy or self.images.busy:
-            if messagebox.askyesno(self.t("TransCora"), self.t("Laufende Arbeit abbrechen und TransCora schließen?"), parent=self.root):
+            if messagebox.askyesno(self.t("TransCora"), self.t("Laufende Arbeit abbrechen und TransCora schlie�en?"), parent=self.root):
                 self.closing = True
                 self.abort()
                 self.images.abort()
@@ -1666,5 +1666,7 @@ class Window:
                        "recursive": self.recursive.get(), "language": self.language})
         except OSError:
             # Read-only application folders must not prevent exit or conversion to a writable destination.
-            messagebox.showwarning(self.t("Einstellungen"), self.t("Der Programmordner ist schreibgeschützt; Einstellungen konnten nicht gespeichert werden."), parent=self.root)
+            messagebox.showwarning(self.t("Einstellungen"), self.t("Der Programmordner ist schreibgesch�tzt; Einstellungen konnten nicht gespeichert werden."), parent=self.root)
         self.root.destroy()
+
+
