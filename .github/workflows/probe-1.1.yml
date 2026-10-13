@@ -9,7 +9,9 @@ on:
       - 'scripts/probe_1_1_heif.py'
       - 'scripts/probe_1_1_mvhevc.py'
       - 'scripts/mvhevc_probe_tools.py'
+      - 'scripts/mvhevc_mp4_probe.py'
       - 'tests/test_mvhevc_probe_tools.py'
+      - 'tests/test_mvhevc_mp4_probe.py'
       - 'native/heif/**'
   workflow_dispatch:
 
@@ -30,7 +32,7 @@ jobs:
       - name: Prepare the pinned FFmpeg decoder
         run: python scripts/fetch_ffmpeg.py
       - name: Verify stereo signalling without changing picture payloads
-        run: python -m unittest discover -s tests -p test_mvhevc_probe_tools.py -v
+        run: python -m unittest discover -s tests -p 'test_mvhevc*probe*.py' -v
       - name: Decode primary photos and tagged stereo half-images
         run: python scripts/probe_1_1_heif.py --ffmpeg tools/ffmpeg/bin/ffmpeg.exe --folder work/heif-probe --report work/heif-probe/report.json
       - name: Prepare verified official multiview encoder sources

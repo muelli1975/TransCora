@@ -30,6 +30,8 @@ def picture_counts(data):
     counts = Counter()
     for nal in annexb_nals(data):
         # Count first_slice_segment_in_pic_flag, not one picture per slice.
+        if (nal[0] >> 1) & 63 < 32 and len(nal) < 3:
+            raise ValueError('Truncated picture NAL')
         if (nal[0] >> 1) & 63 < 32 and nal[2] & 128:
             counts[str(layer(nal))] += 1
     return dict(counts)

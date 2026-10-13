@@ -4,7 +4,8 @@ import hashlib
 import json
 from pathlib import Path
 import subprocess
-from mvhevc_probe_tools import picture_counts, signal_stereo, consolidate_headers
+from mvhevc_probe_tools import picture_counts, signal_stereo, stereo_sei, consolidate_headers, annexb_nals
+from mvhevc_mp4_probe import configure_stereo_mp4, boxes
 
 
 def decoder_diagnostics(ffmpeg, source, folder, originals):
@@ -82,16 +83,30 @@ def main():
         tagged.write_bytes(signal_stereo(initial_headers.read_bytes()))
         report['decoder_diagnostics']['stereo_signalled'] = decoder_diagnostics(ffmpeg, tagged, folder, originals)
         report['signalled_streams'] = json.loads(run([ffprobe, '-v', 'error', '-show_streams', '-of', 'json', tagged]))['streams']
+        reversed_tag = folder/'stereo-rl.hevc'
+        reversed_tag.write_bytes(signal_stereo(initial_headers.read_bytes(),1,0))
         audio = folder/'audio.wav'
         run([ffmpeg, '-v', 'error', '-f', 'lavfi', '-i', 'sine=frequency=700:sample_rate=48000',
              '-t', '0.48', '-c:a', 'pcm_s16le', audio])
         candidates = [raw, initial_headers, paired, tagged]
-        for name, source, tag in [('hev1', raw, 'hev1'), ('hvc1', raw, 'hvc1'), ('stereo-lr', tagged, 'hvc1')]:
+        for name, source, tag in [('hev1', raw, 'hev1'), ('hvc1', raw, 'hvc1'), ('stereo-lr', tagged, 'hvc1'),
+                                  ('stereo-rl', reversed_tag, 'hvc1')]:
             path = folder/f'{name}.mp4'
             try:
                 run([ffmpeg, '-v', 'error', '-r', '25', '-i', source, '-i', audio, '-map', '0:v',
                      '-map', '1:a', '-c:v', 'copy', '-tag:v', tag, '-c:a', 'aac', '-movflags', '+faststart', path])
                 candidates.append(path)
+                if name in ('stereo-lr','stereo-rl'):
+                    configured = folder/(name+'-apple-config.mp4')
+                    before = path.read_bytes()
+                    sei = stereo_sei(1,0) if name=='stereo-rl' else stereo_sei()
+                    after = configure_stereo_mp4(before, sei, annexb_nals(source.read_bytes()))
+                    media = lambda data: next(payload for _,kind,payload in boxes(data) if kind == b'mdat')
+                    assert media(before) == media(after), 'Media data changed during configuration'
+                    configured.write_bytes(after); candidates.append(configured)
+                    before_audio = run([ffmpeg,'-v','error','-i',path,'-map','0:a:0','-f','s16le','-'])
+                    after_audio = run([ffmpeg,'-v','error','-i',configured,'-map','0:a:0','-f','s16le','-'])
+                    assert before_audio == after_audio, 'Decoded audio changed during configuration'
             except Exception as error:
                 report['checks'].append({'container': tag, 'result': 'blocked', 'reason': str(error)})
         for path in candidates:
@@ -117,7 +132,8 @@ def main():
                 for index, side in enumerate(('left', 'right')):
                     pixels = run([ffmpeg, '-v', 'error', '-i', path, '-map', f'0:v:0:vpos:{side}',
                                   '-fps_mode', 'passthrough', '-pix_fmt', 'yuv420p', '-f', 'rawvideo', '-'])
-                    assert pixels == originals[index], f'Explicit {side} view is missing or differs'
+                    expected = originals[1-index] if path.name.startswith('stereo-rl') else originals[index]
+                    assert pixels == expected, f'Explicit {side} view is missing or differs'
                 if path.suffix == '.mp4':
                     timestamps = json.loads(run([ffprobe, '-v', 'error', '-select_streams', 'v:0',
                                                  '-show_packets', '-of', 'json', path]))['packets']
@@ -126,6 +142,8 @@ def main():
                     assert any(stream['codec_type'] == 'audio' for stream in streams)
                     check['apple_decoder_records'] = b'lhvC' in path.read_bytes()
                     assert check['apple_decoder_records'], 'Separate base/enhancement decoder configuration missing'
+                    assert set(str(video.get('view_pos_available','')).split(',')) == {'1','2'}, 'Explicit L/R positions are absent'
+                    assert video.get('profile') in ('Main','Main 10'), 'Base decoder profile is not Main/Main 10'
                 check['result'] = 'passed'
             except Exception as error:
                 check['reason'] = str(error)
