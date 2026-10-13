@@ -1,4 +1,4 @@
-# TransCora 1.0
+# TransCora 1.1 — test build
 
 [Deutsch](README_DE.md)
 
@@ -7,6 +7,18 @@ TransCora is a local desktop program for converting stereoscopic videos and imag
 Everything runs locally, without an account, cloud or tracking. The interface can be switched between German and English.
 
 ![TransCora 1.0 video batch and output settings](docs/TransCora-1.0.png)
+
+Row-interleaved image/video inputs and **Frame sequential** video inputs can now
+be converted to the existing stereo or mono targets. L/R swap determines the first
+half-image. Frame sequential pairs consecutive half-images before frame-rate
+conversion; 120 individual frames/s represent 60 stereo pairs/s. An unpaired final
+half-image is omitted. Choose an output layout for frame-sequential input.
+
+The 1.1 development build reads **HEIC/HEIF** SDR images, including tagged stereo
+HEIC and Spatial Photos. Stereo groups determine left/right assignment; depth
+maps and gainmaps are not selected as a second half-image. Orientation and colour
+profiles are respected. The existing image outputs and preview are available.
+MV-HEVC remains a decoding input; version 1.1 contains no additional MV-HEVC encoder. HDR tone mapping and HEIC output are outside its scope.
 
 ## Quick start
 
@@ -18,15 +30,17 @@ Everything runs locally, without an account, cloud or tracking. The interface ca
 
 The default output folder is `output` beside the program. Folder batches preserve relative subfolders. Existing files receive a numbered alternative name. A failed entry does not stop the remaining valid entries. **Cancel** stops the current operation; completed files remain available.
 
-Video status shows estimated remaining time for the **file** and **batch**. Estimates use live progress and durations of comparable completed files. BD-3D also learns audio and mux finishing times; the first title has a coarser estimate. A dash indicates an unmeasured format or missing progress.
+Video status shows estimated remaining time for the **file** and **batch**, based on remaining video duration and the duration-weighted processing average measured during the run. Different resolutions, frame rates and codecs do not suppress the batch estimate. Estimates remain available across file transitions and delayed progress updates. BD-3D includes total processing time, including audio and muxing. A dash appears before the first progress measurement.
 
-Videos and images share **Source**, **Output**, **Format** and **Save** sections. **Output size** shows dimensions beside the size menu. Video dimensions describe the complete output picture; BD-3D shows dimensions per half-image. Images can be scaled proportionally by their long or short edge.
+Videos and images share **Source**, **Output**, **Format** and **Save** sections. **Output size** shows dimensions beside the size menu. Video dimensions describe the complete output picture; BD-3D and Dual show dimensions per half-image. Images can be scaled proportionally by their long or short edge.
 
 **Advanced** expands additional settings inside the window. **Default settings** restores defaults for new files; existing entries keep their settings. In smaller windows, settings scroll while the file list, information area and processing buttons retain their space. Use **Choose** to select the output folder.
 
 The current file remains visible beside progress information when the processing phase changes. Long filenames are shortened in the middle to fit the window.
 
 Click a column heading to sort the file list in ascending or descending order. Frame rate and duration sort numerically; the visible order also applies to the next processing run. Input and output folders may be identical. Recursive imports skip a nested output subfolder.
+
+Completed jobs show **Processing time**. **Remove completed** clears successful list entries while retaining files and `TransCora-Journal.json` in the output folder. Reimporting unchanged sources, settings and outputs restores completion and elapsed time. **Pause after file** finishes the current file and journal entry before pausing; **Resume** continues the batch.
 
 ## Video output
 
@@ -36,16 +50,24 @@ Click a column heading to sort the file list in ascending or descending order. F
 | Half-SBS / Half-OU | Compact stereo formats for compatible players and displays |
 | Cross-view · Full-SBS R/L | Free-viewing: right half-image on the left, left half-image on the right |
 | Anaglyph | Stereo through coloured glasses; 17 AnaglyphBatch methods |
-| Mono | Export the left half-image as an ordinary video |
+| Dual · L/R tracks | Two separate video tracks in one MP4 or MKV; dimensions per half-image |
+| Mono | Export the selected left or right half-image as an ordinary video |
 | Keep layout | Re-encode with the existing arrangement, optionally changing frame rate |
 | Row-interleaved | Direct output for a compatible polarised monitor |
 | BD-3D | Blu-ray 3D ISO or AVC/MVC M2TS: 1080p at 23.976 fps or 720p at 50/59.94 fps per half-image |
 
 **MP4 is the default; MKV is selectable**, including cross-view. MKV carries the appropriate stereo metadata. Cross-view MP4 keeps the R/L picture arrangement without a misleading L/R marker. Player support varies; check the first output on the intended device.
 
+
+Dual inputs contain two equally sized video tracks. `-dual` enables automatic detection; otherwise explicitly choose the **Dual** source layout. Unambiguous Left/Right track titles determine assignment; otherwise the first track is left and the second right. Unsynchronised half-images produce an error instead of an incomplete stereo output. MP4 is the default and MKV remains selectable.
+
+BD-3D and Dual previews show both half-images using parallel view, cross-view or red/cyan anaglyph. Check spatial depth; if reversed, change **Swap L/R**. Preview views do not alter output options.
+
+The filename-suffix menu identifies Kodi, Bino or Bino/Stereoscopic Player in parentheses. Parentheses appear only in the menu. Combined suggestions such as `.3D.HTAB-tbh` have been removed; existing filenames are still recognised.
+
 ### Resolution and cross-view
 
-Choose **Original**, **1080p**, **2160p** or **Custom**. Automatic retains the reconstructed source size for full layouts and uses 1080p for half layouts. Custom width and height always describe the **complete output picture**. The aspect ratio is preserved, with borders when necessary.
+Choose **Original**, **1080p**, **2160p** or **Custom**. Automatic retains the reconstructed source size for full layouts and uses 1080p for half layouts. Custom width and height describe the **complete output picture** for packed layouts and **each half-image** for Dual. The aspect ratio is preserved, with borders when necessary.
 
 | Example | Complete picture | Stored pixels per half-image |
 | --- | --- | --- |
@@ -84,7 +106,7 @@ Orientation and colour profiles are applied when converting images. Optional met
 
 Packed Full/Half SBS and OU are supported. Automatic source detection uses stereo metadata or an unambiguous filename marker. If the source is ambiguous, choose its layout manually. Common player suffixes include `-lr`, `-rl`, `-lrh`, `-rlh`, `-ab`, `-ba`, `-abq` and `-baq`.
 
-Windows can also read unencrypted MVC/Blu-ray 3D and SDR MV-HEVC sources. Reading a Blu-ray ISO selects its main stereoscopic playlist. The program does not remove copy protection. HDR conversion, animated/multipage images and 16-bit image conversion are outside version 1.0.
+Windows can also read unencrypted MVC/Blu-ray 3D and SDR MV-HEVC sources. Reading a Blu-ray ISO selects its main stereoscopic playlist. The program does not remove copy protection. HDR conversion, animated/multipage images and 16-bit image conversion are outside version 1.1.
 
 Save lists to resume a batch with its per-file settings. Lists contain paths and settings, not the media itself. Save **Presets** to reuse conversion settings. Language and chosen folders are remembered locally.
 
@@ -109,3 +131,4 @@ Release packages include the matching application source. Build instructions: [B
 ## License
 
 Copyright Christoph Müller. TransCora uses the MIT License; supplied third-party tools retain their own licences. See [LICENSE](LICENSE) and [THIRD_PARTY.md](THIRD_PARTY.md).
+

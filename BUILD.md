@@ -16,6 +16,11 @@ verwenden. Der Windows-Build läuft in `.github/workflows/build.yml`.
 Das portable Paket enthält den zugehörigen Anwendungscode unter `source/`,
 die unveränderten Original-Assets sowie die Versions-, Lizenz- und Hash-Nachweise
 der externen Werkzeuge. Die Werkzeuge bleiben eigenständige Prozesse.
+Der Paketbauer erstellt zusätzlich den separaten HEIF-Leser und legt seine
+festgelegten Quellarchive und Lizenznachweise unter `tools/heif/` ab. Die
+Anwendung lädt keine HEIF-Bibliotheken in ihren eigenen Prozess. Die Paketprüfung
+dekodiert normale und Stereo-HEIC und verarbeitet sie mit der gestarteten
+gepackten TransCora-Anwendung.
 Die Build-Skripte laden die festgelegten Versionen ausschließlich während des Builds;
 die Anwendung selbst benötigt keinen Netzwerkzugriff.
 
@@ -40,3 +45,4 @@ Linux/macOS-Pakete enthalten Python/Tk, CIELAB und ExifTool. FFmpeg wird auf die
 Systemen extern verwendet; ExifTool benötigt System-Perl. BD-3D-Kodierung verwendet
 derzeit Windows-FRIM und ist im nativen Linux/macOS-Paket nicht freigegeben.
 Der Linux-x64-Build enthält den unabhängigen MVC-Decoder; Apple Silicon nicht.
+

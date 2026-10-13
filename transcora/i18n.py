@@ -2,6 +2,25 @@
 import re
 LANGUAGES = {'de': 'Deutsch', 'en': 'English'}
 EN = {'Log':'Log', 'Kopieren':'Copy', 'Video':'Video', 'Audio':'Audio', 'Bitrate':'Bitrate',
+ 'Bearbeitungszeit': 'Processing time',
+ 'Fertige entfernen': 'Remove completed',
+ 'Nach Datei pausieren': 'Pause after file',
+ 'Pause vorgemerkt': 'Pause requested',
+ 'Fortsetzen': 'Resume',
+ 'Stapel pausiert': 'Batch paused',
+ 'Halbbild': 'Half-image',
+ 'Bereits verarbeitet.': 'Already processed.',
+ 'Journal: ': 'Journal: ',
+ 'Journal nicht gespeichert: ': 'Journal not saved: ',
+ 'Ausgabe fertig; Journal nicht gespeichert.': 'Output completed; journal not saved.',
+ 'Journal konnte nicht gelesen werden: ': 'Could not read journal: ',
+ 'Unbekanntes Journalformat.': 'Unknown journal format.',
+ 'Journal ist zu groß.': 'Journal is too large.',
+ 'Journal wird von einem anderen Lauf geschrieben.': 'Another run is writing the journal.',
+ 'Ungültige Bearbeitungszeit.': 'Invalid processing time.',
+ 'Quelle wurde während der Verarbeitung geändert; Abschluss nicht zugeordnet.': 'Source changed during processing; completion not recorded.',
+ 'Keine fertigen Ausgaben für das Journal.': 'No completed outputs for the journal.',
+ 'Quelldaten für den Journalnachweis fehlen.': 'Source information for the journal receipt is missing.',
  '\nFehler: {0}\n{1}\n': '\nError: {0}\n{1}\n',
  '\nGespeichert: ': '\nSaved: ',
  ' Bildprotokoll: {0}': ' Image log: {0}',
@@ -563,6 +582,24 @@ EN = {'Log':'Log', 'Kopieren':'Copy', 'Video':'Video', 'Audio':'Audio', 'Bitrate
  'Keiner': 'None',
  'Kompatibel · 8 Bit / 4:2:0': 'Compatible · 8 bit / 4:2:0',
  'Kontrollbild': 'Preview',
+ 'Dual (L/R-Spuren)': 'Dual (L/R tracks)',
+ 'Dual · L/R-Spuren': 'Dual · L/R tracks',
+ 'Dual: Zwei eigenständige Videospuren werden als L/R-Paar dekodiert.': 'Dual: Two independent video tracks are decoded as an L/R pair.',
+ 'Dual: Zwei eigenständige Videospuren; Ausgabegröße gilt je Halbbild. Links ist die erste Spur, rechts die zweite.': 'Dual: Two independent video tracks; output size is per half-image. Left is the first track, right is the second.',
+ 'Dual: Zwei eigenständige Videospuren · Links, dann rechts': 'Dual: Two independent video tracks · Left, then right',
+ 'Zwei eigenständige Videospuren: Dual als Quelllayout wählen.': 'Two independent video tracks: Choose Dual as the source layout.',
+ 'Zwei eigenständige Videospuren: Für ein L/R-Paar Dual als Quelllayout wählen.': 'Two independent video tracks: Choose Dual as the source layout for an L/R pair.',
+ 'Dual: Beide Halbbilder benötigen gleiche Auflösung und gleiches Pixelseitenverhältnis.': 'Dual: Both half-images need the same resolution and pixel aspect ratio.',
+ 'Dual: Beide Videospuren sind demselben Halbbild zugeordnet.': 'Dual: Both video tracks are labelled as the same half-image.',
+ 'Die Anzahl der Videospuren entspricht nicht dem Ausgabeziel.': 'The number of video tracks does not match the output target.',
+ 'Beide Halbbilder kontrollieren; die Ansicht ändert keine Ausgabeoptionen.': 'Check both half-images; the preview view does not change output settings.',
+ 'Dual-Kennung': 'Dual marker',
+ 'Dateinamenszusatz: {0} ({1}).': 'Filename suffix: {0} ({1}).',
+ 'Kontrollbildansicht': 'Preview view',
+ 'Parallelblick · L/R': 'Parallel view · L/R',
+ 'Kreuzblick · R/L': 'Cross view · R/L',
+ 'Anaglyph · Rot/Cyan': 'Anaglyph · Red/cyan',
+ 'Ungültige Kontrollbildansicht.': 'Invalid preview view.',
  'Kontrollbild berechnen': 'Calculate preview',
  'Kontrollbild berechnen …': 'Calculate preview …',
  'Kontrollbild bereit.': 'Preview ready.',
@@ -642,22 +679,7 @@ EN = {'Log':'Log', 'Kopieren':'Copy', 'Video':'Video', 'Audio':'Audio', 'Bitrate
                                                                                            'required.',
  'MVC-Decoder an beiden Halbbildern testen': 'Test MVC decoder with both half-images',
  'MVC-Kennzeichnung der Quelle prüfen': 'Check MVC source metadata',
- 'MVC: Basis-Halbbild als links angenommen. Reihenfolge im Kontrollbild prüfen; L/R tauschen ist verfügbar.': 'MVC: '
-                                                                                                              'base '
-                                                                                                              'half-image '
-                                                                                                              'assumed '
-                                                                                                              'to '
-                                                                                                              'be '
-                                                                                                              'left. '
-                                                                                                              'Check '
-                                                                                                              'order '
-                                                                                                              'in '
-                                                                                                              'the '
-                                                                                                              'preview; '
-                                                                                                              'Swap '
-                                                                                                              'L/R '
-                                                                                                              'is '
-                                                                                                              'available.',
+ 'MVC: Links/rechts nicht gekennzeichnet; Basis-Halbbild wird als links verwendet. Bei umgekehrter Tiefenwirkung L/R tauschen.': 'MVC: Left/right is not labelled; the base half-image is used as left. If depth appears reversed, swap L/R.',
  'MVC: Basis-Halbbild laut Blu-ray-Playlist ': 'MVC: base half-image according to Blu-ray playlist ',
  'MVC: Beide Halbbilder dekodieren · ': 'MVC: decode both half-images · ',
  'MVC: Beschädigter oder verschlüsselter Transportstrom.': 'MVC: damaged or encrypted transport stream.',
@@ -1036,13 +1058,13 @@ EN.update({'Unterordner': 'Subfolders',
                                                                                 'preserved; MP4 without '
                                                                                 'stereo metadata.'})
 
-EN.update({'Größe je Auge': 'Size per eye', 'Größe des Gesamtbildes': 'Output frame size'})
+EN.update({'Größe je Auge': 'Size per half-image', 'Größe des Gesamtbildes': 'Output frame size'})
 
 # Long messages win over prefix fragments. Captures retain filenames and values.
 EN.update({
     'Auswählen':'Choose', 'Quelle':'Source', 'Ausgabe':'Output', 'Format':'Format', 'Speichern':'Save',
-    'Ausgabegröße':'Output size', 'Ausgabegröße je Halbbild':'Output size per eye image',
-    'Automatisch':'Automatic', 'Monitorauflösung':'Display resolution', '1080p · je Halbbild':'1080p · per eye image',
+    'Ausgabegröße':'Output size', 'Ausgabegröße je Halbbild':'Output size per half-image',
+    'Automatisch':'Automatic', 'Monitorauflösung':'Display resolution', '1080p · je Halbbild':'1080p · per half-image',
     'Vorgaben für neue Dateien':'Defaults for new files',
     'Erweitert ▸':'Advanced ▸', 'Erweitert ▾':'Advanced ▾',
     'Dateinamenszusatz folgt dem gewählten Ziel.':'Filename suffix follows the selected target.',
@@ -1056,7 +1078,7 @@ EN.update({
 
 EN.update({
  'Layout, Auflösung und Halbbildreihenfolge bleiben erhalten. Video wird neu kodiert; Ton gemäß Tonoptionen.':
- 'Layout, resolution and eye image order are retained. Video is re-encoded; audio follows Audio options.',
+ 'Layout, resolution and half-image order are retained. Video is re-encoded; audio follows Audio options.',
  'Ton passt nicht zum MP4-Ausgabeformat ({0}). Unter Tonoptionen AAC wählen oder MKV verwenden.':
  'Audio does not fit the MP4 output format ({0}). Select AAC under Audio options or use MKV.',
  '). Unter Tonoptionen AAC wählen oder MKV verwenden.': '). Select AAC under Audio options or use MKV.',
@@ -1092,6 +1114,35 @@ EN.update({'{0} → 23,976 fps: Ganze Stereobildpaare werden ausgelassen oder wi
 for key in list(EN):
     if '{0} '+chr(8594)+' {1} fps:' in key or 'Variable Bildzeiten '+chr(8594)+' {0} fps:' in key:
         del EN[key]
+EN.update({
+    'Zeilenverschachtelt': 'Row interleaved',
+    'Frame sequential': 'Frame sequential',
+    'Zeilenquelle benötigt eine gerade Zeilenzahl.': 'Row-interleaved input requires an even number of rows.',
+    'Frame sequential: Ausgabe-Layout wählen; die Zielbildrate gilt für vollständige Stereobildpaare.':
+        'Frame sequential: choose an output layout; the target frame rate applies to complete stereo pairs.',
+    'Frame sequential: Je zwei aufeinanderfolgende Halbbilder bilden ein Stereobildpaar. Die Paarbildrate ist die halbe Quellbildrate; ein ungepaartes Schlussbild wird ausgelassen.':
+        'Frame sequential: two consecutive half-images form one stereo pair. The pair frame rate is half the source frame rate; an unpaired final half-image is omitted.',
+    'Zeilenquelle: Stereo-Zeilen werden vor Skalierung getrennt. Die halbe vertikale Detailauflösung je Halbbild bleibt erhalten.':
+        'Row-interleaved input: stereo rows are separated before scaling. Each half-image retains half the vertical detail resolution.',
+})
+
+EN.update({
+    'HEIF: Halbbilder anhand der Stereo-Gruppe links/rechts zugeordnet.':
+        'HEIF: half-images assigned left/right using the stereo group.',
+    'HEIF-Leser fehlt. TransCora vollständig entpacken.': 'HEIF reader missing. Extract TransCora completely.',
+    'HEIF-Leser meldet widersprüchliche Bildmaße.': 'HEIF reader reports inconsistent image dimensions.',
+})
+
+EN.update({
+    'HDR-HEIF: SDR-Kopie mit bewusster Tonwertwandlung verwenden.': 'HDR HEIF: use an SDR copy with deliberate tone mapping.',
+    'HEIF enthält mehrere passende Stereo-Gruppen; das gewünschte Paar separat exportieren.':
+        'HEIF contains several applicable stereo groups; export the intended pair separately.',
+    'HEIF-Stereo-Gruppe enthält keine zwei lesbaren Halbbilder.': 'HEIF stereo group does not contain two readable half-images.',
+    'HEIF-Halbbilder haben unterschiedliche Maße.': 'HEIF half-images have different dimensions.',
+    'Nicht unterstützte HEIF-SDR-Farbinterpretation.': 'Unsupported HEIF SDR colour interpretation.',
+    'HEIF mit nichtquadratischen Pixeln wird noch nicht unterstützt.': 'HEIF with non-square pixels is not yet supported.',
+})
+
 PATTERNS = []
 for source, target in EN.items():
     parts = re.split(r"(\{\d+\})", source)
@@ -1100,7 +1151,7 @@ for source, target in EN.items():
         PATTERNS.append((re.compile('^'+pattern+'$', re.S), target))
 PATTERNS.sort(key=lambda item: len(item[0].pattern), reverse=True)
 
-EN.update({'Half-SBS': 'Half-SBS', 'Half-OU': 'Half-OU', 'Full-SBS': 'Full-SBS', 'Full-OU': 'Full-OU', 'BD-3D-Bitrate': 'BD-3D bitrate', 'Videomaße: Gerade Pixelzahlen von 2 bis 16384 verwenden.': 'Video dimensions: use even pixel counts from 2 to 16384.', 'Ungültige Video-Ausgabegröße.': 'Invalid video output size.', 'BD-3D-Bitrate: 20, 25, 30, 35 oder 40 Mbit/s wählen.': 'BD-3D bitrate: choose 20, 25, 30, 35 or 40 Mbit/s.', 'Ungültige BD-3D-Bitrate.': 'Invalid BD-3D bitrate.', 'Breite (Pixel)': 'Width (pixels)', 'Höhe (Pixel)': 'Height (pixels)', 'Maße je Auge': 'Dimensions per eye', 'Maße des Gesamtbildes': 'Dimensions of the complete image', 'Die deinterlacte Ausgabe ist nicht progressiv gekennzeichnet.': 'The deinterlaced output is not marked as progressive.', 'BD-3D: Die erzeugte Bildfolge entspricht nicht der festen Ausgabebildrate.': 'BD-3D: the generated frame sequence does not match the fixed output frame rate.', 'Interlaced: Ein progressives Bild je Halbbildzeit; die zeitliche Auflösung bleibt erhalten. BD-3D und die Zielbildrate passen die Bildfolge anschließend an.': 'Interlaced: one progressive frame per field time preserves temporal resolution. BD-3D and the target frame rate subsequently adapt the frame sequence.'})
+EN.update({'Half-SBS': 'Half-SBS', 'Half-OU': 'Half-OU', 'Full-SBS': 'Full-SBS', 'Full-OU': 'Full-OU', 'BD-3D-Bitrate': 'BD-3D bitrate', 'Videomaße: Gerade Pixelzahlen von 2 bis 16384 verwenden.': 'Video dimensions: use even pixel counts from 2 to 16384.', 'Ungültige Video-Ausgabegröße.': 'Invalid video output size.', 'BD-3D-Bitrate: 20, 25, 30, 35 oder 40 Mbit/s wählen.': 'BD-3D bitrate: choose 20, 25, 30, 35 or 40 Mbit/s.', 'Ungültige BD-3D-Bitrate.': 'Invalid BD-3D bitrate.', 'Breite (Pixel)': 'Width (pixels)', 'Höhe (Pixel)': 'Height (pixels)', 'Maße je Auge': 'Dimensions per half-image', 'Maße des Gesamtbildes': 'Dimensions of the complete image', 'Die deinterlacte Ausgabe ist nicht progressiv gekennzeichnet.': 'The deinterlaced output is not marked as progressive.', 'BD-3D: Die erzeugte Bildfolge entspricht nicht der festen Ausgabebildrate.': 'BD-3D: the generated frame sequence does not match the fixed output frame rate.', 'Interlaced: Ein progressives Bild je Halbbildzeit; die zeitliche Auflösung bleibt erhalten. BD-3D und die Zielbildrate passen die Bildfolge anschließend an.': 'Interlaced: one progressive frame per field time preserves temporal resolution. BD-3D and the target frame rate subsequently adapt the frame sequence.'})
 
 def translate(text, language='de'):
     text = str(text)
@@ -1118,6 +1169,9 @@ def translate(text, language='de'):
     # Preserve track titles/language codes when the presentation is rendered.
     if text.startswith('Audio: '):
         return text
+    for prefix in ('Journal: ', 'Journal nicht gespeichert: ', 'Journal konnte nicht gelesen werden: '):
+        if text.startswith(prefix):
+            return EN[prefix] + translate(text[len(prefix):], language)
     for pattern, target in PATTERNS:
         match = pattern.fullmatch(text)
         if match:

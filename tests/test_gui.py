@@ -18,6 +18,259 @@ from tkinter import ttk
 
 
 class GuiTests(unittest.TestCase):
+    def test_new_stereo_inputs_fit_the_list_and_show_neutral_notices(self):
+        from tkinter import font
+        from transcora.core.model import Job
+        from transcora.core.engine import plan_job
+        from test_stereo_inputs import fixture
+        window = self.window; tools = Toolchain.find()
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            source = fixture(tools, folder, 'frame_sequential', '120')
+            job = Job(source, Options(target='full_sbs', container='mkv', video_size='original'))
+            job.plan = plan_job(tools, job, folder/'out', set())
+            job.status = 'ready'; window.jobs.append(job); window.update_row(job)
+            window.tree.selection_set(job.id); window.show_job_details(job)
+            self.root.update()
+            for language in ('de', 'en'):
+                window.language = language; window.apply_language(); self.root.update()
+                self.assertIn('Frame sequential', window.mappings['layout'].values())
+                measured = font.Font(font=ttk.Style().lookup('Treeview', 'font')).measure('Frame sequential')
+                self.assertGreaterEqual(window.tree.column('layout', 'width'), measured+16)
+                self.assertEqual(window.attention.get(), '')
+                self.assertNotIn('⚠', window.file_notes.get())
+
+    def test_video_pause_preserves_completed_export_and_freezes_elapsed(self):
+        import threading
+        import shutil
+        from transcora.gui.window import execute as actual_execute
+        from transcora.core.journal import Journal
+        tools = Toolchain.find(); window = self.window
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve(); sample = root / 'sample.mp4'
+            capture([str(tools.ffmpeg), '-v', 'error', '-f', 'lavfi', '-i', 'testsrc2=s=128x32:r=30',
+                     '-frames:v', '1', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-colorspace', 'bt709',
+                     '-color_trc', 'bt709', '-color_primaries', 'bt709', '-color_range', 'tv', str(sample)])
+            sources = []
+            for n in range(2):
+                source = root / f'clip{n}_full_sbs.mp4'; shutil.copy2(sample, source); sources.append(source)
+            window.defaults = replace(Options(), target='full_ou', container='mkv', video_size='original')
+            window.output_var.set(str(root / 'out')); window.add_paths(sources)
+            entered, release = threading.Event(), threading.Event(); calls = []
+            def export(tools, plan, *args):
+                calls.append(plan.source)
+                if len(calls) == 1:
+                    entered.set()
+                    if not release.wait(5): raise AssertionError('Test did not release current video')
+                return actual_execute(tools, plan, *args)
+            def wait_for(predicate):
+                deadline = time.monotonic() + 15
+                while not predicate() and time.monotonic() < deadline:
+                    self.root.update(); time.sleep(.01)
+                self.assertTrue(predicate(), window.status.get())
+            with patch('transcora.gui.window.execute', side_effect=export):
+                window.check(True)
+                try:
+                    wait_for(entered.is_set)
+                    window.start_or_pause(); release.set()
+                    wait_for(lambda: window.pause.paused and window.jobs[0].status == 'completed')
+                    window.poll(); window.update_elapsed()
+                    self.assertEqual(window.status.get(), 'Stapel pausiert')
+                    self.assertEqual(window.start_text.get(), 'Fortsetzen')
+                    self.assertEqual(len(Journal(root / 'out').read()['completed']), 1)
+                    elapsed = window.elapsed_time.get()
+                    with patch('transcora.gui.window.time.monotonic', return_value=time.monotonic() + 100):
+                        window.update_elapsed()
+                    self.assertEqual(window.elapsed_time.get(), elapsed)
+                    self.assertLessEqual(window.start_button.winfo_rootx() + window.start_button.winfo_width(),
+                                         self.root.winfo_rootx() + self.root.winfo_width())
+                    window.start_or_pause(); wait_for(lambda: not window.busy)
+                    self.assertEqual(len(calls), 2)
+                    self.assertTrue(all(j.status == 'completed' for j in window.jobs))
+                finally:
+                    release.set(); window.cancel.set(); wait_for(lambda: not window.busy)
+
+    def test_pause_finishes_the_current_image_then_resumes_or_aborts(self):
+        import threading
+        from PIL import Image
+        from transcora.core.images import ImageOptions
+        from transcora.gui.images_panel import execute_image as actual_execute
+        from transcora.core.journal import Journal
+        panel = self.window.images
+        for abort in (False, True):
+            with tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp).resolve(); sources = []
+                for n in range(3):
+                    source = root / f'pair{n}.mpo'
+                    Image.new('RGB', (32, 24), 'red').save(source, format='MPO', save_all=True,
+                                                        append_images=[Image.new('RGB', (32, 24), 'blue')])
+                    sources.append(source)
+                panel.jobs.clear(); panel.tree.delete(*panel.tree.get_children())
+                panel.defaults = ImageOptions(task='mpo'); panel.output.set(str(root / 'out')); panel.add_paths(sources)
+                entered, release = threading.Event(), threading.Event(); calls = []
+                def execute_file(tools, plan, *args):
+                    calls.append(plan.sources[0])
+                    if len(calls) == 1:
+                        entered.set()
+                        if not release.wait(5): raise AssertionError('Test did not release current export')
+                    return actual_execute(tools, plan, *args)
+                def wait_for(predicate):
+                    deadline = time.monotonic() + 8
+                    while not predicate() and time.monotonic() < deadline:
+                        self.root.update(); time.sleep(.01)
+                    self.assertTrue(predicate(), panel.status.get())
+                with patch('transcora.gui.images_panel.execute_image', side_effect=execute_file):
+                    panel.run(True)
+                    try:
+                        wait_for(entered.is_set)
+                        panel.start_or_pause()
+                        self.assertEqual(panel.start_text.get(), self.window.t('Pause vorgemerkt'))
+                        release.set(); wait_for(lambda: panel.pause.paused)
+                        # Flush the completed-file and pause messages together.
+                        panel.poll()
+                        self.assertEqual([j.status for j in panel.jobs], ['completed', 'ready', 'ready'])
+                        self.assertEqual(len(Journal(root / 'out').read()['completed']), 1)
+                        self.assertEqual(panel.start_text.get(), self.window.t('Fortsetzen'))
+                        panel.abort() if abort else panel.start_or_pause()
+                        wait_for(lambda: not panel.busy)
+                        self.assertEqual(len(calls), 1 if abort else 3)
+                        self.assertEqual(panel.jobs[0].status, 'completed')
+                    finally:
+                        release.set(); panel.cancel.set()
+                        wait_for(lambda: not panel.busy)
+
+    def test_mono_half_image_choice_is_visible_only_for_mono_and_updates_name(self):
+        window = self.window
+        window.add_paths([Path('film_full_sbs.mp4')])
+        window.variables['target'].set('Mono'); window.option_changed('target')
+        self.root.update()
+        self.assertTrue(window.option_frames['mono_eye'].winfo_ismapped())
+        window.variables['mono_eye'].set('Rechtes Halbbild'); window.option_changed('mono_eye')
+        self.assertEqual(window.jobs[0].options.mono_eye, 'right')
+        self.assertIn('_mono_r', window.output_name.get())
+        window.language = 'en'; window.apply_language()
+        self.assertEqual(window.variables['mono_eye'].get(), 'Right half-image')
+        window.variables['target'].set('Half-SBS'); window.option_changed('target')
+        self.root.update()
+        self.assertFalse(window.option_frames['mono_eye'].winfo_ismapped())
+
+    def test_journal_write_error_does_not_turn_completed_image_export_into_failure(self):
+        from PIL import Image
+        from transcora.core.images import ImageOptions, mpo_jpegs
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp).resolve()
+            source = folder / 'pair.mpo'
+            Image.new('RGB', (32, 24), 'red').save(source, format='MPO', save_all=True,
+                                                   append_images=[Image.new('RGB', (32, 24), 'blue')])
+            panel = self.window.images
+            panel.defaults = ImageOptions(task='mpo')
+            panel.output.set(str(folder / 'out')); panel.add_paths([source])
+            with patch('transcora.gui.images_panel.threading.Thread') as thread, \
+                 patch('transcora.gui.images_panel.Journal.complete', side_effect=OSError('disk full')):
+                thread.return_value.start.side_effect = lambda: thread.call_args.kwargs['target']()
+                panel.run(True); panel.poll(); self.window.poll()
+            job = panel.jobs[0]
+            self.assertEqual(job.status, 'completed')
+            self.assertIsNotNone(job.result)
+            self.assertEqual(tuple(p.read_bytes() for p in job.result.outputs), mpo_jpegs(source))
+            self.assertIn('Journal nicht gespeichert: 1', panel.status.get())
+            self.assertIn('disk full', '\n'.join(self.window.log_lines))
+
+    def test_colour_assumptions_and_other_review_messages_appear_only_once(self):
+        from types import SimpleNamespace
+        from transcora.core.engine import color_spec
+        window = self.window
+        window.add_paths([Path('colours_full_sbs.mp4')])
+        job = window.jobs[0]
+        _, messages = color_spec(dict(width=3840, height=1080, pix_fmt='yuv420p'), 'full_sbs')
+        self.assertTrue(messages)
+        action = 'Manuell gewähltes Layout/L/R weicht vom Dateinamen ab.'
+        job.plan = SimpleNamespace(summary='Summary\n' + messages[0], warnings=messages + messages + [action],
+                                   review_warnings=[action], layout='full_sbs', output=Path('test.mp4'), duration=1,
+                                   info={'video': {'width': 3840, 'height': 1080, 'avg_frame_rate': '30/1'}})
+        job.status = 'ready'
+        # Additional details must not cause shared warnings to appear again.
+        job.detail = 'Additional detail\n' + '\n'.join(messages)
+        for language in ('de', 'en'):
+            window.language = language; window.apply_language()
+            window.selection_changed(); self.root.update()
+            body = window.detail_text.get('1.0', 'end')
+            for message in messages:
+                self.assertEqual(body.count(window.t(message)), 1)
+                index = window.detail_text.search(window.t(message), '1.0')
+                self.assertNotIn('attention', window.detail_text.tag_names(index))
+            self.assertEqual(body.count(window.t(action)), 1)
+            self.assertIn('Additional detail', body)
+            self.assertTrue(window.detail_text.tag_ranges('attention'))
+
+    def test_delete_keeps_keyboard_selection_in_visible_order_on_both_tabs(self):
+        for panel, suffix in ((self.window, '.mp4'), (self.window.images, '.png')):
+            panel.add_paths([Path('C' + suffix), Path('A' + suffix), Path('B' + suffix)])
+            panel.sorter.sort('file')
+            rows = list(panel.tree.get_children())
+            panel.tree.selection_set(rows[1]); panel.tree.focus(rows[1])
+            panel.remove()
+            self.assertEqual(panel.tree.selection(), (rows[2],))
+            self.assertEqual(panel.tree.focus(), rows[2])
+            panel.remove()
+            self.assertEqual(panel.tree.selection(), (rows[0],))
+            panel.remove()
+            self.assertEqual(panel.tree.get_children(), ())
+            self.assertEqual(panel.tree.selection(), ())
+
+    def test_processing_column_sorts_numbers_and_completed_removal_preserves_files(self):
+        from transcora.core.journal import Completion
+        for panel, suffix in ((self.window, '.mp4'), (self.window.images, '.png')):
+            panel.add_paths([Path(f'item{n}' + suffix) for n in range(3)])
+            a, b, c = panel.jobs
+            a.result = Completion((), 100, {}); a.status = 'completed'
+            b.result = Completion((), 20, {}); b.status = 'completed'
+            self.window.update_row(a) if panel is self.window else panel.refresh()
+            self.window.update_row(b) if panel is self.window else panel.refresh()
+            panel.sorter.sort('processing')
+            self.assertEqual([j.id for j in panel.jobs], [b.id, a.id, c.id])
+            self.assertEqual(panel.tree.set(a.id, 'processing'), '00:01:40')
+            panel.remove_completed()
+            self.assertEqual(panel.jobs, [c])
+            self.assertEqual(str(panel.remove_completed_button.cget('state')), 'disabled')
+
+    def test_completed_receipt_restores_after_removal_and_unchanged_entry_commits(self):
+        from transcora.core.journal import Journal, request, NAME
+        from transcora.core.model import Job
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve(); output = root / 'out'; output.mkdir()
+            source = root / 'clip_full_sbs.mp4'; source.write_bytes(b'input')
+            saved = output / 'clip_half_sbs.mp4'; saved.write_bytes(b'output')
+            window = self.window
+            window.output_var.set(str(output)); window.invalidate_all()
+            Journal(output).complete(request(Job(source, replace(window.defaults)), 'video'), (saved,), 11.5)
+            window.add_paths([source]); job = window.jobs[0]
+            self.assertEqual(job.status, 'completed')
+            self.assertEqual(window.tree.set(job.id, 'processing'), '00:00:11')
+            window.selection_changed(); self.assertTrue(window.commit_entries())
+            self.assertEqual(job.status, 'completed')
+            window.remove_completed()
+            self.assertTrue(saved.exists()); self.assertTrue((output / NAME).exists())
+            window.add_paths([source]); self.assertEqual(window.jobs[0].status, 'completed')
+            (output / NAME).unlink()
+            with patch('transcora.gui.window.Toolchain.find', side_effect=OSError('test stop')):
+                window.check(False)
+                deadline = time.monotonic() + 5
+                while window.busy and time.monotonic() < deadline:
+                    self.root.update(); time.sleep(.01)
+            self.assertEqual(window.jobs[0].status, 'queued')
+
+    def test_new_column_and_completed_button_fit_standard_window_in_both_languages(self):
+        window = self.window
+        for language in ('de', 'en'):
+            window.language = language; window.apply_language()
+            for tab, panel in ((window.video_tab, window), (window.image_tab, window.images)):
+                window.notebook.select(tab); self.root.update()
+                self.assertLessEqual(sum(int(panel.tree.column(c, 'width')) for c in panel.tree['columns']), panel.tree.winfo_width())
+                self.assertLess(panel.remove_completed_button.winfo_rootx(), panel.reset_button.winfo_rootx())
+                self.assertLessEqual(panel.reset_button.winfo_rootx() + panel.reset_button.winfo_width(), self.root.winfo_rootx() + self.root.winfo_width())
+                self.assertEqual(panel.tree.heading('processing', 'text'), 'Processing time' if language == 'en' else 'Bearbeitungszeit')
+
     def test_duration_and_source_fps_survive_option_changes_and_rows_have_exact_size(self):
         from types import SimpleNamespace
         self.window.add_paths([Path('Film_full_sbs.mp4')])
@@ -78,6 +331,12 @@ class GuiTests(unittest.TestCase):
             expected = mpo_jpegs(sources[1])
             outputs = (folder/'out/stereo_2_l.jpg', folder/'out/stereo_2_r.jpg')
             self.assertEqual(tuple(path.read_bytes() for path in outputs), expected)
+            from transcora.core.journal import Journal
+            from transcora.core.images import ImageJob
+            original_job = panel.jobs[-1]
+            self.assertIsNotNone(original_job.result)
+            restored = Journal(folder / 'out').lookup(ImageJob(original_job.source, replace(original_job.options)), 'image')
+            self.assertEqual(restored.outputs, tuple(p.resolve() for p in outputs))
             self.assertIn('1 erfolgreich', panel.status.get())
             self.assertFalse(panel.busy)
 
@@ -88,19 +347,18 @@ class GuiTests(unittest.TestCase):
         job = window.jobs[0]
         job.options = replace(job.options, target='bd3d', container='iso')
         window.run_started = 10
-        window.events.put(('batch', [(100, 'bd', True), (200, 'bd', True)]))
+        window.events.put(('batch', [100, 200]))
         window.events.put(('current', (job.source.name, 1, 2)))
         with patch('transcora.gui.window.time.monotonic', return_value=100):
             window.poll()
         with patch('transcora.gui.window.time.monotonic', return_value=200):
-            window.events.put(('progress', (job.id, 1, 2, {'percent': 37.5, 'phase_percent': 50})))
+            window.events.put(('progress', (job.id, 1, 2, {'percent': 37.5})))
             window.poll()
         self.assertIn('Restzeit: Datei ca.', window.elapsed.get())
         self.assertIn(' · Stapel ca.', window.elapsed.get())
         file_left,batch_left = window.remaining_time.remaining(200)
         self.assertGreater(batch_left,file_left)
         with patch('transcora.gui.window.time.monotonic', return_value=300):
-            window.events.put(('estimate', (job.id, 1, 2, {'encoding_complete': True})))
             window.events.put(('phase', (job.id, 1, 2, 'BD-3D: Blu-ray-ISO erstellen')))
             window.poll()
         self.assertIn('Datei ca.',window.elapsed.get())
@@ -510,6 +768,62 @@ class GuiTests(unittest.TestCase):
             self.window._load_settings()
             self.assertEqual(self.window.defaults.bd_bitrate_mbps,40)
 
+    def test_dual_target_keeps_containers_and_preview_choices_separate(self):
+        from types import SimpleNamespace
+        window=self.window
+        window.variables['target'].set(window.t('Dual · L/R-Spuren'))
+        window.option_changed('target')
+        self.assertEqual(window.defaults.target,'dual')
+        self.assertEqual(window.defaults.container,'mp4')
+        self.assertEqual(tuple(window.combos['container'].cget('values')),('MP4','MKV'))
+        self.assertEqual(window.video_size_caption.get(),window.t('Ausgabegröße je Halbbild'))
+        viewer=PreviewWindow(self.root,lambda seconds:None)
+        window.controls.extend(viewer.controls())
+        viewer.set_plan(SimpleNamespace(duration=1,options=window.defaults,
+                        info={'video':{'avg_frame_rate':'25/1'}}))
+        self.root.update()
+        self.assertTrue(viewer.view_frame.winfo_ismapped())
+        viewer.view_combo.current(1)
+        self.assertEqual(viewer.preview_view,'cross')
+        window.close_preview(viewer.dialog,viewer.time_entry,viewer.scale)
+        self.assertFalse(any(widget==viewer.view_combo for widget,_ in window.controls))
+
+    def test_suffix_popup_fits_player_names_without_widening_controls(self):
+        from tkinter import font
+        if self.root.tk.call('tk','windowingsystem')=='aqua':
+            self.skipTest('Native macOS menus size themselves')
+        window=self.window
+        window.defaults=replace(window.defaults,target='half_sbs')
+        window.refresh_controls();self.root.update()
+        combo=window.combos['suffix'];before=combo.winfo_width()
+        self.root.tk.call('ttk::combobox::Post',str(combo));self.root.update()
+        try:
+            popup=self.root.tk.call('ttk::combobox::PopdownWindow',str(combo))
+            width=int(self.root.tk.call('wm','geometry',popup).split('x')[0])
+            measured=max(font.Font(root=self.root,font='TkTextFont').measure(v) for v in combo.cget('values'))
+            self.assertGreaterEqual(width,measured+36)
+            self.assertEqual(combo.winfo_width(),before)
+        finally:
+            self.root.tk.call('ttk::combobox::Unpost',str(combo))
+
+    def test_player_suffix_labels_are_menu_only_and_custom_text_stays_literal(self):
+        window=self.window
+        for language in ('de','en'):
+            window.language=language; window.apply_language()
+            window.variables['target'].set(window.t('Half-SBS')); window.option_changed('target')
+            values=tuple(window.combos['suffix'].cget('values'))
+            self.assertIn('-lrq (Bino/Stereoscopic Player)',values)
+            self.assertIn('.3D.HSBS (Kodi)',values)
+            self.assertFalse(any('HSBS-lrh' in v for v in values))
+            window.variables['suffix'].set('-lrq (Bino/Stereoscopic Player)')
+            window.option_changed('suffix')
+            self.assertEqual(window.variables['suffix'].get(),'-lrq')
+            self.assertEqual(window.defaults.suffix,'-lrq')
+            self.assertTrue(window.output_name.get().endswith('-lrq.mp4'))
+            window.variables['suffix'].set('_My own (label)')
+            window.option_changed('suffix')
+            self.assertEqual(window.defaults.suffix,'_My own (label)')
+
     def test_file_warnings_are_highlighted_and_follow_selection_and_language(self):
         from types import SimpleNamespace
         message='Full/Half-Layout nicht eindeutig erkennbar. Quelllayout für diese Datei auswählen.'
@@ -525,12 +839,28 @@ class GuiTests(unittest.TestCase):
             self.assertEqual(text.tag_cget('attention','foreground'),GOLD_LIGHT)
         self.window.tree.selection_set(second.id); self.window.selection_changed()
         self.assertEqual(self.window.attention.get(),'')
-        second.plan=SimpleNamespace(summary='Summary',warnings=['Check your player'],layout='full_sbs',
+        second.plan=SimpleNamespace(summary='Summary',warnings=['Check your player'],review_warnings=['Check your player'],layout='full_sbs',
                                     info={'video':{'width':3840,'height':1080}},duration=10)
         self.window.events.put(('job',(second.id,'ready','Check your player',second.plan)))
         self.window.poll()
         self.assertTrue(self.window.detail_text.get('1.0','end').startswith('⚠ Check your player'))
         self.assertEqual(self.window.detail_text.get('1.0','end').count('Check your player'),1)
+
+    def test_unclassified_notes_do_not_request_user_action(self):
+        from types import SimpleNamespace
+        self.window.add_paths([Path('good_full_sbs.mp4')])
+        job=self.window.jobs[0]
+        note='Untertitel werden nicht übernommen.'
+        job.plan=SimpleNamespace(summary='Summary',warnings=[note],layout='full_sbs',output=Path('test.mp4'),
+                                 info={'video':{'width':3840,'height':1080}},duration=10)
+        job.status='ready'; job.detail=note
+        for language in ('de','en'):
+            self.window.language=language; self.window.apply_language()
+            self.window.show_job_details(job); self.root.update()
+            text=self.window.detail_text; body=text.get('1.0','end')
+            self.assertIn(self.window.t(note),body)
+            self.assertNotIn('⚠',body)
+            self.assertFalse(text.tag_ranges('attention'))
 
     def test_english_check_log_translates_audio_labels_and_keeps_track_metadata(self):
         from types import SimpleNamespace
@@ -657,6 +987,17 @@ class GuiTests(unittest.TestCase):
             self.assertTrue(all(j.status=='completed' for j in window.jobs),[(j.source.name,j.status,j.detail) for j in window.jobs])
             self.assertEqual(len(list(folder.glob('*_full_ou.mkv'))),20)
             self.assertEqual(window.current_file.index,20)
+            from transcora.core.journal import Journal
+            self.assertEqual(len(Journal(folder).read()['completed']), 20)
+            self.assertTrue(all(j.result and j.source_fps for j in window.jobs))
+            sources = [j.source for j in window.jobs]
+            window.remove_completed()
+            window.add_paths(sources, folder)
+            self.assertTrue(all(j.status == 'completed' and j.source_fps for j in window.jobs))
+            with patch('transcora.gui.window.execute', side_effect=AssertionError('Completed files must not run again')):
+                window.check(True)
+            self.assertFalse(window.busy)
+            self.assertEqual(len(list(folder.glob('*_full_ou.mkv'))), 20)
             # An output directory above the selected input must not hide it.
             child=base/'parent/child';child.mkdir(parents=True);shutil.copy2(sample,child/'child_full_sbs.mp4')
             window.output_var.set(str(child.parent))
@@ -904,6 +1245,27 @@ class GuiTests(unittest.TestCase):
         self.root.update()
         self.assertFalse(self.window.title_frame.winfo_ismapped())
 
+    def test_batch_remaining_survives_mixed_settings_and_next_file(self):
+        from transcora.gui.remaining import RemainingTime
+        window = self.window
+        window.run_started = 0
+        window.remaining_time = RemainingTime([100, 200])
+        with patch('transcora.gui.window.time.monotonic', return_value=0):
+            window.remaining_time.start(1, 0)
+        with patch('transcora.gui.window.time.monotonic', return_value=50):
+            window.estimate_remaining(1, 2, 50)
+        self.assertEqual(window.elapsed.get(), 'Restzeit: Datei ca. 00:50 · Stapel ca. 04:10')
+        window.remaining_time.complete(100)
+        window.events.put(('current', ('second.mp4', 2, 2)))
+        with patch('transcora.gui.window.time.monotonic', return_value=100):
+            window.poll()
+            window.update_elapsed()
+        self.assertEqual(window.elapsed.get(), 'Restzeit: Datei ca. 03:20 · Stapel ca. 03:20')
+        with patch('transcora.gui.window.time.monotonic', return_value=120):
+            window.update_elapsed()
+        self.assertIn('Stapel ca.', window.elapsed.get())
+        window.set_busy(False)
+
     def test_remaining_estimate_uses_progress_and_freezes_after_finish(self):
         with patch('transcora.gui.window.time.monotonic', return_value=100):
             self.window.run_started = 30
@@ -945,7 +1307,6 @@ class GuiTests(unittest.TestCase):
         self.window.close_audio_options()
         self.assertFalse(self.window.audio_dialog.winfo_ismapped())
         self.window.run_started = time.monotonic()-30
-        self.window.remaining_time.finish = time.monotonic()+100
         self.window.speed.set('Alte Geschwindigkeit')
         text = 'BD-3D: Blu-ray-ISO erstellen'
         self.window.events.put(('phase', ('job', 1, 1, text)))
@@ -1085,3 +1446,4 @@ class GuiTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+

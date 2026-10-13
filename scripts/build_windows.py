@@ -11,6 +11,9 @@ import platform
 
 def main():
     root = Path(__file__).resolve().parents[1]
+    sys.path.insert(0, str(root))
+    from transcora import __version__
+    subprocess.run([sys.executable, str(root/'scripts/prepare_heif.py')], cwd=root, check=True)
     icon_args = ['--icon', str(root/'assets/transcora.ico')] if sys.platform == 'win32' else []
     subprocess.run([sys.executable, '-m', 'PyInstaller', '--noconfirm', '--clean', '--windowed',
                     '--onedir', '--name', 'TransCora', '--collect-all=customtkinter', *icon_args,
@@ -73,7 +76,7 @@ def main():
     (output/'BUILD_HASHES.json').write_text(json.dumps(manifest, indent=2), encoding='utf-8')
     label = ('Windows_x64' if sys.platform == 'win32' else 'Linux_x64' if sys.platform == 'linux'
              else 'macOS_AppleSilicon' if platform.machine() == 'arm64' else 'macOS_Intel')
-    name = 'TransCora_1.0_'+label
+    name = 'TransCora_'+__version__+'_'+label
     archive = Path(shutil.make_archive(str(root/'dist'/name), 'zip' if sys.platform == 'win32' else 'gztar', root/'dist', 'TransCora'))
     with archive.open('rb') as source:
         digest = hashlib.file_digest(source, 'sha256').hexdigest()

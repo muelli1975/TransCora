@@ -1,0 +1,14 @@
+# TransCora 1.1
+
+- Dual video input/output: separate left/right tracks in MP4 or MKV, with size per half-image, audio options and L/R swap.
+- BD-3D and Dual control previews show both half-images as parallel, cross-view or red/cyan anaglyph.
+- Filename suffix menus identify Kodi, Bino and Stereoscopic Player. Labels stay out of filenames; combined suffix suggestions have been removed.
+- Batch remaining time uses a duration-weighted processing average, including mixed settings, file transitions and delayed progress updates.
+- Completed-job processing times, completion journal, remove-completed actions and pause-after-file control.
+- Selectable mono half-image, row-interleaved inputs and frame-sequential half-image pairing.
+- SDR HEIC/HEIF input, including tagged stereo images and Spatial Photos, with orientation and colour-profile handling.
+- Neutral routine messages; highlighted warnings reserved for required decisions and errors.
+- MV-HEVC input decodes both half-images.
+
+Platform capabilities and external FFmpeg requirements are described in the README.
+

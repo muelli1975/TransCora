@@ -56,7 +56,7 @@ def capture(args: list[str], cancel: threading.Event | None = None, timeout: flo
         stop_process(process)
 
 
-def probe(tools: Toolchain, path: Path, cancel: threading.Event | None = None) -> dict:
+def probe(tools: Toolchain, path: Path, cancel: threading.Event | None = None, expected_videos: int = 1) -> dict:
     if not path.is_file():
         raise ValueError(f"Datei fehlt: {path}")
     args = [str(tools.ffprobe), "-v", "error", "-protocol_whitelist", "file,pipe",
@@ -66,8 +66,8 @@ def probe(tools: Toolchain, path: Path, cancel: threading.Event | None = None) -
               and not s.get("disposition", {}).get("attached_pic")]
     if not videos:
         raise ValueError("Keine nutzbare Videospur gefunden.")
-    if len(videos) > 1:
-        raise ValueError("Mehrere Videospuren: Getrennte L/R-Spuren sind in dieser Version noch nicht freigegeben.")
+    if len(videos) != expected_videos:
+        raise ValueError("Die Anzahl der Videospuren entspricht nicht dem Ausgabeziel.")
     result["video"] = videos[0]
     return result
 
@@ -83,11 +83,12 @@ def metadata_layout(video: dict) -> tuple[str, bool] | None:
     tag = source_tags.get('stereo_mode', '')
     tags = {"left_right": ("sbs", False), "right_left": ("sbs", True),
             "top_bottom": ("ou", False), "bottom_top": ("ou", True),
-            "row_interleaved_lr": ("rows", False), "row_interleaved_rl": ("rows", True)}
+            "row_interleaved_lr": ("rows", False), "row_interleaved_rl": ("rows", True),
+            "block_lr": ("frames", False), "block_rl": ("frames", True)}
     if tag in tags:
         return tags[tag]
     numeric = {'1': ('sbs', False), '11': ('sbs', True), '3': ('ou', False), '2': ('ou', True),
-               '7': ('rows', False), '6': ('rows', True)}
+               '7': ('rows', False), '6': ('rows', True), '13': ('frames', False), '14': ('frames', True)}
     if tag in numeric:
         return numeric[tag]
     wmv = {'sidebysidelf': ('sbs', False), 'sidebysiderf': ('sbs', True),
@@ -96,7 +97,7 @@ def metadata_layout(video: dict) -> tuple[str, bool] | None:
         return wmv[source_tags['stereoscopiclayout']]
     for side in video.get("side_data_list", []):
         if side.get("side_data_type") == "Stereo 3D":
-            kind = {"side by side": "sbs", "top and bottom": "ou", "interleaved lines": "rows"}.get(side.get("type"))
+            kind = {"side by side": "sbs", "top and bottom": "ou", "interleaved lines": "rows", "frame alternate": "frames"}.get(side.get("type"))
             if kind:
                 return kind, bool(side.get("inverted", 0))
             if side.get("type") not in (None, "2D", "unspecified"):
@@ -104,13 +105,18 @@ def metadata_layout(video: dict) -> tuple[str, bool] | None:
     return None
 
 
+def layout_axis(layout):
+    return {'row_interleaved': 'rows', 'frame_sequential': 'frames'}.get(
+        layout, 'sbs' if layout.endswith('sbs') else 'ou')
+
+
 def metadata_full_half(video: dict) -> tuple[str, bool] | None:
     stereo = metadata_layout(video)
     if not stereo:
         return None
     axis, swap = stereo
-    if axis == 'rows':
-        return None
+    if axis in {'rows', 'frames'}:
+        return ('row_interleaved' if axis == 'rows' else 'frame_sequential', swap)
     tags = {k.lower().rsplit('/', 1)[-1]: str(v).lower() for k, v in video.get('tags', {}).items()}
     half = tags.get('stereoscopichalfwidth' if axis == 'sbs' else 'stereoscopichalfheight')
     if half in {'1', 'true', 'yes'}:
@@ -197,7 +203,7 @@ class Plan:
         # raster stays intact; omit misleading stereo tags rather than claim L/R.
         if layout == "cross_sbs": return ("sbs", True) if self.options.container == "mkv" else None
         if layout == "row_interleaved":
-            return ('rows', self.options.row_first == 'right') if self.options.container == 'mkv' else None
+            return ('rows', (self.swap if self.options.target == 'framerate' else self.options.row_first == 'right')) if self.options.container == 'mkv' else None
         if layout not in {"half_sbs", "full_sbs", "half_ou", "full_ou"}:
             return None
         if self.options.target == 'framerate' and self.swap and self.options.container == 'mp4':
@@ -213,6 +219,8 @@ class Plan:
             return 'Kreuzblick: R/L-Anordnung; MP4 ohne Stereo-Kennzeichnung.'
         if self.options.target == 'framerate' and self.swap and self.options.container == 'mp4':
             return 'Umgekehrte Augenreihenfolge bleibt erhalten; MP4 ohne Stereo-Kennzeichnung.'
+        if self.options.target == "dual":
+            return "Dual: Zwei eigenständige Videospuren · Links, dann rechts"
         if self.options.target == "bd3d":
             return "3D-Kennzeichnung: AVC-Basis + zweites MVC-Halbbild · Linkes Halbbild zuerst"
         if not self.stereo:
@@ -220,8 +228,8 @@ class Plan:
         axis, inverted = self.stereo
         flags = "MKV-StereoMode" if self.options.container == "mkv" else "MP4-st3d"
         if self.options.codec == "h264" and not inverted:
-            flags += f" · H.264 Frame-Packing {'3' if axis == 'sbs' else '4'}"
-        return f"3D-Kennzeichnung: {flags} · {'SBS' if axis == 'sbs' else 'OU'} · " + ("R/L" if inverted else "L/R")
+            flags += f" · H.264 Frame-Packing {dict(sbs='3', ou='4', rows='2')[axis]}"
+        return f"3D-Kennzeichnung: {flags} · {dict(sbs='SBS', ou='OU', rows='Zeilenverschachtelt')[axis]} · " + ("R/L" if inverted else "L/R")
 
     @property
     def summary(self) -> str:
@@ -256,6 +264,21 @@ class Plan:
 def build_graph(video: dict, options: Options, layout: str, swap: bool, colors: dict,
                 method: dict) -> tuple[str, tuple[int, int], str]:
     from .video import deinterlace, interlaced, output_dimensions
+    from .stereo_input import unpack, attach
+    if layout in {'row_interleaved', 'frame_sequential'} and options.target != 'framerate':
+        working, packed, prefix = unpack(video, layout)
+        graph, size, pixel = build_graph(working, options, packed, swap, colors, method)
+        return attach(prefix, graph, video['index']), size, pixel
+    if options.target == 'dual':
+        packed=replace(options,target='full_sbs',
+                       video_width=options.video_width*2 if options.video_size=='custom' else options.video_width)
+        graph,size,pixel=build_graph(video,packed,layout,swap,colors,method)
+        width,height=size[0]//2,size[1]
+        graph=graph.removesuffix('[v]')+'[dualpacked];[dualpacked]split[dl][dr];'
+        graph+=f'[dl]crop={width}:{height}:0:0[left];[dr]crop={width}:{height}:{width}:0[right]'
+        return graph,(width,height),pixel
+    if layout == 'row_interleaved':
+        video = dict(video, field_order='progressive')
     width, height = video["width"], video["height"]
     if options.target == "framerate":
         pixel_format = video.get("pix_fmt", "")
@@ -338,8 +361,10 @@ def build_graph(video: dict, options: Options, layout: str, swap: bool, colors: 
         size = (out_w * (2 if options.target in {'full_sbs', 'cross_sbs'} else 1),
                 out_h * (2 if options.target == 'full_ou' else 1))
     elif options.target == "mono":
-        graph.append("[r]nullsink")
-        graph.append("[l]null[composite]")
+        selected = 'l' if options.mono_eye == 'left' else 'r'
+        other = 'r' if selected == 'l' else 'l'
+        graph.append(f"[{other}]nullsink")
+        graph.append(f"[{selected}]null[composite]")
         size = (display_w, display_h)
     else:
         mode = method["pipeline_type"]
@@ -433,8 +458,6 @@ def plan_job(tools: Toolchain, job: Job, output_root: Path, reserved: set[str],
         warnings.append(message)
         review_warnings.append(message)
     from .video import interlaced
-    if interlaced(video):
-        warnings.append("Interlaced: Ein progressives Bild je Halbbildzeit; die zeitliche Auflösung bleibt erhalten. BD-3D und die Zielbildrate passen die Bildfolge anschließend an.")
     try:
         metadata = None if multiview else metadata_layout(video)
         geometry_hint = None if multiview else metadata_full_half(video)
@@ -444,16 +467,16 @@ def plan_job(tools: Toolchain, job: Job, output_root: Path, reserved: set[str],
         metadata = geometry_hint = None
         review('Manuelle Quellinterpretation ersetzt abweichende Stereo-Metadaten.')
     if multiview:
-        if options.layout not in {'auto', 'mvc', 'mvhevc'}:
+        if options.layout not in {'auto', 'mvc', 'mvhevc', 'dual'}:
             raise ValueError('Diese Quelle enthält echte Multiview-Halbbilder. Automatisch oder das passende Multiview-Format wählen.')
         if options.target == 'framerate':
             raise ValueError('Layout beibehalten erhält gepackte SBS/OU-Quellen. Für MVC/MV-HEVC zuerst das gewünschte Ausgabe-Layout wählen.')
         layout, swap = 'full_sbs', options.swap ^ bool(multiview.get('base_view_right', False))
-        warnings.append('Zwei vollständige Multiview-Halbbilder werden dekodiert.')
+        warnings.append('Dual: Zwei eigenständige Videospuren werden als L/R-Paar dekodiert.' if multiview['kind']=='dual' else 'Zwei vollständige Multiview-Halbbilder werden dekodiert.')
         if multiview['kind'] == 'mvc':
             warnings.append('MVC: Basis-Halbbild laut Blu-ray-Playlist '+('rechts' if multiview['base_view_right'] else 'links')+'.'
                 if 'base_view_right' in multiview else
-                'MVC: Basis-Halbbild als links angenommen. Reihenfolge im Kontrollbild prüfen; L/R tauschen ist verfügbar.')
+                'MVC: Links/rechts nicht gekennzeichnet; Basis-Halbbild wird als links verwendet. Bei umgekehrter Tiefenwirkung L/R tauschen.')
             if 'base_view_right' not in multiview:
                 review_warnings.append(warnings[-1])
         if multiview.get('playlist'):
@@ -464,17 +487,25 @@ def plan_job(tools: Toolchain, job: Job, output_root: Path, reserved: set[str],
         if not hint:
             raise ValueError("Full/Half-Layout nicht eindeutig erkennbar. Quelllayout für diese Datei auswählen.")
         layout, swapped = hint
-        if metadata and metadata != ("sbs" if layout.endswith("sbs") else "ou", swapped):
+        if metadata and metadata != (layout_axis(layout), swapped):
             raise ValueError("Dateiname und Stereo-Metadaten widersprechen sich. Quelllayout bewusst auswählen.")
         swap = swapped ^ options.swap
     else:
-        if options.layout in {'mvc', 'mvhevc'}:
+        if options.layout in {'mvc', 'mvhevc', 'dual'}:
             raise ValueError('Die Quelle enthält nicht das gewählte Multiview-Format.')
         layout, swap = options.layout, options.swap
         if hint and hint != (layout, swap):
             review("Manuell gewähltes Layout/L/R weicht vom Dateinamen ab.")
-        if metadata and metadata != ("sbs" if layout.endswith("sbs") else "ou", swap):
+        if metadata and metadata != (layout_axis(layout), swap):
             review("Manuelle Quellinterpretation ersetzt abweichende Stereo-Metadaten.")
+    if interlaced(video) and layout != 'row_interleaved':
+        warnings.append("Interlaced: Ein progressives Bild je Halbbildzeit; die zeitliche Auflösung bleibt erhalten. BD-3D und die Zielbildrate passen die Bildfolge anschließend an.")
+    if layout == 'frame_sequential':
+        if options.target == 'framerate':
+            raise ValueError('Frame sequential: Ausgabe-Layout wählen; die Zielbildrate gilt für vollständige Stereobildpaare.')
+        warnings.append('Frame sequential: Je zwei aufeinanderfolgende Halbbilder bilden ein Stereobildpaar. Die Paarbildrate ist die halbe Quellbildrate; ein ungepaartes Schlussbild wird ausgelassen.')
+    elif layout == 'row_interleaved':
+        warnings.append('Zeilenquelle: Stereo-Zeilen werden vor Skalierung getrennt. Die halbe vertikale Detailauflösung je Halbbild bleibt erhalten.')
     if options.target != 'framerate' and sar not in {'1:1', '0:1', 'N/A', None}:
         if (layout, sar) in {('half_sbs', '2:1'), ('half_ou', '1:2')}:
             video['sample_aspect_ratio'] = '1:1'
@@ -486,7 +517,7 @@ def plan_job(tools: Toolchain, job: Job, output_root: Path, reserved: set[str],
     if options.target == "framerate":
         if options.swap:
             raise ValueError("Layout beibehalten erhält die Halbbildreihenfolge. L/R tauschen ausschalten.")
-        orientation = "sbs" if layout.endswith("sbs") else "ou"
+        orientation = layout_axis(layout)
         swap = metadata[1] if metadata and metadata[0] == orientation else hint[1] if hint and hint[0] == layout else False
         if layout == "mono":
             if metadata or hint:
@@ -497,15 +528,16 @@ def plan_job(tools: Toolchain, job: Job, output_root: Path, reserved: set[str],
     if requested_rate(options):
         warnings.append("Ganze Bilder werden ausgelassen/wiederholt; keine Überblendung oder Bewegungsinterpolation. "
                         "Video wird neu kodiert; Ton und Wiedergabegeschwindigkeit bleiben erhalten.")
-    if layout != "mono" and (width if layout.endswith("sbs") else height) % 2:
+    if layout not in {"mono", "frame_sequential"} and (width if layout.endswith("sbs") else height) % 2:
         raise ValueError("Das gepackte Raster lässt sich nicht in zwei gleich große Halbbilder teilen.")
     colors, color_warnings = color_spec(video, layout)
     warnings.extend(color_warnings)
-    review_warnings.extend(color_warnings)
+    # Established SDR defaults are explanations, not requests for user action.
+    # Unsupported/ambiguous input still reports its existing actionable error.
     if layout.startswith('half_') and options.target in {'full_sbs', 'full_ou', 'cross_sbs'}:
         warnings.append('Half → Full: Die gestauchte Achse wird hochskaliert. Verlorene Bilddetails werden nicht wiederhergestellt.')
     if any(s.get("codec_type") == "subtitle" for s in info["streams"]):
-        review("Untertitel werden nicht übernommen.")
+        warnings.append("Untertitel werden nicht übernommen.")
     from .audio import validate
     stage('Auflösung, Bildrate und Tonoptionen prüfen')
     audios = validate(info, options)
@@ -524,8 +556,13 @@ def plan_job(tools: Toolchain, job: Job, output_root: Path, reserved: set[str],
         warnings.append('BD-3D: FFmpeg bereitet die Quelle vor, FRIM kodiert AVC/MVC und tsMuxeR erstellt die Ausgabe. Gewählter Ton wird als LPCM gespeichert.')
         graph, size, pixel_format = preparation.graph, preparation.size, 'yuv420p'
     else:
-        graph, size, pixel_format = build_graph(video, options, layout, swap, colors, catalog[options.method])
-    graph = graph_prefix(info, graph)
+        dual_rate = multiview and multiview['kind'] == 'dual' and requested_rate(options)
+        graph_options = replace(options, fps_mode='source') if dual_rate else options
+        graph_video = dict(video, field_order='progressive') if dual_rate else video
+        graph, size, pixel_format = build_graph(graph_video, graph_options, layout, swap, colors, catalog[options.method])
+    if options.target == 'dual':
+        warnings.append('Dual: Zwei eigenständige Videospuren; Ausgabegröße gilt je Halbbild. Links ist die erste Spur, rechts die zweite.')
+    graph = graph_prefix(info, graph, options)
     output_colors = dict(colors) if options.target == "framerate" else {
         "matrix": "bt709", "primaries": "bt709", "transfer": "bt709", "range": "tv"}
     if output_colors["matrix"] == "gbr":
@@ -553,18 +590,20 @@ def plan_job(tools: Toolchain, job: Job, output_root: Path, reserved: set[str],
     reason = (f"{multiview['kind'].upper()} · Zwei vollständige Halbbilder aus dem Bitstream" if multiview else
               f"{LAYOUTS[layout]} · " + ((f"erkannt am Dateizusatz in {job.source.name}" if filename_layout(job.source.stem)
                   else 'erkannt an Stereo-Metadaten und Halbbildgeometrie') if options.layout == "auto" else "manuell gewählt"))
+    warnings = list(dict.fromkeys(warnings))
+    review_warnings = list(dict.fromkeys(review_warnings))
     return Plan(job.source.resolve(), output, options, info, layout, swap, size, pixel_format, graph, duration, warnings, output_colors, reason, review_warnings)
 
 
 def command(tools: Toolchain, plan: Plan, temporary: Path) -> list[str]:
     from .multiview import input_args
     options = plan.options
-    mv = plan.info.get('multiview', {}).get('kind') == 'mvhevc'
+    mv = plan.info.get('multiview', {}).get('kind') in {'mvhevc','dual'}
     args = [str(tools.ffmpeg), "-hide_banner", "-nostdin", "-n", "-loglevel", "info" if mv else "warning",
             *(['-xerror', '-err_detect', 'explode'] if mv else []),
             "-progress", "pipe:1", "-stats_period", "0.3",
             "-protocol_whitelist", "file,pipe", "-noautorotate", *input_args(plan),
-            "-filter_complex", plan.graph, "-map", "[v]", "-sn", "-dn",
+            "-filter_complex", plan.graph, *(['-map', '[left]', '-map', '[right]'] if options.target=='dual' else ['-map', '[v]']), "-sn", "-dn",
             "-map_metadata", "-1", "-c:v", "libx264" if options.codec == "h264" else "libx265",
             "-preset", "slow", "-pix_fmt", plan.pixel_format,
             "-fps_mode", "passthrough", "-enc_time_base",
@@ -591,12 +630,14 @@ def command(tools: Toolchain, plan: Plan, temporary: Path) -> list[str]:
         value = plan.info.get("format", {}).get("tags", {}).get(name)
         if isinstance(value, str):
             args += ["-metadata", name + "=" + value]
+    if options.target == 'dual':
+        args += ['-metadata:s:v:0','title=Left','-metadata:s:v:1','title=Right',
+                 '-disposition:v:0','default','-disposition:v:1','0']
     return args + [str(temporary)]
 
 
-def verify(tools: Toolchain, plan: Plan, path: Path, cancel: threading.Event) -> None:
-    info = probe(tools, path, cancel)
-    video = info["video"]
+def verify_output_video(plan, video):
+    """Apply the existing output metadata checks independently to each view."""
     if (video.get("width"), video.get("height")) != plan.size or str(video.get("pix_fmt", "")).replace("yuvj", "yuv") != plan.pixel_format:
         raise ValueError("Ausgabemaße oder Pixelformat entsprechen nicht dem geprüften Plan.")
     if video.get("codec_name") != ("h264" if plan.options.codec == "h264" else "hevc"):
@@ -607,25 +648,8 @@ def verify(tools: Toolchain, plan: Plan, path: Path, cancel: threading.Event) ->
     from .video import interlaced
     if interlaced(plan.info['video']) and video.get('field_order') not in (None, 'unknown', 'progressive'):
         raise ValueError('Die deinterlacte Ausgabe ist nicht progressiv gekennzeichnet.')
-    from .audio import selected, codec, channels
-    tracks = selected(plan.info, plan.options)
-    expected_audio = [codec(s, plan.options) for s in tracks]
-    actual_audio = [s.get("codec_name") for s in info["streams"] if s.get("codec_type") == "audio"]
-    if actual_audio != expected_audio:
-        raise ValueError("Die Audioübernahme stimmt nicht mit der Quelle überein.")
-    actual_channels = [s.get('channels') for s in info['streams'] if s.get('codec_type') == 'audio']
-    if actual_channels != [channels(s, plan.options) for s in tracks]:
-        raise ValueError('Die Kanalzahl des ausgegebenen Tons stimmt nicht mit dem Plan überein.')
     if metadata_layout(video) != plan.stereo:
         raise ValueError("Die Stereo-Kennzeichnung der Ausgabe stimmt nicht mit dem Plan überein: " + json.dumps(video.get('side_data_list', [])))
-    if plan.options.container == "mp4" and plan.stereo:
-        if packed_stereo_boxes(path) != [2 if plan.stereo[0] == "sbs" else 1]:
-            raise ValueError("Die explizite MP4-st3d-Kennzeichnung fehlt oder ist falsch.")
-    if plan.stereo and plan.options.codec == "h264" and not plan.stereo[1]:
-        frame_info = json.loads(capture([str(tools.ffprobe), "-v", "error", "-select_streams", "v:0",
-            "-read_intervals", "%+#1", "-show_frames", "-of", "json", str(path)], cancel))
-        if not frame_info.get("frames") or metadata_layout(frame_info["frames"][0]) != plan.stereo:
-            raise ValueError("Die H.264-Frame-Packing-Kennzeichnung fehlt oder ist falsch.")
     if requested_rate(plan.options):
         if Fraction(video.get("r_frame_rate", "0/1")) != requested_rate(plan.options):
             raise ValueError("Die Zielbildrate wurde nicht korrekt gespeichert: " + json.dumps({k: video.get(k) for k in (
@@ -637,6 +661,32 @@ def verify(tools: Toolchain, plan: Plan, path: Path, cancel: threading.Event) ->
     if plan.options.target == "framerate":
         if video.get("sample_aspect_ratio", "1:1") != plan.info['video'].get("sample_aspect_ratio", "1:1"):
             raise ValueError("Das Pixelseitenverhältnis wurde unerwartet geändert.")
+
+
+def verify(tools: Toolchain, plan: Plan, path: Path, cancel: threading.Event) -> None:
+    info = probe(tools, path, cancel, expected_videos=2 if plan.options.target=='dual' else 1)
+    video = info["video"]
+    videos = [stream for stream in info['streams'] if stream.get('codec_type') == 'video'
+              and not stream.get('disposition',{}).get('attached_pic')]
+    for output_video in videos:
+        verify_output_video(plan, output_video)
+    from .audio import selected, codec, channels
+    tracks = selected(plan.info, plan.options)
+    expected_audio = [codec(s, plan.options) for s in tracks]
+    actual_audio = [s.get("codec_name") for s in info["streams"] if s.get("codec_type") == "audio"]
+    if actual_audio != expected_audio:
+        raise ValueError("Die Audioübernahme stimmt nicht mit der Quelle überein.")
+    actual_channels = [s.get('channels') for s in info['streams'] if s.get('codec_type') == 'audio']
+    if actual_channels != [channels(s, plan.options) for s in tracks]:
+        raise ValueError('Die Kanalzahl des ausgegebenen Tons stimmt nicht mit dem Plan überein.')
+    if plan.options.container == "mp4" and plan.stereo:
+        if packed_stereo_boxes(path) != [2 if plan.stereo[0] == "sbs" else 1]:
+            raise ValueError("Die explizite MP4-st3d-Kennzeichnung fehlt oder ist falsch.")
+    if plan.stereo and plan.options.codec == "h264" and not plan.stereo[1]:
+        frame_info = json.loads(capture([str(tools.ffprobe), "-v", "error", "-select_streams", "v:0",
+            "-read_intervals", "%+#1", "-show_frames", "-of", "json", str(path)], cancel))
+        if not frame_info.get("frames") or metadata_layout(frame_info["frames"][0]) != plan.stereo:
+            raise ValueError("Die H.264-Frame-Packing-Kennzeichnung fehlt oder ist falsch.")
     if path.stat().st_size == 0:
         raise ValueError("Die Ausgabe ist leer.")
 
@@ -689,7 +739,7 @@ def execute_prepared(tools: Toolchain, plan: Plan, cancel: threading.Event, emit
     process = None
     readers = []
     from .multiview import PairClock, check_decoder
-    pair_clock = PairClock() if plan.info.get('multiview', {}).get('kind') == 'mvhevc' else None
+    pair_clock = PairClock() if plan.info.get('multiview', {}).get('kind') in {'mvhevc','dual'} else None
     errors = []
     with log_path.open("a", encoding="utf-8") as log:
         log.write("\n" + json.dumps({"source": str(plan.source), "output": str(plan.output),
@@ -782,12 +832,21 @@ def execute_prepared(tools: Toolchain, plan: Plan, cancel: threading.Event, emit
                 encoded.unlink(missing_ok=True)
 
 
-def preview(tools: Toolchain, plan: Plan, cancel: threading.Event, seconds: float = 0) -> bytes:
+def preview(tools: Toolchain, plan: Plan, cancel: threading.Event, seconds: float = 0, view: str = 'parallel') -> bytes:
     if not math.isfinite(seconds) or seconds < 0 or (plan.duration and seconds >= plan.duration):
         raise ValueError("Zeitstelle liegt außerhalb des Videos.")
     from .multiview import runtime, input_args
     with runtime(tools, plan, cancel, seconds) as (working, decoder):
-        graph = working.graph + (";[right]nullsink;[left]null[v]" if plan.options.target == "bd3d" else "") + ";[v]format=rgb24[preview]"
+        if view not in {'parallel', 'cross', 'anaglyph'}:
+            raise ValueError('Ungültige Kontrollbildansicht.')
+        stereo = ''
+        if plan.options.target in {'bd3d','dual'}:
+            order = '[right][left]' if view == 'cross' else '[left][right]'
+            stereo = ';' + order + 'hstack=inputs=2'
+            if view == 'anaglyph':
+                stereo += ',stereo3d=sbsl:arcd'
+            stereo += '[v]'
+        graph = working.graph + stereo + ";[v]format=rgb24[preview]"
         if working.info.get('preview_trim'):
             index = working.info['video']['index']
             graph = graph.replace(f'[0:{index}]', f"[0:{index}]trim=start_frame={working.info['preview_trim']},", 1)

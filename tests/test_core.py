@@ -27,8 +27,8 @@ class CoreTests(unittest.TestCase):
                    color_space='bt709',color_primaries='bt709',color_transfer='bt709',color_range='tv')
         with tempfile.TemporaryDirectory() as tmp:
             folder=Path(tmp);source=folder/'slideshow_full_sbs.mp4';source.write_bytes(b'source')
-            def planned(options, stream=video):
-                info={'video':deepcopy(stream),'streams':[deepcopy(stream)],'format':{'duration':'1'}}
+            def planned(options, stream=video, extra_streams=()):
+                info={'video':deepcopy(stream),'streams':[deepcopy(stream),*deepcopy(extra_streams)],'format':{'duration':'1'}}
                 with patch('transcora.core.multiview.inspect_source',return_value=info), \
                      patch('transcora.core.bd3d_export.BdTools.find'):
                     return plan_job(SimpleNamespace(),Job(source,options),folder/'out',set())
@@ -43,8 +43,11 @@ class CoreTests(unittest.TestCase):
             inferred=dict(video)
             for key in ('color_space','color_primaries','color_transfer'):inferred.pop(key)
             inferred_plan=planned(Options(layout='full_sbs',target='bd3d',container='iso'),inferred)
-            self.assertTrue(inferred_plan.review_warnings)
-            self.assertTrue(all(note.startswith('Farbannahme') for note in inferred_plan.review_warnings))
+            self.assertTrue(any(note.startswith('Farbannahme') for note in inferred_plan.warnings))
+            self.assertEqual(inferred_plan.review_warnings, [])
+            subtitle_plan=planned(Options(layout='full_sbs'),extra_streams=[dict(index=1,codec_type='subtitle')])
+            self.assertIn('Untertitel werden nicht übernommen.',subtitle_plan.warnings)
+            self.assertEqual(subtitle_plan.review_warnings, [])
 
     def test_catalog_is_exactly_batch_without_cielab(self):
         batch = (app_root() / 'reference/AnaglyphBatch_DE.bat').read_text(encoding='utf-8-sig')

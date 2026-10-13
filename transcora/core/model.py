@@ -11,11 +11,12 @@ import uuid
 VIDEO_EXTENSIONS = {".mp4", ".mkv", ".mk3d", ".mkv3d", ".mov", ".m2ts", ".mts", ".ts", ".ssif", ".iso", ".avi", ".wmv"}
 LAYOUTS = {"auto": "Automatisch", "full_sbs": "Full-SBS", "half_sbs": "Half-SBS",
            "full_ou": "Full-OU", "half_ou": "Half-OU", "mono": "Mono / 2D",
-           "mvc": "MVC / Blu-ray 3D", "mvhevc": "MV-HEVC"}
+           "mvc": "MVC / Blu-ray 3D", "mvhevc": "MV-HEVC", "dual": "Dual (L/R-Spuren)",
+           "row_interleaved": "Zeilenverschachtelt", "frame_sequential": "Frame sequential"}
 TARGETS = {"half_sbs": "Half-SBS", "half_ou": "Half-OU",
            "row_interleaved": "Zeilenverschachtelt (Polfilter)",
            "cross_sbs": "Kreuzblick · Full-SBS R/L", "full_sbs": "Full-SBS", "full_ou": "Full-OU",
-           "anaglyph": "Anaglyph", "mono": "Mono · linkes Halbbild", "framerate": "Layout beibehalten", "bd3d": "BD-3D"}
+           "anaglyph": "Anaglyph", "dual": "Dual · L/R-Spuren", "mono": "Mono", "framerate": "Layout beibehalten", "bd3d": "BD-3D"}
 NAMING = {"original": "Kein Layout-Zusatz", "layout": "Layout-Zusatz",
           "players": "Player-Kürzel (Kodi/Bino)"}
 PROFILES = {"quality": "Qualität · 8 Bit / 4:4:4", "quality10": "Hohe Farbtiefe · 10 Bit / 4:4:4",
@@ -88,6 +89,7 @@ class Options:
     audio_tracks: str = 'all'
     audio_selection: str = '1'
     audio_channels: str = 'source'
+    mono_eye: str = 'left'
 
     @classmethod
     def from_dict(cls, data: dict) -> "Options":
@@ -115,7 +117,8 @@ class Options:
     def validate(self) -> None:
         for name, values in (("layout", LAYOUTS), ("target", TARGETS), ("profile", PROFILES),
                              ("naming", NAMING), ("container", {"mp4", "mkv", "iso", "m2ts"}),
-                             ("codec", {"h264", "h265"}), ("rate_mode", {"crf", "abr"})):
+                             ("codec", {"h264", "h265"}), ("rate_mode", {"crf", "abr"}),
+                             ('mono_eye', {'left', 'right'})):
             if getattr(self, name) not in values:
                 raise ValueError(f"Ungültige Einstellung: {name}.")
         if self.video_size not in VIDEO_SIZES:
@@ -175,6 +178,7 @@ class Job:
     plan: object | None = None
     source_fps: str | None = None
     source_duration: float | None = None
+    result: object | None = None
 
     def serializable(self) -> dict:
         return {"source": str(self.source), "source_root": str(self.source_root) if self.source_root else None,

@@ -4,6 +4,42 @@ import math
 import re
 
 
+def completed_button(panel):
+    button = getattr(panel, 'remove_completed_button', None)
+    if button is not None:
+        enabled = not panel.sorter.busy() and any(j.status == 'completed' for j in panel.jobs)
+        button.configure(state='normal' if enabled else 'disabled')
+
+
+def remove_entries(panel, ids):
+    """Keep the keyboard cursor in visible (possibly sorted) row order."""
+    tree = panel.tree
+    visible = list(tree.get_children())
+    ids = set(ids).intersection(visible)
+    if not ids:
+        return 0
+    selected = list(tree.selection())
+    focus = tree.focus()
+    anchor = focus if focus in ids else next((i for i in visible if i in ids and i in selected), None)
+    retained = [i for i in selected if i not in ids]
+    if anchor and not retained:
+        index = visible.index(anchor)
+        retained = next(([i] for i in visible[index + 1:] if i not in ids), [])
+        if not retained:
+            retained = next(([i] for i in reversed(visible[:index]) if i not in ids), [])
+    panel.jobs[:] = [job for job in panel.jobs if job.id not in ids]
+    for id_ in ids:
+        tree.delete(id_)
+    tree.selection_set(retained)
+    if retained:
+        tree.focus(focus if focus in retained else retained[0])
+        tree.see(tree.focus())
+    tree.focus_set()
+    panel.selection_changed()
+    completed_button(panel)
+    return len(ids)
+
+
 class FileListSorter:
     def __init__(self, panel, labels):
         self.panel = panel
@@ -21,6 +57,9 @@ class FileListSorter:
         return self.panel.busy or owner.busy or getattr(getattr(owner,'images',None),'busy',False)
 
     def key(self, job):
+        if self.column == 'processing':
+            value = getattr(job.result, 'seconds', None)
+            return value if value is not None and math.isfinite(value) else None
         if self.column == 'fps':
             try:
                 return Fraction(job.source_fps)

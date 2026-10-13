@@ -1,4 +1,4 @@
-# TransCora 1.0
+# TransCora 1.1 — Testfassung
 
 [English](README.md)
 
@@ -6,7 +6,20 @@ TransCora ist ein lokales Desktopprogramm zum Umwandeln stereoskopischer Videos 
 
 Alles läuft lokal, ohne Account, Cloud oder Tracking. Die Oberfläche lässt sich zwischen Deutsch und Englisch umschalten.
 
-![TransCora 1.0: Videostapel und Ausgabeeinstellungen](docs/TransCora-1.0.png)
+![Screenshot aus TransCora 1.0: Videostapel und Ausgabeeinstellungen](docs/TransCora-1.0.png)
+
+Zeilenverschachtelte Bild-/Videoeingaben und **Frame sequential** bei Videos lassen
+sich in die vorhandenen Stereo- und Mono-Ziele umwandeln. L/R tauschen bestimmt
+die Zuordnung des ersten Halbbilds. Frame sequential bildet vor der Bildratenwandlung
+vollständige Paare: 120 Einzelbilder/s entsprechen 60 Stereobildpaaren/s. Ein
+ungepaartes Schlussbild wird ausgelassen. Dafür ein Ausgabe-Layout wählen.
+
+**HEIC/HEIF** wird in der 1.1-Entwicklungsfassung als SDR-Bildeingabe gelesen,
+einschließlich gekennzeichneter Stereo-HEIC und Spatial Photos. Die Stereo-Gruppe
+bestimmt die L/R-Zuordnung; Tiefenkarten und Gainmaps werden nicht als zweites
+Halbbild verwendet. Orientierung und Farbprofile werden berücksichtigt. Die
+vorhandenen Bildziele und das Kontrollbild stehen auch dafür zur Verfügung.
+MV-HEVC bleibt eine Eingabe zum Dekodieren; Version 1.1 enthält keinen zusätzlichen MV-HEVC-Encoder. HDR-Tonwertwandlung und HEIC-Ausgabe gehören nicht zum Umfang.
 
 ## Schnellstart
 
@@ -18,15 +31,21 @@ Alles läuft lokal, ohne Account, Cloud oder Tracking. Die Oberfläche lässt si
 
 Standardmäßig landen Ergebnisse im Ordner `output` neben dem Programm. Bei Ordnerstapeln bleiben relative Unterordner erhalten. Vorhandene Dateien erhalten einen nummerierten Alternativnamen. Ein fehlerhafter Eintrag hält die übrigen gültigen Dateien nicht auf. **Abbrechen** beendet die aktuelle Verarbeitung; bereits fertige Dateien bleiben erhalten.
 
-Bei Videos zeigt der Status die geschätzte Restzeit für **Datei** und **Stapel**. Die Schätzung nutzt den laufenden Fortschritt und die Laufzeiten vergleichbarer fertiger Dateien. Bei BD-3D fließen auch die gemessenen Abschlusszeiten für Ton und Multiplexing ein; beim ersten Titel ist die Schätzung gröber. Für noch nicht vergleichbare Formate oder fehlenden Fortschritt steht ein Strich.
+Bei Videos zeigt der Status die geschätzte Restzeit für **Datei** und **Stapel**. Grundlage sind die verbleibende Videodauer und der bisherige, nach Videodauer gewichtete Verarbeitungsdurchschnitt. Unterschiedliche Auflösungen, Bildraten oder Codecs verhindern die Stapelschätzung nicht. Sie bleibt bei Dateiwechseln und verspäteten Fortschrittsmeldungen erhalten. Bei BD-3D zählt die gesamte Bearbeitungszeit einschließlich Ton und Multiplexing. Vor der ersten Fortschrittsmessung steht ein Strich.
 
-Fotos und Videos verwenden dieselben Bereiche **Quelle**, **Ausgabe**, **Format** und **Speichern**. Unter **Ausgabegröße** stehen die Maße direkt beim Größenmenü. Videomaße beziehen sich auf das gesamte Ausgabebild; BD-3D zeigt die Maße je Halbbild. Bilder lassen sich proportional nach langer oder kurzer Seite skalieren.
+Fotos und Videos verwenden dieselben Bereiche **Quelle**, **Ausgabe**, **Format** und **Speichern**. Unter **Ausgabegröße** stehen die Maße direkt beim Größenmenü. Videomaße beziehen sich auf das gesamte Ausgabebild; BD-3D und Dual zeigen die Maße je Halbbild. Bilder lassen sich proportional nach langer oder kurzer Seite skalieren.
 
 **Erweitert** klappt zusätzliche Einstellungen im Fenster auf. **Standardeinstellungen** stellt die Vorgaben für neue Dateien wieder her; bestehende Einträge behalten ihre Einstellungen. Bei kleinen Fenstern scrollen die Einstellungen, während Dateiliste, Informationsfeld und Verarbeitungsschaltflächen Platz behalten. Wähle den Ausgabeordner mit **Auswählen**.
 
 Die aktuelle Datei bleibt beim Fortschritt sichtbar, auch wenn der Verarbeitungsschritt wechselt. Lange Dateinamen werden passend zur Fensterbreite in der Mitte gekürzt.
 
 Klicke auf einen Spaltenkopf, um die Dateiliste auf- oder absteigend zu sortieren. Bildrate und Dauer werden numerisch sortiert; die sichtbare Reihenfolge gilt auch für den nächsten Verarbeitungslauf. Eingabe- und Ausgabeordner dürfen identisch sein. Beim rekursiven Import wird ein darunterliegender Ausgabe-Unterordner ausgelassen.
+
+Fertige Aufträge zeigen **Bearbeitungszeit** hinter **Status**. **Fertige entfernen** neben **Standardeinstellungen** leert erfolgreiche Einträge aus der Liste. Entf markiert anschließend den nächsten sichtbaren Eintrag, am Listenende den vorherigen.
+
+Erfolgreiche Ausgaben stehen in **TransCora-Journal.json** im Ausgabeordner. Unveränderte Quellen, Einstellungen und Ergebnisdateien werden beim erneuten Hinzufügen wiedererkannt. Entfernen aus der Liste erhält das Journal; Löschen der Journaldatei setzt den gespeicherten Verlauf zurück. Alte Ausgaben ohne Nachweis werden nicht übernommen.
+
+Während eines Stapels wird **Start** zu **Nach Datei pausieren**. Erneutes Klicken hebt den Wunsch auf. Die aktuelle Datei wird fertiggestellt, danach wartet der Stapel; **Fortsetzen** setzt ihn fort. **Abbrechen** bleibt erreichbar. Bei Mono-Ausgabe wählst du das linke oder rechte Halbbild.
 
 ## Videoausgaben
 
@@ -36,16 +55,24 @@ Klicke auf einen Spaltenkopf, um die Dateiliste auf- oder absteigend zu sortiere
 | Half-SBS / Half-OU | Kompakte Stereoformate für passende Player und Bildschirme |
 | Kreuzblick · Full-SBS R/L | Freies Betrachten: rechtes Halbbild links, linkes Halbbild rechts |
 | Anaglyph | Stereo mit Farbbrille; 17 Verfahren aus AnaglyphBatch |
-| Mono | Linkes Halbbild als gewöhnliches Video ausgeben |
+| Dual · L/R-Spuren | Zwei getrennte Videospuren im selben MP4 oder MKV; Maße je Halbbild |
+| Mono | Gewähltes linkes oder rechtes Halbbild als gewöhnliches Video ausgeben |
 | Layout beibehalten | Anordnung erhalten und neu kodieren, optional mit anderer Bildrate |
 | Zeilenverschachtelt | Direkte Ausgabe für einen passenden Polfilter-Monitor |
 | BD-3D | Blu-ray-3D-ISO oder AVC/MVC-M2TS: 1080p mit 23,976 fps oder 720p mit 50/59,94 fps je Halbbild |
 
 **MP4 ist voreingestellt; MKV bleibt wählbar**, auch für Kreuzblick. MKV erhält die passende Stereo-Kennzeichnung. Kreuzblick-MP4 behält die R/L-Anordnung ohne irreführenden L/R-Marker. Die Player-Unterstützung unterscheidet sich; prüfe die erste Ausgabe auf dem vorgesehenen Gerät.
 
+
+Dual-Eingaben enthalten zwei gleich große Videospuren. `-dual` kennzeichnet sie für die automatische Erkennung; sonst wähle das Quelllayout **Dual** ausdrücklich. Eindeutige Spurtitel Left/Right bestimmen die Zuordnung, sonst gilt erste Spur links, zweite rechts. Zeitlich abweichende Halbbilder führen zu einer Meldung statt einer unvollständigen Stereoausgabe. MP4 ist voreingestellt, MKV bleibt wählbar.
+
+Für BD-3D und Dual zeigt das Kontrollbild beide Halbbilder als Parallelblick, Kreuzblick oder Rot/Cyan-Anaglyph. Prüfe die räumliche Tiefe; ist sie umgekehrt, ändere **L/R tauschen**. Die Kontrollansicht verändert keine Ausgabeoptionen.
+
+Das Menü für Dateinamenszusätze nennt die zugehörigen Player in Klammern: Kodi, Bino bzw. Bino/Stereoscopic Player. Die Klammern erscheinen nur im Menü. Kodi und Bino verwenden eigene Kennungen; zusammengesetzte Vorschläge wie `.3D.HTAB-tbh` entfallen. Bestehende Namen werden weiterhin erkannt.
+
 ### Auflösung und Kreuzblick
 
-Wähle **Original**, **1080p**, **2160p** oder **Benutzerdefiniert**. Automatisch erhält bei vollständigen Layouts die rekonstruierte Quellgröße und verwendet bei Half-Layouts 1080p. Frei eingegebene Breite und Höhe bezeichnen immer das **gesamte Ausgabebild**. Das Seitenverhältnis bleibt erhalten; falls nötig entstehen Ränder.
+Wähle **Original**, **1080p**, **2160p** oder **Benutzerdefiniert**. Automatisch erhält bei vollständigen Layouts die rekonstruierte Quellgröße und verwendet bei Half-Layouts 1080p. Frei eingegebene Breite und Höhe bezeichnen bei gepackten Layouts das **gesamte Ausgabebild**, bei Dual die Maße **je Halbbild**. Das Seitenverhältnis bleibt erhalten; falls nötig entstehen Ränder.
 
 | Beispiel | Gesamtes Bild | Gespeicherte Pixel je Halbbild |
 | --- | --- | --- |
@@ -84,7 +111,7 @@ Bei Bildwandlungen werden Orientierung und Farbprofile angewendet. Die optionale
 
 Gepacktes Full-/Half-SBS und Full-/Half-OU werden unterstützt. Die automatische Erkennung nutzt Stereo-Metadaten oder eindeutige Dateikürzel. Bei uneindeutigen Quellen wählst du das Layout selbst. Übliche Player-Kürzel sind `-lr`, `-rl`, `-lrh`, `-rlh`, `-ab`, `-ba`, `-abq` und `-baq`.
 
-Windows liest außerdem unverschlüsseltes MVC/Blu-ray 3D und SDR-MV-HEVC. Bei einer Blu-ray-ISO wird die Haupt-Stereo-Playlist gewählt. Das Programm entfernt keinen Kopierschutz. HDR-Wandlung, animierte/mehrseitige Bilder und die Wandlung von 16-Bit-Bildern gehören nicht zu Version 1.0.
+Windows liest außerdem unverschlüsseltes MVC/Blu-ray 3D und SDR-MV-HEVC. Bei einer Blu-ray-ISO wird die Haupt-Stereo-Playlist gewählt. Das Programm entfernt keinen Kopierschutz. HDR-Wandlung, animierte/mehrseitige Bilder und die Wandlung von 16-Bit-Bildern gehören nicht zu Version 1.1.
 
 Speichere **Listen**, um einen Stapel mit seinen Einstellungen je Datei fortzusetzen. Listen enthalten Pfade und Einstellungen, nicht die Medien selbst. **Voreinstellungen** speichern wiederverwendbare Wandlungsoptionen. Sprache und gewählte Ordner werden lokal gemerkt.
 
@@ -109,3 +136,4 @@ Die Pakete enthalten den zugehörigen Programmquellcode. Bauanleitung: [BUILD.md
 ## Lizenz
 
 Copyright Christoph Müller. TransCora steht unter der MIT-Lizenz; mitgelieferte Fremdwerkzeuge behalten ihre eigenen Lizenzen. Siehe [LICENSE](LICENSE) und [THIRD_PARTY.md](THIRD_PARTY.md).
+

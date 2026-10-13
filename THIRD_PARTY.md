@@ -20,7 +20,18 @@ license notices and checksum record are included. The Windows package contains
 its own Perl runtime; it does not require the user to install Perl.
 Source and licensing: https://exiftool.org/ . Pins: `scripts/prepare_exiftool.py`.
 
-## FFmpeg
+## Separate HEIF reader
+
+HEIC/HEIF loading runs in `tools/heif/TransCora-HEIF`, a separate replaceable
+process. The main application does not load pillow-heif. The helper includes
+pillow-heif 1.8.1 (BSD-3-Clause), libheif 1.23.6 and libde265 1.1.3 (LGPLv3),
+and x265 4.3 (GPLv2 or later). The combined helper is distributed under
+GPL-3.0-or-later, with component notices and pinned corresponding source archives.
+See `native/heif/LICENSE.md`, `scripts/heif-sources.json` and the helper's
+`BUILD_READER.json` for the actual libraries in the platform build. The native
+libraries remain beside the helper so they can be replaced.
+
+## FFmpeg toolchain
 
 FFmpeg 7.1.1 full shared Windows build from Gyan.dev, pinned with SHA256 in
 `scripts/ffmpeg-windows.json`. FFmpeg and ffprobe remain external programs under

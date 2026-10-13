@@ -4,7 +4,19 @@ on:
   push:
     branches: [main]
   pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - 'README.md'
+      - 'README_DE.md'
+      - 'BUILD.md'
+      - 'THIRD_PARTY.md'
   workflow_dispatch:
+    inputs:
+      publish_release:
+        description: 'Publish this tested stable version as a new release'
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
@@ -25,7 +37,7 @@ jobs:
       - name: Install test tools
         run: |
           sudo apt-get update && sudo apt-get install -y ffmpeg xvfb
-          python -m pip install Pillow==11.3.0 cmake==4.4.4 customtkinter==5.2.2 darkdetect==0.8.0
+          python -m pip install Pillow==11.3.0 pillow-heif==1.8.1 cmake==4.4.4 customtkinter==5.2.2 darkdetect==0.8.0
           python scripts/prepare_exiftool.py
       - name: Build pinned native CIELab image method
         run: python scripts/build_cielab.py
@@ -96,14 +108,18 @@ jobs:
           $process = Start-Process -FilePath ./dist/TransCora/TransCora.exe -ArgumentList @("--self-test", "`"$report`"") -WindowStyle Hidden -Wait -PassThru
           if ($process.ExitCode -ne 0) { throw "TransCora self-test failed" }
           $result = Get-Content $report | ConvertFrom-Json
-          if (-not $result.ok -or $result.methods -ne 17 -or -not $result.bd3d -or -not $result.mvc -or -not $result.images -or -not $result.cielab) { throw "TransCora assets/toolchain check failed" }
+          if (-not $result.ok -or $result.methods -ne 17 -or -not $result.bd3d -or -not $result.mvc -or -not $result.images -or -not $result.cielab -or -not $result.heif) { throw "TransCora assets/toolchain check failed" }
           Get-Content $report
+      - name: Test the packaged HEIF reader with both tagged half-images
+        run: python scripts/probe_1_1_heif.py --ffmpeg dist/TransCora/tools/ffmpeg/bin/ffmpeg.exe --reader dist/TransCora/tools/heif/TransCora-HEIF.exe --application dist/TransCora/TransCora.exe --folder work/heif-package-test --report work/heif-package-test/report.json
+      - name: Test Dual MP4 and MKV through the packaged application
+        run: python scripts/check_dual_package.py --application dist/TransCora/TransCora.exe
       - uses: actions/upload-artifact@v4
         with:
           name: TransCora-Release-Windows
           path: |
-            dist/TransCora_1.0_Windows_x64.zip
-            dist/TransCora_1.0_Windows_x64.zip.sha256
+            dist/TransCora_*_Windows_x64.zip
+            dist/TransCora_*_Windows_x64.zip.sha256
           if-no-files-found: error
           retention-days: 30
 
@@ -195,18 +211,22 @@ jobs:
         run: |
           dist/TransCora/TransCora --self-test smoke.json
           dist/TransCora/TransCora.app/Contents/MacOS/TransCora --self-test smoke-app.json
+      - name: Test the packaged HEIF reader
+        run: python scripts/probe_1_1_heif.py --ffmpeg "$(command -v ffmpeg)" --reader dist/TransCora/tools/heif/TransCora-HEIF --application dist/TransCora/TransCora --folder work/heif-package-test --report work/heif-package-test/report.json
+      - name: Test Dual MP4 and MKV through the packaged application
+        run: python scripts/check_dual_package.py --application dist/TransCora/TransCora
       - uses: actions/upload-artifact@v4
         with:
           name: TransCora-Release-${{ matrix.label }}
           path: |
-            dist/TransCora_1.0_*.tar.gz
-            dist/TransCora_1.0_*.tar.gz.sha256
+            dist/TransCora_*_*.tar.gz
+            dist/TransCora_*_*.tar.gz.sha256
           if-no-files-found: error
           retention-days: 30
 
   publish:
     needs: [windows-portable, unix-packages]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.publish_release
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -217,29 +237,36 @@ jobs:
           pattern: TransCora-Release-*
           path: release-files
           merge-multiple: true
-      - name: Publish tested TransCora 1.0
+      - name: Publish a tested stable version without replacing existing releases
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          python -c "from transcora import __version__; assert __version__ == '1.0'"
+          version=$(python -c "from transcora import __version__; print(__version__)")
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ || "$version" == "1.0" ]]; then
+            echo 'Development or legacy build; keeping release publication disabled.'
+            exit 0
+          fi
           current_head=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')
           if [ "$current_head" != "$GITHUB_SHA" ]; then
             echo 'A newer revision is being tested; skipping this superseded publication.'
             exit 0
           fi
-          if gh release view v1.0 >/dev/null 2>&1; then
-            release_head=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v1.0" --jq '.object.sha')
-            # Only replace the explicitly approved revisions of this release.
-            case "$release_head" in
-              "$GITHUB_SHA"|35d7ea128d37358b847c1007d1b1f7bf20392986|b77593433e2495c1b89bf713e18ee0c70e069065|b1d6ff713a8ef7e92fd7d48d9881cdff21046c4f|9538f9faa7e9c5f0e3861c68205a3729fe60bec7|b315c91bc012261dea6f645496e9abc4b1c93aa9|6013949130cc1efeb6e4743132601fea287e3685) ;;
-              *) echo 'Release v1.0 belongs to a different revision; leaving it unchanged.'; exit 1 ;;
-            esac
-            gh release upload v1.0 release-files/* --clobber
-            if [ "$release_head" != "$GITHUB_SHA" ]; then
-              gh api --method PATCH "repos/$GITHUB_REPOSITORY/git/refs/tags/v1.0" -f sha="$GITHUB_SHA" -F force=true
+          tag="v$version"
+          notes="docs/RELEASE_NOTES_$version.md"
+          test -f "$notes"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            draft=$(gh release view "$tag" --json isDraft --jq '.isDraft')
+            if [ "$draft" != "true" ]; then
+              echo 'This stable release already exists; leaving its tag and assets unchanged.'
+              exit 0
             fi
-            gh release edit v1.0 --title 'TransCora 1.0' --notes-file docs/RELEASE_NOTES_1.0.md --latest
+            release_head=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" --jq '.object.sha')
+            if [ "$release_head" != "$GITHUB_SHA" ]; then
+              echo 'The existing draft belongs to another revision; leaving it unchanged.'
+              exit 1
+            fi
           else
-            gh release create v1.0 release-files/* --target "$GITHUB_SHA" --title 'TransCora 1.0' --notes-file docs/RELEASE_NOTES_1.0.md --latest
+            gh release create "$tag" --draft --target "$GITHUB_SHA" --title "TransCora $version" --notes-file "$notes"
           fi
-
+          gh release upload "$tag" release-files/* --clobber
+          gh release edit "$tag" --draft=false --latest

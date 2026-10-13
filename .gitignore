@@ -11,3 +11,6 @@ tools/ffmpeg/*
 !tools/ffmpeg/README.md
 tools/mvc/*
 !tools/mvc/README.md
+
+tools/heif/*
+!tools/heif/README.md
