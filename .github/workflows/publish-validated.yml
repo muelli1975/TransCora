@@ -1,0 +1,82 @@
+name: Publish validated TransCora 1.1
+
+on:
+  push:
+    branches: [release/publish-1.1]
+    paths: ['.github/workflows/publish-validated.yml']
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: transcora-release-1.1
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TARGET_SHA: 2ba13ed8f4d85aa2f6e064eaddfbde40c7fbbbb0
+      TESTED_SHA: fb648363fe11e96b593406e42b195303a47f7ca7
+      DOC_PATHS: 'README.md README_DE.md BUILD.md docs/TECHNICAL_REFERENCE.md docs/PLAN_1.1.md docs/TESTPLAN_1.1.md docs/CHANGES_1.1_DE.md docs/RELEASE_NOTES_1.1.md'
+      TEST_RUN: '38398039792'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify the exact tested revision and all package jobs
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$TEST_RUN" > run.json
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$TEST_RUN/jobs?per_page=100" > jobs.json
+          gh api "repos/$GITHUB_REPOSITORY/compare/$TESTED_SHA...$TARGET_SHA" > documentation-diff.json
+          python - <<'PY'
+          import json, os
+          run = json.load(open('run.json'))
+          assert run['head_sha'] == os.environ['TESTED_SHA']
+          assert run['status'] == 'completed' and run['conclusion'] == 'success'
+          diff = json.load(open('documentation-diff.json'))
+          assert diff['status'] == 'ahead' and diff['ahead_by'] == 1
+          assert all(f['filename'] in os.environ['DOC_PATHS'].split() for f in diff['files'])
+          jobs = json.load(open('jobs.json'))['jobs']
+          required = ('linux-tests', 'windows-portable',
+                      'unix-packages (macos-14, macOS_AppleSilicon)',
+                      'unix-packages (ubuntu-24.04, Linux_x64)')
+          assert all(any(j['name'] == name and j['conclusion'] == 'success'
+                         for j in jobs) for name in required)
+          PY
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: TransCora-Release-*
+          path: release-files
+          merge-multiple: true
+          run-id: 38398039792
+          github-token: ${{ github.token }}
+      - name: Check package names and hashes before publication
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib
+          folder = Path('release-files')
+          names = ('TransCora_1.1_Windows_x64.zip', 'TransCora_1.1_Linux_x64.tar.gz',
+                   'TransCora_1.1_macOS_AppleSilicon.tar.gz')
+          assert {p.name for p in folder.iterdir()} == set(names) | {n+'.sha256' for n in names}
+          for name in names:
+              expected = (folder/(name+'.sha256')).read_text().split()[0]
+              with (folder/name).open('rb') as f:
+                  assert hashlib.file_digest(f, 'sha256').hexdigest() == expected
+          PY
+      - name: Sync final documentation in the tested packages
+        run: python .github/scripts/sync_release_docs.py
+      - name: Publish the tested 1.1 packages
+        run: |
+          python -c "from transcora import __version__; assert __version__ == '1.1'"
+          if gh release view v1.1 >/dev/null 2>&1; then
+            release_head=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v1.1" --jq '.object.sha')
+            test "$release_head" = "$TARGET_SHA"
+            draft=$(gh release view v1.1 --json isDraft --jq '.isDraft')
+            test "$draft" = "true"
+          else
+            gh release create v1.1 --draft --target "$TARGET_SHA" --title 'TransCora 1.1' --notes-file docs/RELEASE_NOTES_1.1.md
+          fi
+          gh release upload v1.1 release-files/* --clobber
+          gh release edit v1.1 --draft=false --latest
