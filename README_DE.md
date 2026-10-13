@@ -47,6 +47,8 @@ Erfolgreiche Ausgaben stehen in **TransCora-Journal.json** im Ausgabeordner. Unv
 
 Während eines Stapels wird **Start** zu **Nach Datei pausieren**. Erneutes Klicken hebt den Wunsch auf. Die aktuelle Datei wird fertiggestellt, danach wartet der Stapel; **Fortsetzen** setzt ihn fort. **Abbrechen** bleibt erreichbar. Bei Mono-Ausgabe wählst du das linke oder rechte Halbbild.
 
+**Nach dem Stapel** steht direkt über den Stapelbuttons bei Videos und Bildern. Wähle **Nichts tun**, **TransCora beenden** oder **Computer herunterfahren**. Die Auswahl bleibt während des Laufs änderbar und wird nicht gespeichert. Eine Aktion erfolgt erst nach einem vollständig erfolgreichen Verarbeitungslauf mit gespeicherten Ergebnissen und Abschlussjournal; bei Fehlern, blockierten Dateien oder Abbruch bleibt TransCora geöffnet. Vor dem Herunterfahren erscheint ein abbrechbarer 30-Sekunden-Countdown. Das Betriebssystem kann das Herunterfahren wegen fehlender Berechtigungen oder anderer Anwendungen ablehnen.
+
 ## Videoausgaben
 
 | Ziel | Verwendung |

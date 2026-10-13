@@ -42,6 +42,8 @@ Click a column heading to sort the file list in ascending or descending order. F
 
 Completed jobs show **Processing time**. **Remove completed** clears successful list entries while retaining files and `TransCora-Journal.json` in the output folder. Reimporting unchanged sources, settings and outputs restores completion and elapsed time. **Pause after file** finishes the current file and journal entry before pausing; **Resume** continues the batch.
 
+**After the batch**, above the batch buttons in both tabs, offers **Do nothing**, **Close TransCora** and **Shut down computer**. The selection can change during processing and is not saved. An action runs only after a completely successful processing batch with saved outputs and completion journal; errors, blocked files and cancellation leave the application open. Shutdown has a cancellable 30-second countdown. The operating system may reject shutdown because of permissions or other applications.
+
 ## Video output
 
 | Output | Use |

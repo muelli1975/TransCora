@@ -18,6 +18,78 @@ from tkinter import ttk
 
 
 class GuiTests(unittest.TestCase):
+    def test_completed_details_do_not_repeat_stereo_summary_and_output_path(self):
+        from types import SimpleNamespace
+        window = self.window
+        window.add_paths([Path('clip_full_sbs.mp4')]); job = window.jobs[0]
+        output = Path('completed_half_sbs.mp4')
+        stereo = 'Half-SBS · MP4-Stereo-Kennzeichnung'
+        job.plan = SimpleNamespace(summary=stereo+'\n'+str(output), warnings=[],
+                                   review_warnings=[], output=output, layout='full_sbs', duration=1,
+                                   info={'video': {'width':128, 'height':32, 'avg_frame_rate':'25/1'}})
+        job.status = 'completed'
+        job.detail = 'Gespeichert · '+stereo+'\nGespeichert: '+str(output)
+        for language in ('de', 'en'):
+            window.language = language; window.apply_language()
+            window.show_job_details(job); self.root.update()
+            body = window.detail_text.get('1.0','end')
+            self.assertEqual(body.count(window.t(stereo)), 1)
+            self.assertEqual(body.count(str(output)), 1)
+
+    def test_after_batch_selection_fits_both_tabs_and_remains_available_while_busy(self):
+        window = self.window
+        for language in ('de', 'en'):
+            window.language = language; window.apply_language()
+            self.root.geometry('780x680')
+            for tab, panel, combo in zip((window.video_tab, window.image_tab),
+                    (window, window.images), window.batch_finish.combos):
+                window.notebook.select(tab); self.root.update()
+                row = combo.master
+                self.assertLessEqual(row.winfo_rootx()+row.winfo_width(),
+                                     self.root.winfo_rootx()+self.root.winfo_width())
+                self.assertLessEqual(combo.winfo_rootx()+combo.winfo_width(),
+                                     row.winfo_rootx()+row.winfo_width())
+                self.assertLessEqual(row.winfo_rooty()+row.winfo_height(),
+                                     panel.start_button.winfo_rooty())
+                old_geometry = (row.winfo_width(), row.winfo_height(), panel.tree.winfo_height())
+                combo.current(2); combo.event_generate('<<ComboboxSelected>>'); self.root.update()
+                self.assertEqual(old_geometry, (row.winfo_width(), row.winfo_height(), panel.tree.winfo_height()))
+                panel.set_busy(True)
+                self.assertEqual(str(combo.cget('state')), 'readonly')
+                panel.set_busy(False)
+
+    def test_completed_video_and_image_batches_offer_action_but_errors_and_tests_do_not(self):
+        from PIL import Image
+        from transcora.core.images import ImageOptions
+        window = self.window; tools = Toolchain.find()
+        def wait_for_completion(panel):
+            deadline = time.monotonic()+20
+            while panel.busy and time.monotonic()<deadline:
+                self.root.update(); time.sleep(.01)
+            self.assertFalse(panel.busy, panel.status.get())
+        with tempfile.TemporaryDirectory() as tmp, patch.object(window.batch_finish, 'completed', return_value=False) as completed:
+            folder = Path(tmp)
+            source = folder/'video_full_sbs.mp4'
+            capture([str(tools.ffmpeg), '-v', 'error', '-f', 'lavfi', '-i', 'testsrc2=s=128x32:r=25',
+                     '-frames:v', '2', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', str(source)])
+            window.defaults = replace(Options(), target='full_ou', container='mkv', video_size='original')
+            window.output_var.set(str(folder/'video-out')); window.add_paths([source])
+            window.check(False); wait_for_completion(window); completed.assert_not_called()
+            window.check(True); wait_for_completion(window); completed.assert_called_once_with(True)
+            completed.reset_mock()
+            window.add_paths([folder/'missing_full_sbs.mp4'])
+            window.check(True); wait_for_completion(window); completed.assert_called_once_with(False)
+            completed.reset_mock()
+            panel = window.images
+            image = folder/'image_full_sbs.png'; Image.new('RGB', (64,16), 'red').save(image)
+            panel.defaults = replace(ImageOptions(), metadata=False)
+            panel.output.set(str(folder/'image-out')); panel.add_paths([image])
+            panel.run(False); wait_for_completion(panel); completed.assert_not_called()
+            panel.run(True); wait_for_completion(panel); completed.assert_called_once_with(True)
+            completed.reset_mock()
+            panel.add_paths([folder/'missing_full_sbs.png'])
+            panel.run(True); wait_for_completion(panel); completed.assert_called_once_with(False)
+
     def test_new_stereo_inputs_fit_the_list_and_show_neutral_notices(self):
         from tkinter import font
         from transcora.core.model import Job
@@ -783,6 +855,7 @@ class GuiTests(unittest.TestCase):
                         info={'video':{'avg_frame_rate':'25/1'}}))
         self.root.update()
         self.assertTrue(viewer.view_frame.winfo_ismapped())
+        self.assertNotIn('BD-3D:', viewer.note.cget('text'))
         viewer.view_combo.current(1)
         self.assertEqual(viewer.preview_view,'cross')
         window.close_preview(viewer.dialog,viewer.time_entry,viewer.scale)

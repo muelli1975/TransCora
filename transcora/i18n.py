@@ -1143,6 +1143,20 @@ EN.update({
     'HEIF mit nichtquadratischen Pixeln wird noch nicht unterstützt.': 'HEIF with non-square pixels is not yet supported.',
 })
 
+EN.update({
+    'Nach dem Stapel': 'After the batch',
+    'Nichts tun': 'Do nothing',
+    'TransCora beenden': 'Close TransCora',
+    'Computer herunterfahren': 'Shut down computer',
+    'Stapel erfolgreich abgeschlossen. Computer wird in {0} Sekunden heruntergefahren.':
+        'Batch completed successfully. Computer will shut down in {0} seconds.',
+    'Herunterfahren angefordert …': 'Shutdown requested …',
+    'Herunterfahren nicht möglich: {0}': 'Unable to shut down: {0}',
+    'Herunterfahren wird auf diesem Betriebssystem nicht unterstützt.':
+        'Shutdown is not supported on this operating system.',
+    'Das Betriebssystem hat das Herunterfahren abgelehnt.': 'The operating system rejected the shutdown request.',
+})
+
 PATTERNS = []
 for source, target in EN.items():
     parts = re.split(r"(\{\d+\})", source)

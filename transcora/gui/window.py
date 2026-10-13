@@ -1,5 +1,6 @@
 from __future__ import annotations
 from .remaining import RemainingTime
+from .batch_finish import BatchFinish
 
 from dataclasses import asdict, replace
 from pathlib import Path
@@ -69,6 +70,7 @@ class Window:
         self.localizer = Localizer(root, self)
         root.localizer = self.localizer
         self.t = self.localizer.t
+        self.batch_finish = BatchFinish(self)
         self._style()
         self._build()
         self.apply_language()
@@ -114,6 +116,7 @@ class Window:
         self.images.refresh(); self.images.selection_changed()
         self.combos['target_fps'].configure(values=[value.replace(',', '.') if self.language == 'en' else value for value in FPS_CHOICES])
         self.localizer.apply()
+        self.batch_finish.render()
 
     def persist_settings(self):
         write_json(app_root() / 'settings.json', {'schema_version': 2,
@@ -369,7 +372,10 @@ class Window:
             def insert(source, attention=False):
                 for line in source.splitlines():
                     translated = self.t(line).strip()
-                    identity = translated.removeprefix('⚠').strip()
+                    # Completion messages repeat the plan's stereo summary and
+                    # output path with a "Saved" prefix. Compare their content.
+                    identity_source = line.removeprefix('Gespeichert · ').removeprefix('Gespeichert: ')
+                    identity = self.t(identity_source).strip().removeprefix('⚠').strip()
                     if identity and identity not in seen:
                         seen.add(identity)
                         self.detail_text.insert('end', ('⚠ ' if attention else '') + identity + '\n',
@@ -399,7 +405,8 @@ class Window:
         self.details.trace_add("write", show_details)
         show_details()
         actions = ttk.Frame(outer)
-        actions.grid(row=13, column=0, sticky="ew", pady=(8, 0))
+        self.batch_finish.add_controls(outer, 13)
+        actions.grid(row=14, column=0, sticky="ew", pady=(8, 0))
         self.advanced_button = self.button(actions, "Erweitert ▸", self.toggle_advanced)
         self.advanced_button.pack(side="left")
         self.button(actions, "Kontrollbild", self.show_preview).pack(side="left", padx=5)
@@ -1327,14 +1334,15 @@ class Window:
         self.progress.configure(mode="indeterminate")
         self.progress.start(12)
         def worker():
+            success = False
             try:
-                work()
+                success = work() is True
             except Cancelled:
                 self.events.put(("notice", "Abgebrochen."))
             except Exception as error:
                 self.events.put(("error", str(error)))
             finally:
-                self.events.put(("done", None))
+                self.events.put(("done", success))
         threading.Thread(target=worker, daemon=True).start()
 
     def check(self, run):
@@ -1452,6 +1460,8 @@ class Window:
             self.events.put(("log", summary))
             if ready and not self.cancel.is_set():
                 self.events.put(("sound", None))
+            return bool(ready) and counts['completed'] == len(ready) and not (
+                blocked or journal_failures or self.cancel.is_set())
         self.background(work, "Testen", track_time=run)
 
     def show_preview(self):
@@ -1663,9 +1673,15 @@ class Window:
                         import winsound
                         winsound.PlaySound(str(app_root() / "assets" / "ready.wav"), winsound.SND_FILENAME | winsound.SND_ASYNC | winsound.SND_NODEFAULT)
                 elif kind == "done":
+                    processing = self.processing
                     self.set_busy(False)
                     if self.closing:
                         self.finish_close()
+                        return
+                    if processing and self.batch_finish.completed(payload):
+                        return
+                elif kind == 'shutdown-result':
+                    if self.batch_finish.shutdown_result(payload):
                         return
         except queue.Empty:
             pass
@@ -1683,7 +1699,7 @@ class Window:
         else:
             self.finish_close()
 
-    def finish_close(self):
+    def save_session(self):
         try:
             self.images.persist()
             write_json(app_root() / "settings.json", {"schema_version": 2,
@@ -1691,7 +1707,12 @@ class Window:
                        "output_folder": str(self.output_path()), "input_folder": self.input_folder,
                        "recursive": self.recursive.get(), "language": self.language})
         except OSError:
-            # Read-only application folders must not prevent exit or conversion to a writable destination.
             messagebox.showwarning(self.t("Einstellungen"), self.t("Der Programmordner ist schreibgeschützt; Einstellungen konnten nicht gespeichert werden."), parent=self.root)
+            return False
+        return True
+
+    def finish_close(self):
+        self.batch_finish.cancel()
+        self.save_session()
         self.root.destroy()
 

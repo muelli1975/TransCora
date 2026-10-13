@@ -126,7 +126,7 @@ class PreviewWindow:
         self.bd_preview = plan.options.target in {'bd3d','dual'}
         if self.bd_preview:
             self.view_frame.grid()
-            self.note.configure(text=self.t('BD-3D: Beide Halbbilder kontrollieren; die Ansicht ändert keine Ausgabeoptionen.'))
+            self.note.configure(text=self.t('Beide Halbbilder kontrollieren; die Ansicht ändert keine Ausgabeoptionen.'))
         else:
             self.view_frame.grid_remove()
         self.duration = plan.duration

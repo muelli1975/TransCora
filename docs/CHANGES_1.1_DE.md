@@ -13,10 +13,12 @@ Version 1.1 · 13. Oktober 2026.
 | Journalfehler | Beschädigte oder fehlende Nachweise verhindern keinen Import. Schreibfehler werden gemeldet; fertige Medien bleiben erhalten. |
 | Dateilisten | Fertige entfernen für Videos/Bilder. Entfernen per Button oder Entf folgt der sichtbaren Sortierreihenfolge und erhält den Fokus. |
 | Pause | Nach Datei pausieren, Wunsch zurücknehmen, Fortsetzen und Abbrechen. Pause nach vollständigem Export und Journaleintrag. |
+| Stapelabschluss | Wahlweise TransCora beenden oder Computer herunterfahren, nachdem alle Videos oder Bilder erfolgreich verarbeitet sind. 30 Sekunden abbrechbarer Countdown vor dem Herunterfahren; bei Fehlern, blockierten Dateien oder Abbruch bleibt TransCora geöffnet. Die Auswahl gilt für die laufende Sitzung und beginnt nach Programmstart mit „Nichts tun“. |
 | Mono-Video | Linkes oder rechtes Halbbild direkt wählen; L/R-Tausch wird berücksichtigt. |
 | Zeilenquellen | Stereo-Zeilen werden vor Skalierung getrennt rekonstruiert. Erste Zeile und L/R-Zuordnung bleiben erhalten. |
 | Frame sequential | Aufeinanderfolgende Halbbilder werden vor Größen-/Bildratenanpassung zu Paaren verbunden. Einzelbildrate und Paarbildrate werden unterschieden; Ton und Laufzeit bleiben erhalten. |
 | HEIC/HEIF | SDR-Fotos, gekennzeichnete Stereo-HEIC und Spatial Photos. Stereo-Gruppe bestimmt L/R; Orientierung und ICC/NCLX werden berücksichtigt. Zusatzbilder werden nicht als zweites Halbbild gewählt. |
 | Hinweise | Farbannahmen, Abläufe und Formatfolgen neutral. Gold/Fettschrift/Warndreieck nur für erforderliche Klärung oder zu behebende Fehler. Doppelte Hinweise und pauschale Warnungseinstufung entfallen. |
 | Bedienung | Unveränderte Eingaben setzen fertige Aufträge nicht zurück. Beschriftungen und Spalten berücksichtigen Deutsch/Englisch. |
+| Dateiinformationen | Nach einem erfolgreichen Export erscheinen Stereoangaben und Ausgabepfad einmal statt erneut mit „Gespeichert“ vorangestellt. |
 | MV-HEVC | Eingabe mit Dekodierung beider gekennzeichneter Halbbilder. |

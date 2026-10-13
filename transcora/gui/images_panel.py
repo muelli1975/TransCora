@@ -173,7 +173,8 @@ class ImagePanel:
             self.detail_text.configure(state='normal'); self.detail_text.delete('1.0','end')
             self.detail_text.insert('end',self.detail.get()); self.detail_text.configure(state='disabled')
         self.detail.trace_add('write',show_detail); show_detail()
-        actions = ttk.Frame(box); actions.grid(row=13, column=0, sticky='ew',pady=(8,0))
+        owner.batch_finish.add_controls(box, 13)
+        actions = ttk.Frame(box); actions.grid(row=14, column=0, sticky='ew',pady=(8,0))
         self.advanced_button = self.button(actions,'Erweitert ▸',self.toggle_advanced)
         self.advanced_button.pack(side='left')
         self.preview_button = self.button(actions, 'Kontrollbild', self.preview)
@@ -521,6 +522,7 @@ class ImagePanel:
         self.cancel.clear(); self.processing = convert; self.pause.reset()
         self.set_busy(True); self.progress['value'] = 0; self.status.set('Bildstapel prüfen …')
         def worker():
+            success = False
             try:
                 prepared = []; reserved = set(); receipts = {}; blocked = failed = completed = journal_failures = 0
                 for job in snapshot:
@@ -584,9 +586,11 @@ class ImagePanel:
                 if journal_failures:
                     summary += ' · ' + self.t('Journal nicht gespeichert: ') + str(journal_failures)
                 self.events.put(('status', summary))
+                success = bool(convert and prepared) and completed == len(prepared) and not (
+                    blocked or failed or journal_failures or self.cancel.is_set())
             except Cancelled: self.events.put(('error', ('cancelled', 'Bildstapel abgebrochen.')))
             except Exception as error: self.events.put(('error', ('failed' if convert else 'blocked', str(error))))
-            finally: self.events.put(('done', None))
+            finally: self.events.put(('done', success))
         threading.Thread(target=worker, daemon=True).start()
 
     def preview(self):
@@ -656,6 +660,8 @@ class ImagePanel:
                     self.owner.localizer.apply()
                     self.status.set('Kontrollbild bereit.')
                 elif kind == 'done':
+                    processing = self.processing
                     self.set_busy(False)
                     if self.owner.closing: self.owner.finish_close(); return True
+                    if processing and self.owner.batch_finish.completed(data): return True
         except queue.Empty: pass

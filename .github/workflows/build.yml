@@ -226,7 +226,10 @@ jobs:
 
   publish:
     needs: [windows-portable, unix-packages]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.publish_release
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      ((github.event_name == 'workflow_dispatch' && inputs.publish_release) ||
+       (github.event_name == 'push' && github.event.head_commit.message == 'Update TransCora 1.1: batch completion actions and Dual preview label'))
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -254,6 +257,20 @@ jobs:
           tag="v$version"
           notes="docs/RELEASE_NOTES_$version.md"
           test -f "$notes"
+          # Update the existing 1.1 only for this explicitly requested revision.
+          if [ "$version" = "1.1" ] && [ "$GITHUB_EVENT_NAME" = "push" ]; then
+            release_head=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v1.1" --jq '.object.sha')
+            case "$release_head" in
+              2ba13ed8f4d85aa2f6e064eaddfbde40c7fbbbb0|"$GITHUB_SHA") ;;
+              *) echo 'Release 1.1 changed independently; leaving it unchanged.'; exit 1 ;;
+            esac
+            gh release upload v1.1 release-files/* --clobber
+            if [ "$release_head" != "$GITHUB_SHA" ]; then
+              gh api --method PATCH "repos/$GITHUB_REPOSITORY/git/refs/tags/v1.1" -f sha="$GITHUB_SHA" -F force=false
+            fi
+            gh release edit v1.1 --title 'TransCora 1.1' --notes-file "$notes" --latest
+            exit 0
+          fi
           if gh release view "$tag" >/dev/null 2>&1; then
             draft=$(gh release view "$tag" --json isDraft --jq '.isDraft')
             if [ "$draft" != "true" ]; then
