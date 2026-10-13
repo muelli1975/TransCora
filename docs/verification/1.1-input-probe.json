@@ -97,7 +97,6 @@
   "not_checked": [
     "TransCora GUI or import integration",
     "audio synchronization",
-    "HEIC/HEIF/AVIF decoding and stereo metadata",
-    "MV-HEVC encoding and device playback"
+    "HEIC/HEIF/AVIF decoding and stereo metadata"
   ]
 }

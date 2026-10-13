@@ -365,18 +365,24 @@ def inspect_source(tools, source, cancel=None, explicit='auto', phase=None):
         return info
 
 
-def graph_prefix(info, graph):
+def graph_prefix(info, graph, options=None):
     desc = info.get('multiview')
     if desc and desc['kind'] == 'dual':
         from .engine import color_spec
+        from .video import requested_rate, rate_filters, deinterlace
+        rate = requested_rate(options) if options else None
         prefix = []
         for side,video in zip(('left','right'),desc['videos']):
             colors,_=color_spec(video)
             rgb=(f"zscale=matrixin={colors['matrix']}:primariesin={colors['primaries']}:"
                  f"transferin={colors['transfer']}:rangein={'full' if colors['range']=='pc' else 'limited'}:"
                  "matrix=gbr:primaries=bt709:transfer=iec61966-2-1:range=full,format=gbrp16,")
+            # Convert clocks while frame durations still belong to each decoded track.
+            # Older hstack versions discard EOF duration needed by a following fps filter.
+            timing = dict(video, _start_offset=info['video'].get('_start_offset', 0))
+            conversion = (','+deinterlace(video)+','.join(rate_filters(timing, rate))) if rate else ''
             prefix.append(f"[0:{video['index']}]" + rgb +
-                          f"settb=expr=1/1000000,showinfo@mv_{side}=checksum=0[d{side}]")
+                          f"settb=expr=1/1000000,showinfo@mv_{side}=checksum=0"+conversion+f"[d{side}]")
         prefix.append('[dleft][dright]hstack=inputs=2[stereo]')
         return ';'.join(prefix)+';'+graph.replace(f"[0:{info['video']['index']}]",'[stereo]')
     if not desc or desc['kind'] != 'mvhevc':

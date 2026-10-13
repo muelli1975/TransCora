@@ -556,10 +556,13 @@ def plan_job(tools: Toolchain, job: Job, output_root: Path, reserved: set[str],
         warnings.append('BD-3D: FFmpeg bereitet die Quelle vor, FRIM kodiert AVC/MVC und tsMuxeR erstellt die Ausgabe. Gewählter Ton wird als LPCM gespeichert.')
         graph, size, pixel_format = preparation.graph, preparation.size, 'yuv420p'
     else:
-        graph, size, pixel_format = build_graph(video, options, layout, swap, colors, catalog[options.method])
+        dual_rate = multiview and multiview['kind'] == 'dual' and requested_rate(options)
+        graph_options = replace(options, fps_mode='source') if dual_rate else options
+        graph_video = dict(video, field_order='progressive') if dual_rate else video
+        graph, size, pixel_format = build_graph(graph_video, graph_options, layout, swap, colors, catalog[options.method])
     if options.target == 'dual':
         warnings.append('Dual: Zwei eigenständige Videospuren; Ausgabegröße gilt je Halbbild. Links ist die erste Spur, rechts die zweite.')
-    graph = graph_prefix(info, graph)
+    graph = graph_prefix(info, graph, options)
     output_colors = dict(colors) if options.target == "framerate" else {
         "matrix": "bt709", "primaries": "bt709", "transfer": "bt709", "range": "tv"}
     if output_colors["matrix"] == "gbr":
