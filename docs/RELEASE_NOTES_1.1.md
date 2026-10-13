@@ -9,6 +9,7 @@
 - Neutral control-preview hint for both BD-3D and Dual.
 - Completed-file details display stereo information and the output path once.
 - The information field omits the inapplicable "no SBS/OU flag" note for outputs such as anaglyph and mono.
+- Row-interleaved output labels the first-row selection as "Left half-image" or "Right half-image" in both video and image tabs.
 - Selectable mono half-image, row-interleaved inputs and frame-sequential half-image pairing.
 - SDR HEIC/HEIF input, including tagged stereo images and Spatial Photos, with orientation and colour-profile handling.
 - Neutral routine messages; highlighted warnings reserved for required decisions and errors.

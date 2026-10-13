@@ -395,7 +395,7 @@ class GuiTests(unittest.TestCase):
         self.assertEqual(panel.defaults.format,'png')
         panel.variables['screen_width'].set('2560'); panel.changed('screen_width')
         panel.variables['screen_height'].set('1440'); panel.changed('screen_height')
-        panel.variables['row_first'].set('Rechtes Auge in erster Zeile'); panel.changed('row_first')
+        panel.variables['row_first'].set('Rechtes Halbbild'); panel.changed('row_first')
         self.assertEqual((panel.defaults.screen_width,panel.defaults.screen_height,panel.defaults.row_first),(2560,1440,'right'))
 
     def test_image_batch_continues_after_bad_source_and_export_failure(self):
@@ -659,6 +659,14 @@ class GuiTests(unittest.TestCase):
         self.assertFalse(self.window.option_frames['profile'].winfo_ismapped())
         self.assertFalse(self.window.option_frames['method'].winfo_ismapped())
         self.assertTrue(self.window.screen_fields.winfo_ismapped())
+
+        for language in ('de', 'en'):
+            self.window.language = language; self.window.apply_language()
+            expected = ('Linkes Halbbild', 'Rechtes Halbbild') if language == 'de' else ('Left half-image', 'Right half-image')
+            for panel in (self.window, self.window.images):
+                self.assertEqual(tuple(panel.combos['row_first'].cget('values')), expected)
+            self.window.variables['row_first'].set(expected[1]); self.window.option_changed('row_first')
+            self.assertEqual(self.window.defaults.row_first, 'right')
 
     def test_dimension_focus_change_preserves_pending_height_and_invalid_edits_block_save(self):
         self.window.variables['video_size'].set('Benutzerdefiniert')
