@@ -976,23 +976,22 @@ class Window:
             return options.suffix or fps_suffix(options.target_fps)
 
     def fit_suffix_menu(self):
-        def resize():
-            try:
-                combo=self.combos['suffix']
-                if self.root.tk.call('tk','windowingsystem')=='aqua':
-                    return
-                popdown=self.root.tk.call('ttk::combobox::PopdownWindow',str(combo))
-                from tkinter import font
-                metrics=font.Font(root=self.root,font='TkTextFont')
-                width=max(combo.winfo_width(),max((metrics.measure(value) for value in combo.cget('values')),default=0)+36)
-                width=min(width,self.root.winfo_screenwidth()-20)
-                current=self.root.tk.call('wm','geometry',popdown)
-                match=__import__('re').match(r'\\d+x(\\d+)([+-]\\d+[+-]\\d+)',current)
-                if match:
-                    self.root.tk.call('wm','geometry',popdown,f'{width}x{match[1]}{match[2]}')
-            except tk.TclError:
-                pass
-        self.root.after_idle(resize)
+        try:
+            if self.root.tk.call('tk','windowingsystem')=='aqua':
+                return
+            from tkinter import font
+            combo=self.combos['suffix']
+            metrics=font.Font(root=self.root,font='TkTextFont')
+            width=max(combo.winfo_width(),max((metrics.measure(value) for value in combo.cget('values')),default=0)+36)
+            width=min(width,self.root.winfo_screenwidth()-20)
+            # ttk places the popup after postcommand; its postoffset controls popup width.
+            style=combo.cget('style') or 'TCombobox'
+            if not style.startswith('Suffix.'):
+                style='Suffix.'+style
+                combo.configure(style=style)
+            ttk.Style(self.root).configure(style,postoffset=(0,0,width-combo.winfo_width(),0))
+        except tk.TclError:
+            pass
 
     def available_suffixes(self, options, job=None):
         layout, swap = options.layout, False

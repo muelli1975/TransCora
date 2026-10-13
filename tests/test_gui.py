@@ -789,6 +789,24 @@ class GuiTests(unittest.TestCase):
         window.close_preview(viewer.dialog,viewer.time_entry,viewer.scale)
         self.assertFalse(any(widget==viewer.view_combo for widget,_ in window.controls))
 
+    def test_suffix_popup_fits_player_names_without_widening_controls(self):
+        from tkinter import font
+        if self.root.tk.call('tk','windowingsystem')=='aqua':
+            self.skipTest('Native macOS menus size themselves')
+        window=self.window
+        window.defaults=replace(window.defaults,target='half_sbs')
+        window.refresh_controls();self.root.update()
+        combo=window.combos['suffix'];before=combo.winfo_width()
+        self.root.tk.call('ttk::combobox::Post',str(combo));self.root.update()
+        try:
+            popup=self.root.tk.call('ttk::combobox::PopdownWindow',str(combo))
+            width=int(self.root.tk.call('wm','geometry',popup).split('x')[0])
+            measured=max(font.Font(root=self.root,font='TkTextFont').measure(v) for v in combo.cget('values'))
+            self.assertGreaterEqual(width,measured+36)
+            self.assertEqual(combo.winfo_width(),before)
+        finally:
+            self.root.tk.call('ttk::combobox::Unpost',str(combo))
+
     def test_player_suffix_labels_are_menu_only_and_custom_text_stays_literal(self):
         window=self.window
         for language in ('de','en'):
