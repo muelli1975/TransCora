@@ -331,7 +331,8 @@ def resized_dimensions(size, options):
 
 def fixed_image_size(options):
     """Fixed canvases are opt-in; edge-based sizes and screen rows keep their rules."""
-    if options.task == 'convert' and options.size_fit != 'scale' and options.target != 'row_interleaved':
+    if (options.task == 'convert' and options.size_fit != 'scale' and options.target != 'row_interleaved'
+            and not (options.target == 'keep' and options.layout == 'row_interleaved')):
         return {'1080p': (1920, 1080), '2160p': (3840, 2160)}.get(options.size_mode)
     return None
 
