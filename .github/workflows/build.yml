@@ -229,7 +229,7 @@ jobs:
     if: >-
       github.ref == 'refs/heads/main' &&
       ((github.event_name == 'workflow_dispatch' && inputs.publish_release) ||
-       (github.event_name == 'push' && github.event.head_commit.message == 'Update TransCora 1.1: correct first-row half-image labels'))
+       (github.event_name == 'push' && github.event.head_commit.message == 'Update TransCora 1.1: add fixed-size image fitting'))
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -261,7 +261,7 @@ jobs:
           if [ "$version" = "1.1" ] && [ "$GITHUB_EVENT_NAME" = "push" ]; then
             release_head=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v1.1" --jq '.object.sha')
             case "$release_head" in
-              feff8fda909c2770a39785dfb926c5a453281da2|"$GITHUB_SHA") ;;
+              6895841fe5d98ff6935943bc0421b029c61f5f53|"$GITHUB_SHA") ;;
               *) echo 'Release 1.1 changed independently; leaving it unchanged.'; exit 1 ;;
             esac
             gh release upload v1.1 release-files/* --clobber

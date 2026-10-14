@@ -25,7 +25,7 @@ def verify_tool():
 
 
 def render(image, plan, folder: Path, cancel, emit):
-    from .images import resized_dimensions
+    from .images import resized_dimensions, fixed_image_size, fit_image_pixels
     if cancel.is_set(): raise Cancelled()
     horizontal = plan.layout.endswith('sbs')
     w, h = image.size
@@ -39,9 +39,13 @@ def render(image, plan, folder: Path, cancel, emit):
     if plan.layout == 'half_ou': h *= 2
     # AnaChroma resizes before the iterative solver. Each half uses identical
     # dimensions and Lanczos; no additional transfer/gamma is applied here.
-    size = resized_dimensions((w, h), plan.options)
+    frame = fixed_image_size(plan.options)
+    size = frame or resized_dimensions((w, h), plan.options)
     for side, half in zip(('left', 'right'), halves):
-        if half.size != size: half = half.resize(size, Image.Resampling.LANCZOS)
+        if frame:
+            half = fit_image_pixels(half, (w, h), frame, plan.options.size_fit)
+        elif half.size != size:
+            half = half.resize(size, Image.Resampling.LANCZOS)
         half.convert('RGB').save(folder/(side+'.png'), compress_level=0)
     output = folder/'pixels.png'
     emit('phase', 'CIELAB: Halbbilder iterativ berechnen')
@@ -51,3 +55,4 @@ def render(image, plan, folder: Path, cancel, emit):
         if result.size != size or result.mode != 'RGB':
             raise ValueError('CIELAB liefert unerwartete Bildmaße oder ein falsches Farbformat.')
     return output
+

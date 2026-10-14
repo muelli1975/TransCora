@@ -2,6 +2,7 @@
 from __future__ import annotations
 from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
+from fractions import Fraction
 import io
 import json
 import os
@@ -32,6 +33,8 @@ FORMATS = {'jpeg': 'JPEG', 'png': 'PNG', 'tiff': 'TIFF', 'webp': 'WebP (verlustf
 SIZES = {'original': 'Original', '1080p': '1080p', '2160p': '2160p',
          '2048': '2048 lange Seite', 'custom': 'Benutzerdefiniert'}
 SIZE_EDGES = {'long': 'lange Seite', 'short': 'kurze Seite'}
+SIZE_FITS = {'scale': 'Proportional skalieren', 'pad': 'Mit schwarzen Balken auffüllen',
+             'crop': 'Bildfüllend zuschneiden'}
 SUFFIX = {'jpeg': '.jpg', 'png': '.png', 'tiff': '.tif', 'webp': '.webp'}
 SRGB = ImageCms.ImageCmsProfile(ImageCms.createProfile('sRGB')).tobytes()
 
@@ -49,6 +52,7 @@ class ImageOptions:
     quality: int = 90
     long_edge: int = 0
     size_mode: str = 'original'
+    size_fit: str = 'scale'
     size_edge: str = 'long'
     size_pixels: int = 2048
     swap: bool = False
@@ -79,6 +83,8 @@ class ImageOptions:
             raise ValueError('JPEG-Qualität: 90/95. Lange Kante: 0 (Original) bis 20000 Pixel.')
         if type(self.swap) is not bool or type(self.metadata) is not bool or self.method not in image_methods():
             raise ValueError('Ungültige Bild-, Metadaten- oder Anaglypheneinstellung.')
+        if self.size_fit not in SIZE_FITS:
+            raise ValueError('Ungültige Bildanpassung.')
         if self.size_mode not in SIZES or self.size_edge not in SIZE_EDGES or type(self.size_pixels) is not int or not 1 <= self.size_pixels <= 20000:
             raise ValueError('Eine positive Pixelzahl bis 20000 und lange/kurze Seite wählen.')
 
@@ -323,6 +329,71 @@ def resized_dimensions(size, options):
     return max(1, round(w*factor)), max(1, round(h*factor))
 
 
+def fixed_image_size(options):
+    """Fixed canvases are opt-in; edge-based sizes and screen rows keep their rules."""
+    if options.task == 'convert' and options.size_fit != 'scale' and options.target != 'row_interleaved':
+        return {'1080p': (1920, 1080), '2160p': (3840, 2160)}.get(options.size_mode)
+    return None
+
+
+def fitted_dimensions(display_size, frame, mode, packed=None):
+    """Fit in display geometry, then map to the stored (possibly half-size) grid."""
+    dw, dh = display_size; w, h = frame
+    pw, ph = packed or frame
+    factor = (min if mode == 'pad' else max)(Fraction(w, dw), Fraction(h, dh))
+    fw = max(1, round(dw*factor*pw/w)); fh = max(1, round(dh*factor*ph/h))
+    return (min(pw, fw), min(ph, fh)) if mode == 'pad' else (max(pw, fw), max(ph, fh))
+
+
+def image_fit_filter(display_size, frame, mode, packed=None):
+    w, h = packed or frame
+    fw, fh = fitted_dimensions(display_size, frame, mode, packed)
+    fit = (f'pad={w}:{h}:{(w-fw)//2}:{(h-fh)//2}:color=black' if mode == 'pad' else
+           f'crop={w}:{h}:{(fw-w)//2}:{(fh-h)//2}')
+    return f'scale={fw}:{fh}:flags=lanczos,{fit},setsar=1'
+
+
+def fit_image_pixels(image, display_size, frame, mode):
+    """The CIELAB path fits each half before running the separate colour solver."""
+    size = fitted_dimensions(display_size, frame, mode)
+    image = image.resize(size, Image.Resampling.LANCZOS)
+    if mode == 'pad':
+        canvas = Image.new(image.mode, frame, 'black')
+        canvas.paste(image, ((frame[0]-size[0])//2, (frame[1]-size[1])//2))
+        return canvas
+    x, y = (size[0]-frame[0])//2, (size[1]-frame[1])//2
+    return image.crop((x, y, x+frame[0], y+frame[1]))
+
+
+def fixed_stereo_graph(plan, frame):
+    """Fit independent halves before packing, keeping identical crops and borders."""
+    opts = plan.options
+    target = plan.layout if opts.target == 'keep' else opts.target
+    pixel = 'rgba' if opts.target == 'keep' else 'rgb24'
+    if target == 'mono':
+        return f'[0:v]format={pixel},'+image_fit_filter(plan.size, frame, opts.size_fit)+'[v]', frame
+    w, h = plan.size; horizontal = plan.layout.endswith('sbs')
+    ew, eh = (w//2, h) if horizontal else (w, h//2)
+    display = (ew*(2 if plan.layout == 'half_sbs' else 1),
+               eh*(2 if plan.layout == 'half_ou' else 1))
+    positions = [(0, 0), (ew, 0)] if horizontal else [(0, 0), (0, eh)]
+    if plan.swap and opts.target != 'keep': positions.reverse()
+    if target in {'left', 'right'}:
+        x, y = positions[target == 'right']
+        return (f'[0:v]format={pixel},crop={ew}:{eh}:{x}:{y},'+
+                image_fit_filter(display, frame, opts.size_fit)+'[v]'), frame
+    tw, th = frame
+    logical = (tw//2, th) if target == 'full_sbs' else (tw, th//2) if target == 'full_ou' else frame
+    packed = (tw//2, th) if target in {'full_sbs', 'half_sbs'} else (tw, th//2) if target in {'full_ou', 'half_ou'} else frame
+    parts = [f'[0:v]format={pixel},split[a][b]']
+    for name, (x, y), label in zip(('a', 'b'), positions, ('l', 'r')):
+        parts.append(f'[{name}]crop={ew}:{eh}:{x}:{y},'+
+                     image_fit_filter(display, logical, opts.size_fit, packed)+f'[{label}]')
+    stack = 'vstack' if target.endswith('ou') else 'hstack'
+    parts.append(f'[l][r]{stack}=inputs=2,format={pixel}[v]')
+    return ';'.join(parts), (tw*2, th) if target == 'split' else frame
+
+
 def image_graph(plan):
     opts = plan.options; target = opts.target
     if plan.layout == 'row_interleaved':
@@ -338,6 +409,9 @@ def image_graph(plan):
             return None, size
         prefix = '[0:v]format=gbrp,stereo3d=irl:ab2l[stereopair];'
         return prefix + graph.replace('[0:v]', '[stereopair]').replace('[0:0]', '[stereopair]'), size
+    frame = fixed_image_size(opts)
+    if frame and target != 'anaglyph':
+        return fixed_stereo_graph(plan, frame)
     if target == 'keep':
         graph = '[0:v]null[composite]'; size = plan.size
     elif target == 'anaglyph':
@@ -346,7 +420,7 @@ def image_graph(plan):
             size = (w//2, h) if plan.layout.endswith('sbs') else (w, h//2)
             if plan.layout == 'half_sbs': size = (size[0]*2, size[1])
             if plan.layout == 'half_ou': size = (size[0], size[1]*2)
-            return None, resized_dimensions(size, opts)
+            return None, frame or resized_dimensions(size, opts)
         video = dict(index=0, width=plan.size[0], height=plan.size[1], pix_fmt='rgb24')
         graph, size, _ = build_graph(video, Options(target='anaglyph'), plan.layout, plan.swap,
             dict(matrix='gbr', primaries='bt709', transfer='iec61966-2-1', range='pc'), methods()[opts.method])
@@ -370,6 +444,8 @@ def image_graph(plan):
         ou = target.endswith('ou')
         parts.append(f"[l][r]{'vstack' if ou else 'hstack'}=inputs=2[composite]")
         graph = ';'.join(parts); size = (dw, dh*2) if ou else (dw*2, dh)
+    if frame:
+        return graph+';[composite]'+image_fit_filter(size, frame, opts.size_fit)+',format=rgb24[v]', frame
     filters = []
     if target in {'left', 'right', 'split'}:
         width, height = size[0]//2, size[1]
@@ -536,3 +612,4 @@ def load_images(path):
         result.append(ImageJob(Path(item['source']).expanduser().resolve(), ImageOptions.from_dict(item.get('options', {})),
                                Path(root).expanduser().resolve() if root else None))
     return result
+

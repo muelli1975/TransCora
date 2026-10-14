@@ -11,7 +11,7 @@ from tkinter import ttk, filedialog, messagebox
 from PIL import Image
 
 from transcora.core.images import (ImageJob, ImageOptions, EXTENSIONS, TASKS, LAYOUTS, TARGETS, FORMATS,
-    plans, execute_image, save_images, load_images, SIZES, SIZE_EDGES, image_methods)
+    plans, execute_image, save_images, load_images, SIZES, SIZE_EDGES, SIZE_FITS, image_methods)
 from transcora.core.engine import Cancelled
 from transcora.core.model import app_root, ROW_ORDERS
 from transcora.core.storage import write_json, new_run_log, validate_preset_name
@@ -122,6 +122,14 @@ class ImagePanel:
         size_combo = ttk.Combobox(size, textvariable=self.variables['size_mode'], values=[self.t(v) for v in SIZES.values()], state='readonly')
         size_combo.pack(fill='x'); size_combo.bind('<<ComboboxSelected>>', lambda e: self.changed('size_mode'))
         self.combos['size_mode'] = size_combo; self.controls.append((size_combo, 'readonly'))
+        fit = ttk.Frame(output_fields); fit.grid(row=0, column=2, sticky='new', padx=(0, 8))
+        ttk.Label(fit, text='Bildanpassung').pack(anchor='w')
+        self.mappings['size_fit'] = SIZE_FITS
+        self.variables['size_fit'] = tk.StringVar(value=self.t(SIZE_FITS[self.defaults.size_fit]))
+        fit_combo = ttk.Combobox(fit, textvariable=self.variables['size_fit'],
+            values=[self.t(v) for v in SIZE_FITS.values()], state='disabled', width=1)
+        fit_combo.pack(fill='x'); fit_combo.bind('<<ComboboxSelected>>', lambda e: self.changed('size_fit'))
+        self.combos['size_fit'] = fit_combo; self.controls.append((fit_combo, 'readonly'))
         self.dimensions = ttk.Frame(size); self.dimensions.pack(fill='x',pady=(4,0))
         self.dimension_values = [tk.StringVar(),tk.StringVar()]
         for i,var in enumerate(self.dimension_values):
@@ -345,6 +353,9 @@ class ImagePanel:
             if key == 'row_first': enabled = rows
             if key in {'screen_width', 'screen_height'}: enabled = rows
             if key in {'size_mode', 'size_edge'}: enabled = enabled and not rows
+            if key == 'size_fit':
+                enabled = enabled and not rows and opts.size_mode in {'1080p', '2160p'}
+                enabled = enabled and not (opts.target == 'keep' and opts.layout == 'row_interleaved')
             set_control_state(combo, ('normal' if key in {'swap', 'metadata', 'screen_width', 'screen_height'} else 'readonly') if enabled and not self.busy else 'disabled')
         if rows or opts.task=='mpo':
             self.variables['size_mode'].set(self.t('Monitorauflösung' if rows else 'Original'))

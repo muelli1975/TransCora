@@ -3,6 +3,11 @@ import re
 LANGUAGES = {'de': 'Deutsch', 'en': 'English'}
 EN = {'Log':'Log', 'Kopieren':'Copy', 'Video':'Video', 'Audio':'Audio', 'Bitrate':'Bitrate',
  'Bearbeitungszeit': 'Processing time',
+ 'Bildanpassung': 'Image fitting',
+ 'Proportional skalieren': 'Scale proportionally',
+ 'Mit schwarzen Balken auffüllen': 'Add black bars',
+ 'Bildfüllend zuschneiden': 'Crop to fill',
+ 'Ungültige Bildanpassung.': 'Invalid image fitting mode.',
  'Fertige entfernen': 'Remove completed',
  'Nach Datei pausieren': 'Pause after file',
  'Pause vorgemerkt': 'Pause requested',

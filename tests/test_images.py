@@ -8,7 +8,7 @@ import threading
 import unittest
 from PIL import Image
 from transcora.core.images import (ImageJob, ImageOptions, plans, execute_image, mpo_jpegs,
-                                   save_images, load_images, exiftool)
+                                   save_images, load_images, exiftool, ImagePlan, image_graph)
 from transcora.core.engine import capture
 from transcora.core.toolchain import Toolchain
 
@@ -29,6 +29,114 @@ class ImageTests(unittest.TestCase):
         plan = plans([ImageJob(source, options)], self.folder/'out', self.cancel)[0]
         execute_image(self.tools, plan, self.cancel, lambda *a: None, self.folder/'log.jsonl')
         return plan
+
+    def test_fixed_image_fitting_preserves_half_image_shape_borders_and_order(self):
+        halves = []
+        for colour in ((210, 30, 10), (10, 50, 210)):
+            half = Image.new('RGB', (160, 120), colour)
+            half.paste('white', (60, 40, 100, 80))
+            half.paste('green', (0, 0, 160, 12))
+            half.paste('green', (0, 108, 160, 120))
+            halves.append(half)
+        source = self.folder/'four_three_full_sbs.png'
+        packed = Image.new('RGB', (320, 120))
+        for i, half in enumerate(halves): packed.paste(half, (160*i, 0))
+        packed.save(source)
+        for target in ('half_sbs', 'half_ou'):
+            for mode in ('pad', 'crop'):
+                with self.subTest(target=target, mode=mode):
+                    plan = self.run_job(source, ImageOptions(target=target, size_mode='1080p',
+                        size_fit=mode, format='png', metadata=False))
+                    self.assertIn('1920 × 1080', plan.summary)
+                    with Image.open(plan.outputs[0]) as image:
+                        self.assertEqual(image.size, (1920, 1080))
+                        boxes = ((0, 0, 960, 1080), (960, 0, 1920, 1080)) if target == 'half_sbs' else (
+                            (0, 0, 1920, 540), (0, 540, 1920, 1080))
+                        for i, box in enumerate(boxes):
+                            half = image.crop(box).resize((1920, 1080), Image.Resampling.NEAREST).convert('RGB')
+                            self.assertEqual(half.getpixel((20, 540)), (0, 0, 0) if mode == 'pad' else halves[i].getpixel((0, 60)))
+                            white = half.point(lambda p: 255 if p > 245 else 0)
+                            r, g, b = white.split()
+                            from PIL import ImageChops
+                            bounds = ImageChops.multiply(ImageChops.multiply(r, g), b).getbbox()
+                            self.assertIsNotNone(bounds)
+                            self.assertLessEqual(abs((bounds[2]-bounds[0])-(bounds[3]-bounds[1])), 3)
+                            self.assertAlmostEqual((bounds[0]+bounds[2])/2, 960, delta=2)
+                            self.assertAlmostEqual((bounds[1]+bounds[3])/2, 540, delta=2)
+                            if mode == 'crop':
+                                self.assertEqual(half.getpixel((960, 5)), halves[i].getpixel((0, 60)))
+        swapped = self.run_job(source, ImageOptions(target='half_sbs', size_mode='1080p',
+            size_fit='pad', swap=True, format='png', metadata=False))
+        with Image.open(swapped.outputs[0]) as image:
+            self.assertEqual(image.getpixel((200, 540)), (10, 50, 210))
+
+    def test_fixed_image_fitting_handles_wide_portrait_ou_and_split_sources(self):
+        for eye_size in ((240, 90), (90, 160)):
+            left = Image.new('RGB', eye_size, 'red'); right = Image.new('RGB', eye_size, 'blue')
+            source = self.folder/f'wide_{eye_size[0]}_full_ou.png'
+            image = Image.new('RGB', (eye_size[0], eye_size[1]*2))
+            image.paste(left); image.paste(right, (0, eye_size[1])); image.save(source)
+            plan = self.run_job(source, ImageOptions(target='half_sbs', size_mode='1080p',
+                size_fit='pad', format='png', metadata=False))
+            with Image.open(plan.outputs[0]) as result:
+                self.assertEqual(result.size, (1920, 1080))
+                self.assertEqual(result.getpixel((480, 540)), (255, 0, 0))
+                self.assertEqual(result.getpixel((1440, 540)), (0, 0, 255))
+                self.assertEqual(result.getpixel((0, 0)), (0, 0, 0))
+        plan = self.run_job(source, ImageOptions(target='split', size_mode='1080p',
+            size_fit='crop', format='png', metadata=False))
+        for i, output in enumerate(plan.outputs):
+            with Image.open(output) as result:
+                self.assertEqual(result.size, (1920, 1080))
+                self.assertEqual(result.getpixel((0, 0)), ((255, 0, 0), (0, 0, 255))[i])
+
+    def test_fixed_image_fitting_2160p_and_inactive_modes_keep_existing_geometry(self):
+        for target in ('keep', 'full_sbs', 'full_ou', 'half_sbs', 'half_ou', 'left', 'right', 'split', 'anaglyph'):
+            opts = ImageOptions(target=target, size_mode='2160p', size_fit='pad', metadata=False)
+            plan = ImagePlan((self.source,), (), opts, 'full_sbs', False, (320, 120), (), ())
+            graph, size = image_graph(plan)
+            self.assertEqual(size, (7680, 2160) if target == 'split' else (3840, 2160))
+            self.assertIn('pad=', graph)
+            for mode in ('original', '2048', 'custom'):
+                original = replace(plan, options=replace(opts, size_mode=mode, size_fit='scale'))
+                inactive = replace(original, options=replace(original.options, size_fit='crop'))
+                self.assertEqual(image_graph(original), image_graph(inactive))
+        old = ImageOptions.from_dict({'target': 'half_sbs', 'size_mode': '1080p'})
+        self.assertEqual(old.size_fit, 'scale')
+        with self.assertRaises(ValueError): ImageOptions.from_dict({'size_fit': 'stretch'})
+        listing = self.folder/'fitting-list.json'
+        save_images(listing, [ImageJob(self.source, opts)])
+        self.assertEqual(load_images(listing)[0].options.size_fit, 'pad')
+
+    def test_fixed_image_fitting_cielab_matches_the_planned_canvas(self):
+        from transcora.core.cielab import executable
+        if not executable().is_file(): self.skipTest('CIELAB not available')
+        source = self.folder/'cielab_full_sbs.png'
+        image = Image.new('RGB', (160, 60), 'white'); image.save(source)
+        for mode in ('pad', 'crop'):
+            plan = self.run_job(source, ImageOptions(target='anaglyph', method='cielab',
+                size_mode='1080p', size_fit=mode, format='png', metadata=False))
+            with Image.open(plan.outputs[0]) as result:
+                self.assertEqual(result.size, (1920, 1080))
+                self.assertEqual(result.getpixel((0, 540)), (0, 0, 0) if mode == 'pad' else (255, 255, 255))
+
+    def test_fixed_image_fitting_preserves_old_completion_receipts_and_distinguishes_new_modes(self):
+        from dataclasses import asdict
+        from transcora.core.journal import Journal, request
+        job = ImageJob(self.source, ImageOptions(target='half_sbs', size_mode='1080p'))
+        folder = self.folder/'history'; folder.mkdir()
+        output = folder/'finished.png'; self.left.save(output)
+        journal = Journal(folder)
+        legacy = request(job, 'image')
+        legacy['options'] = asdict(job.options); legacy['options'].pop('size_fit')
+        journal.complete(legacy, (output,), 12.5)
+        self.assertEqual(journal.lookup(job, 'image').seconds, 12.5)
+        job.options = replace(job.options, size_fit='pad')
+        self.assertIsNone(journal.lookup(job, 'image'))
+        journal.complete(request(job, 'image'), (output,), 15)
+        self.assertEqual(journal.lookup(job, 'image').seconds, 15)
+        job.options = replace(job.options, size_fit='crop')
+        self.assertIsNone(journal.lookup(job, 'image'))
 
     def test_layout_dimensions_and_left_right_order_for_real_outputs(self):
         for target, size in [('full_sbs', (256, 72)), ('full_ou', (128, 144)), ('half_sbs', (128, 72)),
@@ -100,3 +208,4 @@ class ImageTests(unittest.TestCase):
         with self.assertRaises(__import__('transcora.core.engine', fromlist=['Cancelled']).Cancelled):
             execute_image(self.tools, next_plan, self.cancel, lambda *a: None, self.folder/'log')
         self.assertFalse(any(p.exists() for p in next_plan.outputs))
+

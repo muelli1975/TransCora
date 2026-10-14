@@ -1,5 +1,7 @@
 # TransCora 1.1
 
+- Image fitting for 1080p/2160p: proportional scaling, black bars or a centred crop, applied equally to both half-images and shown in the control preview.
+
 - Dual video input/output: separate left/right tracks in MP4 or MKV, with size per half-image, audio options and L/R swap.
 - BD-3D and Dual control previews show both half-images as parallel, cross-view or red/cyan anaglyph.
 - Filename suffix menus identify Kodi, Bino and Stereoscopic Player. Labels stay out of filenames; combined suffix suggestions have been removed.

@@ -100,6 +100,8 @@ Display the result at the exact native resolution, full screen, with no scaling 
 
 Read JPEG/JPS, PNG/PNS, TIFF, BMP, WebP and MPO containing two half-images. Convert to SBS, over/under, anaglyphs, individual half-images or row-interleaved output. Save JPEG, PNG, TIFF or lossless WebP. Image sizes include Original, 1080p, 2160p, 2048 pixels on the long edge and custom long/short edge.
 
+For **1080p** and **2160p**, **Image fitting** offers **Scale proportionally** (the existing default), **Add black bars** or **Crop to fill**. The latter two produce an exact 1920 × 1080 or 3840 × 2160 output canvas (per file for split half-images). Stereo halves receive matching borders or centred crops in their display proportions before packing. The control preview uses the same fitting and export settings.
+
 **Split MPO losslessly** writes the two original JPEG half-images as `_l.jpg` and `_r.jpg`, without recompression. This also handles Fujifilm camera padding. Image anaglyphs offer the 17 video methods plus **CIELAB Least Squares**. JPEG normally uses quality 90 with 4:4:4, optionally 95.
 
 Orientation and colour profiles are applied when converting images. Optional metadata copying retains capture dates and suitable EXIF/XMP/IPTC fields. PNG, TIFF and WebP can retain transparency when keeping the layout.

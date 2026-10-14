@@ -18,6 +18,68 @@ from tkinter import ttk
 
 
 class GuiTests(unittest.TestCase):
+    def test_image_fitting_control_fits_and_applies_only_to_fixed_image_sizes(self):
+        from tkinter import font
+        from transcora.core.images import ImageOptions, SIZE_FITS
+        window = self.window; panel = window.images
+        window.notebook.select(window.image_tab)
+        for language in ('de', 'en'):
+            window.language = language; window.apply_language()
+            self.root.geometry('780x680'); self.root.update()
+            combo = panel.combos['size_fit']; size = panel.combos['size_mode']
+            self.assertEqual(int(combo.master.grid_info()['column']), 2)
+            self.assertEqual(int(size.master.grid_info()['column']), 1)
+            self.assertEqual(combo.winfo_rooty(), size.winfo_rooty())
+            self.assertLessEqual(combo.winfo_rootx()+combo.winfo_width(), panel.settings_area.canvas.winfo_rootx()+panel.settings_area.canvas.winfo_width())
+            face = font.Font(root=self.root, font=ttk.Style().lookup('TCombobox', 'font') or 'TkTextFont')
+            for mode in ('original', 'custom', '2048', '1080p', '2160p'):
+                panel.defaults = replace(ImageOptions(), target='half_sbs', size_mode=mode)
+                panel.selection_changed(); self.root.update()
+                self.assertEqual(str(combo.cget('state')), 'readonly' if mode in {'1080p', '2160p'} else 'disabled')
+            before = (panel.settings_area.body.winfo_reqheight(), panel.tree.winfo_height(), panel.detail_text.winfo_height())
+            for key, title in SIZE_FITS.items():
+                panel.variables['size_fit'].set(window.t(title)); panel.changed('size_fit'); self.root.update()
+                self.assertEqual(panel.defaults.size_fit, key)
+                self.assertLessEqual(face.measure(combo.get())+24, combo.winfo_width())
+                self.assertEqual(before, (panel.settings_area.body.winfo_reqheight(), panel.tree.winfo_height(), panel.detail_text.winfo_height()))
+            panel.defaults = replace(panel.defaults, target='row_interleaved')
+            panel.selection_changed(); self.assertEqual(str(combo.cget('state')), 'disabled')
+            panel.defaults = replace(ImageOptions(), task='mpo', size_mode='1080p')
+            panel.selection_changed(); self.assertEqual(str(combo.cget('state')), 'disabled')
+
+    def test_image_fitting_control_preview_matches_real_export_and_selected_scope(self):
+        from PIL import Image
+        from transcora.core.images import ImageOptions, execute_image, plans
+        from transcora.gui.image_view import ImageView
+        import threading
+        panel = self.window.images
+        self.window.notebook.select(self.window.image_tab)
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp); source = folder/'test_full_sbs.png'
+            image = Image.new('RGB', (320, 120), 'red')
+            image.paste('blue', (160, 0, 320, 120)); image.save(source)
+            panel.add_paths([source, folder/'second_full_sbs.png'])
+            job, other = panel.jobs
+            job.options = ImageOptions(target='half_sbs', size_mode='1080p', format='png', metadata=False)
+            panel.tree.selection_set(job.id); panel.selection_changed()
+            for mode in ('pad', 'crop'):
+                panel.variables['size_fit'].set(self.window.t(panel.mappings['size_fit'][mode])); panel.changed('size_fit')
+                self.assertEqual(other.options.size_fit, 'scale')
+                self.assertEqual([v.get() for v in panel.dimension_values], ['1920', '1080'])
+                panel.preview()
+                deadline = time.monotonic()+20
+                while panel.busy and time.monotonic()<deadline:
+                    self.root.update(); time.sleep(.01)
+                self.assertFalse(panel.busy, panel.status.get())
+                self.assertIsNotNone(panel.preview_dialog, panel.status.get())
+                viewer = next(c for c in panel.preview_dialog.winfo_children() if isinstance(c, ImageView))
+                plan = plans([job], folder/'export', threading.Event())[0]
+                execute_image(Toolchain.find(), plan, threading.Event(), lambda *args: None, folder/'test.log')
+                with Image.open(plan.outputs[0]) as exported:
+                    self.assertEqual(viewer.images[0].size, exported.size)
+                    self.assertEqual(viewer.images[0].convert('RGB').tobytes(), exported.convert('RGB').tobytes())
+                panel.preview_dialog.destroy()
+
     def test_information_omits_inapplicable_stereo_note_but_keeps_written_metadata(self):
         from transcora.core.engine import Plan
         window = self.window

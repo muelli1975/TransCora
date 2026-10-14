@@ -105,6 +105,8 @@ Zeige das Ergebnis bildschirmfüllend in exakt nativer Auflösung, ohne Skalieru
 
 Öffne JPEG/JPS, PNG/PNS, TIFF, BMP, WebP und MPO mit zwei Halbbildern. Wandle in SBS, Over/Under, Anaglyphen, einzelne Halbbilder oder Zeilenverschachtelung um. Speichere JPEG, PNG, TIFF oder verlustfreies WebP. Bildgrößen: Original, 1080p, 2160p, 2048 Pixel an der langen Seite sowie frei wählbare lange/kurze Seite.
 
+Bei **1080p** und **2160p** bietet **Bildanpassung** die Auswahl **Proportional skalieren** (bisheriger Standard), **Mit schwarzen Balken auffüllen** oder **Bildfüllend zuschneiden**. Die beiden neuen Modi erzeugen exakt 1920 × 1080 beziehungsweise 3840 × 2160 Pixel (je Datei beim Teilen der Halbbilder). Beide Halbbilder erhalten in ihren Wiedergabeproportionen die gleichen Ränder oder einen mittigen Beschnitt, bevor sie zusammengesetzt werden. Das Kontrollbild verwendet dieselbe Anpassung und dieselben Exporteinstellungen.
+
 **MPO verlustfrei teilen** speichert die beiden Original-JPEGs als `_l.jpg` und `_r.jpg`, ohne Neukodierung. Auch die zusätzlichen Füllbytes von Fujifilm-Kameras werden berücksichtigt. Bildanaglyphen bieten neben den 17 Videoverfahren **CIELAB Least Squares**. JPEG verwendet normalerweise Qualität 90 mit 4:4:4, optional 95.
 
 Bei Bildwandlungen werden Orientierung und Farbprofile angewendet. Die optionale Metadatenübernahme erhält Aufnahmezeiten und passende EXIF/XMP/IPTC-Felder. PNG, TIFF und WebP können beim Beibehalten des Layouts Transparenz erhalten.

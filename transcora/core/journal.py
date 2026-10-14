@@ -45,8 +45,14 @@ def request(job, kind):
     source = job.source.resolve()
     # Relative output hierarchy participates in matching, independently of GUI IDs.
     destination = source.parent.relative_to(job.source_root.resolve()).as_posix() if job.source_root else '.'
+    options = asdict(job.options)
+    if kind == 'image':
+        from .images import fixed_image_size
+        if not fixed_image_size(job.options):
+            # Default/inactive fitting must still match existing image receipts.
+            options.pop('size_fit', None)
     return {'kind': kind, 'source': stamp(source), 'destination': destination,
-            'options': asdict(job.options)}
+            'options': options}
 
 
 def key(value):
@@ -197,3 +203,4 @@ def processing_text(result):
         return '—'
     seconds = int(result.seconds)
     return f'{seconds // 3600:02}:{seconds // 60 % 60:02}:{seconds % 60:02}'
+
