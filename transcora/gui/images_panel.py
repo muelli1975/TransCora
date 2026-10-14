@@ -7,7 +7,7 @@ import tempfile
 import threading
 import time
 import tkinter as tk
-from tkinter import ttk, filedialog, messagebox
+from tkinter import ttk, filedialog, messagebox, font
 from PIL import Image
 
 from transcora.core.images import (ImageJob, ImageOptions, EXTENSIONS, TASKS, LAYOUTS, TARGETS, FORMATS,
@@ -122,6 +122,8 @@ class ImagePanel:
         size_combo = ttk.Combobox(size, textvariable=self.variables['size_mode'], values=[self.t(v) for v in SIZES.values()], state='readonly')
         size_combo.pack(fill='x'); size_combo.bind('<<ComboboxSelected>>', lambda e: self.changed('size_mode'))
         self.combos['size_mode'] = size_combo; self.controls.append((size_combo, 'readonly'))
+        fit_font = font.Font(font=ttk.Style().lookup('TCombobox', 'font') or 'TkTextFont')
+        output_fields.columnconfigure(2, uniform='', minsize=max(fit_font.measure(v) for v in SIZE_FITS.values())+32)
         fit = ttk.Frame(output_fields); fit.grid(row=0, column=2, sticky='new', padx=(0, 8))
         ttk.Label(fit, text='Bildanpassung').pack(anchor='w')
         self.mappings['size_fit'] = SIZE_FITS
