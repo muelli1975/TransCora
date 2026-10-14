@@ -46,7 +46,7 @@ def request(job, kind):
     # Relative output hierarchy participates in matching, independently of GUI IDs.
     destination = source.parent.relative_to(job.source_root.resolve()).as_posix() if job.source_root else '.'
     options = asdict(job.options)
-    if kind == 'image':
+    if kind == 'image' and 'size_fit' in options:
         from .images import fixed_image_size
         if not fixed_image_size(job.options):
             # Default/inactive fitting must still match existing image receipts.
