@@ -1,11 +1,15 @@
 # TransCora 1.0
 
-TransCora converts stereoscopic videos and images locally.
+Convert stereoscopic videos and images locally, with separate batch lists, settings and previews.
 
-- Full/Half-SBS and Over/Under, cross-view, anaglyphs, row-interleaved stereo and separate eyes.
-- Windows Blu-ray 3D export to ISO or M2TS, at 1080p/23.976 or 720p/50 and 59.94 fps, with AVC/MVC video, LPCM audio and adjustable bitrate; default 40 Mbit/s.
-- Adjustable output sizes and optional video frame-rate conversion.
-- Image conversion, metadata preservation and lossless MPO eye extraction.
-- Batch processing, sortable file lists, saved presets, previews, file and batch time estimates, and cancellation.
-- Grouped settings, highlighted file warnings and a Log view with text selection and copying.
-- German and English interface; portable Windows, Linux and macOS Apple Silicon packages.
+- Export Full/Half SBS and over/under, cross-view, anaglyph, row-interleaved and separate-view formats.
+- Create Blu-ray 3D ISO and AVC/MVC M2TS files on Windows.
+- Split MPO files without JPEG recompression and transfer image metadata.
+- Use presets, batch processing, progress estimates and cancellation.
+- German and English interface.
+
+## Installation
+
+Extract the complete package for your system into a writable folder and start TransCora. Keep the supplied tools and application files together.
+
+Windows includes the required video tools and supports Blu-ray 3D output. Linux and macOS require an external FFmpeg installation; see the [platform requirements](https://github.com/muelli1975/TransCora#portable-builds-and-source).

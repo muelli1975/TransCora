@@ -1,21 +1,15 @@
 # TransCora 1.1
 
-- Image fitting for 1080p/2160p: proportional scaling, black bars or a centred crop, applied equally to both half-images and shown in the control preview.
+- Add proportional fitting, black bars or centred cropping for 1080p/2160p output.
+- Add separate left/right video tracks in MP4 and MKV, with stereo control previews.
+- Add row-interleaved and frame-sequential inputs and selectable mono views.
+- Add supported SDR HEIC/HEIF images and Spatial Photos; decode both views from MV-HEVC input.
+- Add completed-job times, a completion journal, removal of completed entries and pause after the current file.
+- Add optional application close or computer shutdown after a successful batch.
+- Improve remaining-time estimates, filename suffix menus and status messages.
 
-- Dual video input/output: separate left/right tracks in MP4 or MKV, with size per half-image, audio options and L/R swap.
-- BD-3D and Dual control previews show both half-images as parallel, cross-view or red/cyan anaglyph.
-- Filename suffix menus identify Kodi, Bino and Stereoscopic Player. Labels stay out of filenames; combined suffix suggestions have been removed.
-- Batch remaining time uses a duration-weighted processing average, including mixed settings, file transitions and delayed progress updates.
-- Completed-job processing times, completion journal, remove-completed actions and pause-after-file control.
-- Optional close or computer shutdown after a successful video/image batch; cancellable 30-second shutdown countdown and session-only selection.
-- Neutral control-preview hint for both BD-3D and Dual.
-- Completed-file details display stereo information and the output path once.
-- The information field omits the inapplicable "no SBS/OU flag" note for outputs such as anaglyph and mono.
-- Row-interleaved output labels the first-row selection as "Left half-image" or "Right half-image" in both video and image tabs.
-- Selectable mono half-image, row-interleaved inputs and frame-sequential half-image pairing.
-- SDR HEIC/HEIF input, including tagged stereo images and Spatial Photos, with orientation and colour-profile handling.
-- Neutral routine messages; highlighted warnings reserved for required decisions and errors.
-- MV-HEVC input decodes both half-images.
+## Installation
 
-Platform capabilities and external FFmpeg requirements are described in the README.
+Extract the complete package for your system into a writable folder and start TransCora. Keep the supplied tools and application files together.
 
+Windows includes the required video tools and supports Blu-ray 3D output. Linux and macOS require an external FFmpeg installation; see the [platform requirements](https://github.com/muelli1975/TransCora#portable-builds-and-source).

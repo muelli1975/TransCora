@@ -1,6 +1,6 @@
-# TransCora 1.1 — Testfassung
+# TransCora 1.1
 
-[English](README.md)
+[Downloads und SHA-256](https://github.com/muelli1975/TransCora/releases/tag/v1.1) · [English](README.md)
 
 TransCora ist ein lokales Desktopprogramm zum Umwandeln stereoskopischer Videos und Bilder. Es unterstützt SBS, Over/Under, Kreuzblick, Anaglyphen und zeilenverschachtelte Ausgaben für Polfilter-Monitore. Unter Windows erstellt es außerdem Blu-ray-3D-ISOs und AVC/MVC-M2TS. MPO-Dateien lassen sich ohne JPEG-Neukodierung in ihre beiden Halbbilder aufteilen. Videos und Bilder haben eigene Stapellisten, Einstellungen und Kontrollbilder.
 
@@ -14,7 +14,7 @@ die Zuordnung des ersten Halbbilds. Frame sequential bildet vor der Bildratenwan
 vollständige Paare: 120 Einzelbilder/s entsprechen 60 Stereobildpaaren/s. Ein
 ungepaartes Schlussbild wird ausgelassen. Dafür ein Ausgabe-Layout wählen.
 
-**HEIC/HEIF** wird in der 1.1-Entwicklungsfassung als SDR-Bildeingabe gelesen,
+**HEIC/HEIF** wird in TransCora 1.1 als SDR-Bildeingabe gelesen,
 einschließlich gekennzeichneter Stereo-HEIC und Spatial Photos. Die Stereo-Gruppe
 bestimmt die L/R-Zuordnung; Tiefenkarten und Gainmaps werden nicht als zweites
 Halbbild verwendet. Orientierung und Farbprofile werden berücksichtigt. Die
@@ -127,9 +127,9 @@ Lade ein Paket unter [Releases](https://github.com/muelli1975/TransCora/releases
 
 | System | Paket | Start |
 | --- | --- | --- |
-| Windows x64 | `TransCora_1.0_Windows_x64.zip` | `TransCora.exe` |
-| Linux x64 | `TransCora_1.0_Linux_x64.tar.gz` | `./TransCora` |
-| macOS Apple Silicon | `TransCora_1.0_macOS_AppleSilicon.tar.gz` | `TransCora.app` |
+| Windows x64 | [TransCora_1.1_Windows_x64.zip](https://github.com/muelli1975/TransCora/releases/download/v1.1/TransCora_1.1_Windows_x64.zip) | `TransCora.exe` |
+| Linux x64 | [TransCora_1.1_Linux_x64.tar.gz](https://github.com/muelli1975/TransCora/releases/download/v1.1/TransCora_1.1_Linux_x64.tar.gz) | `./TransCora` |
+| macOS Apple Silicon | [TransCora_1.1_macOS_AppleSilicon.tar.gz](https://github.com/muelli1975/TransCora/releases/download/v1.1/TransCora_1.1_macOS_AppleSilicon.tar.gz) | `TransCora.app` |
 
 Windows enthält Python, FFmpeg und die BD-3D-Werkzeuge. Linux und macOS enthalten die Programmlaufzeit und Bildwerkzeuge; **FFmpeg einschließlich ffprobe und System-Perl müssen separat installiert sein**. Unter Ubuntu/Debian: `sudo apt install ffmpeg perl`. Mit Homebrew unter macOS: `brew install ffmpeg@7`. Das macOS-Paket ist ad-hoc signiert und nicht notarisiert.
 
