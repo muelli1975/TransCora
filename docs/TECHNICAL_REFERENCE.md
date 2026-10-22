@@ -377,10 +377,8 @@ und [sView-Stereoformate](https://github.com/gkv311/sview/blob/master/docs/stere
 ## Stand der MVC-Qualitätsprüfung
 
 Native BT.709-/1080p-Halbbilder bleiben vor der MVC-Kodierung pixelgenau erhalten.
-Der bisherige YUV/RGB/YUV-Umweg entfällt. Die FRIM-Grundeinstellungen bleiben
-vorerst im dokumentierten Qualitätsprofil. Gemeldetes Flackern und Artefakte
-bei Textüberblendungen einer Diaschau sind in Untersuchung; eine vollständige
-Behebung ist noch nicht bestätigt. Technische Abschlussprüfungen bewerten
+Der bisherige YUV/RGB/YUV-Umweg entfällt. Die MVC-Ausgabe verwendet das im Abschnitt **BD-3D-Ausgabe** dokumentierte
+Qualitätsprofil. Technische Abschlussprüfungen bewerten
 Integrität, Halbbilder und Verpackung, nicht die sichtbare Bildqualität.
 
 Build-Anleitung: [BUILD.md](BUILD.md). Der passende Anwendungscode liegt im
