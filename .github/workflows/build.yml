@@ -2,7 +2,7 @@ name: Repair existing TransCora 1.0
 
 on:
   push:
-    branches: [maintenance/v1.0-restzeit]
+    branches: [maintenance/v1.0-restzeit, maintenance/sdr-1.0]
   pull_request:
   workflow_dispatch:
 
@@ -243,3 +243,22 @@ jobs:
             gh release create v1.0 release-files/* --target "$GITHUB_SHA" --title 'TransCora 1.0' --notes-file docs/RELEASE_NOTES_1.0.md --latest
           fi
 
+
+  publish-color-update:
+    needs: [windows-portable, unix-packages]
+    if: github.ref == 'refs/heads/maintenance/sdr-1.0' && github.event_name == 'push' && github.event.head_commit.message == 'Fix SDR color handling and refresh TransCora 1.0 packages'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: TransCora-Release-*
+          path: release-files
+          merge-multiple: true
+      - name: Refresh the authorized existing packages after all tests
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/publish_color_update.py --root release-files --config .github/color-update.json
