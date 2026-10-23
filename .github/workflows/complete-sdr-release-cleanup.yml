@@ -1,0 +1,16 @@
+name: Complete verified SDR release cleanup
+on:
+  push:
+    branches: [maintenance/sdr-release-cleanup]
+permissions:
+  contents: write
+jobs:
+  cleanup:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reverify downloads and remove the exact superseded checksum
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/complete_sdr_release_cleanup.py
