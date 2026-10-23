@@ -1,0 +1,36 @@
+name: Verify BT709 anaglyph video against Batch
+on:
+  push:
+    branches: [maintenance/anaglyph-bt709-verification]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install FFmpeg and Pillow
+        run: |
+          for apt_sources_file in /etc/apt/sources.list /etc/apt/sources.list.d/ubuntu.sources /etc/apt/apt-mirrors.txt; do
+            if [ -f "$apt_sources_file" ]; then
+              sudo sed -i -e 's|azure.archive.ubuntu.com|archive.ubuntu.com|g' -e 's|http://archive.ubuntu.com|https://archive.ubuntu.com|g' "$apt_sources_file"
+            fi
+          done
+          sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 update
+          sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 install -y ffmpeg
+          python -m pip install Pillow==11.3.0
+      - name: Compare all 17 methods with Batch and previous video adapters
+        env:
+          PYTHONPATH: .
+        run: python scripts/verify_anaglyph_bt709.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Anaglyph-BT709-Verification
+          path: anaglyph-bt709-verification.json
+          if-no-files-found: warn
+          retention-days: 30
