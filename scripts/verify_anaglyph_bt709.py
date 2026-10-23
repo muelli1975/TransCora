@@ -33,6 +33,12 @@ def decode(path):
         "scale=in_color_matrix=bt709:in_range=limited:out_range=full",
         "-pix_fmt","rgb24","-f","rawvideo","pipe:1"))
 
+def yuv_samples(path):
+    raw=ff("-i",path,"-frames:v","1","-pix_fmt","yuv444p","-f","rawvideo","pipe:1")
+    plane=256*144
+    return [tuple(raw[c*plane+y*256+32*i+16] for c in range(3))
+            for y in (36,108) for i in range(8)]
+
 def encode(source,graph,path,lossless=False):
     ff("-i",source,"-filter_complex",graph,"-map","[v]","-frames:v","1",
        "-c:v","libx264","-preset","slow",*(["-qp","0"] if lossless else ["-crf","18"]),"-pix_fmt","yuv444p",
@@ -98,6 +104,8 @@ with tempfile.TemporaryDirectory() as temp:
         report.append(dict(method=key,mode=method["pipeline_type"],
                            working_rgb_max_error=difference(actual_raw,reference_raw),
                            lossless_mp4_max_error=difference(published_lossless_decoded,reference_lossless_decoded),
+                           lossless_yuv_max_error=difference(yuv_samples(new_lossless),yuv_samples(ref_lossless)),
+                           lossless_gray_max_error=difference(published_lossless_decoded[:8],reference_lossless_decoded[:8]),
                            reference_codec_max_error=difference(reference_decoded,reference_lossless_decoded),
                            published_codec_max_error=difference(decode(new_file),published_lossless_decoded),
                            published_mp4_max_error=difference(decode(new_file),reference_decoded),
@@ -106,7 +114,11 @@ Path("anaglyph-bt709-verification.json").write_text(json.dumps(report,indent=2),
 print(json.dumps(report,indent=2),flush=True)
 assert len(report)==17
 assert all(x["working_rgb_max_error"]<=3 for x in report), "Working RGB differs from Batch"
-assert all(x["lossless_mp4_max_error"]<=3 for x in report), "Lossless MP4 differs from Batch policy"
+# QP0 removes codec loss; RGB/YUV quantization and two independent matrix
+# converters remain. Inspect the stored YUV codes directly, before decoding.
+assert all(x["lossless_yuv_max_error"]<=2 for x in report), "Stored YUV differs from Batch policy"
+assert all(x["lossless_gray_max_error"]<=3 for x in report), "Neutral tones differ from Batch policy"
+assert all(x["lossless_mp4_max_error"]<=5 for x in report), "RGB reconstruction exceeds matrix rounding envelope"
 # A separate CRF18 encode may amplify a one-code-value RGB rounding difference.
 # Keep the same five-code-value colour-patch envelope as the SDR regression tests.
 assert all(x["published_mp4_max_error"]<=5 for x in report), "CRF18 MP4 exceeds colour-patch envelope"
