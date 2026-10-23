@@ -1,0 +1,23 @@
+{
+  "repository": "muelli1975/TransCora",
+  "release_id": 411672025,
+  "tag": "v1.1",
+  "branch": "main",
+  "previous_tag": "c8f7a00b8ea0494912454e668740c2071a5c2766",
+  "assets": {
+    "TransCora_1.1_Linux_x64.tar.gz": "sha256:b96ac8f8906313c1b2399a691c964afc8b21d8fe2d53ec3f9600dcd2c800feee",
+    "TransCora_1.1_Linux_x64.tar.gz.sha256": "sha256:21c91ede921c8a9831abb7535ef3645491698b2815308d110b498b677d688f9a",
+    "TransCora_1.1_macOS_AppleSilicon.tar.gz": "sha256:61441bb73c8d3d299a039d34993a5ff79fe31f6d3701b20a29418c60e6ef5839",
+    "TransCora_1.1_macOS_AppleSilicon.tar.gz.sha256": "sha256:eccbb1513ceee1ab97a28ad192b2d81be8229a24f280acf05519dbe624ca16b9",
+    "TransCora_1.1_Windows_x64.zip": "sha256:b1e415fbbf233dd4a40a8cea479bd9882dc6ed483f5ab33fa61d0815d6f35aaa",
+    "TransCora_1.1_Windows_x64.zip.sha256": "sha256:a7d002ca6cc963b89be1bd47eba69436acf031ba4558314c4fb2c2a65f43ce7e"
+  },
+  "replace": [
+    "TransCora_1.1_Linux_x64.tar.gz",
+    "TransCora_1.1_Linux_x64.tar.gz.sha256",
+    "TransCora_1.1_macOS_AppleSilicon.tar.gz",
+    "TransCora_1.1_macOS_AppleSilicon.tar.gz.sha256",
+    "TransCora_1.1_Windows_x64.zip",
+    "TransCora_1.1_Windows_x64.zip.sha256"
+  ]
+}

@@ -19,6 +19,7 @@ from .naming import filename_layout, reserve_output
 from .toolchain import Toolchain, process_options
 from .mp4 import packed_stereo_boxes
 from .video import requested_rate, rate_filters, rate_ticks
+from .sdr_color import rgb_input, SDR_TAGS
 
 
 class Cancelled(Exception):
@@ -317,10 +318,8 @@ def build_graph(video: dict, options: Options, layout: str, swap: bool, colors: 
     eye_w, eye_h = (width // 2, height) if horizontal else (width, height // 2)
     display_w = eye_w * (2 if layout == "half_sbs" else 1)
     display_h = eye_h * (2 if layout == "half_ou" else 1)
-    # A single adapter brings video into the Batch method's sRGB working space.
-    rgb = (f"zscale=matrixin={colors['matrix']}:primariesin={colors['primaries']}:"
-           f"transferin={colors['transfer']}:rangein={'full' if colors['range'] == 'pc' else 'limited'}:"
-           "matrix=gbr:primaries=bt709:transfer=iec61966-2-1:range=full,format=gbrp16")
+    # Keep conventional SDR display values; method-specific linearization stays below.
+    rgb = rgb_input(colors)
     # Crop before chroma reconstruction when the eye boundaries match the
     # source subsampling grid, so neighbouring eyes do not share interpolation.
     separate_colour = eye_w % 2 == 0 and eye_h % 2 == 0
@@ -406,8 +405,8 @@ def build_graph(video: dict, options: Options, layout: str, swap: bool, colors: 
     output_sar = ('2' if options.target == 'half_sbs' else '1/2') if (
         options.container == 'mkv' and options.target in {'half_sbs', 'half_ou'}) else '1'
     graph.append("[composite]zscale=matrixin=gbr:primariesin=bt709:transferin=iec61966-2-1:rangein=full:"
-                 "matrix=bt709:primaries=bt709:transfer=bt709:range=limited:dither=error_diffusion,"
-                 f"format={pixel_format},setsar={output_sar}[v]")
+                 "matrix=bt709:primaries=bt709:transfer=iec61966-2-1:range=limited:dither=error_diffusion,"
+                 f"format={pixel_format},{SDR_TAGS},setsar={output_sar}[v]")
     rate = requested_rate(options)
     if rate:
         graph[-1] = graph[-1].removesuffix('[v]')+'[beforefps]'

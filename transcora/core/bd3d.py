@@ -101,10 +101,12 @@ def prepare(video: dict, layout: str, swap: bool = False, mode: str = "1080p") -
     native = (colors == {'matrix': 'bt709', 'primaries': 'bt709',
                         'transfer': 'bt709', 'range': 'tv'}
               and video.get('pix_fmt') == 'yuv420p')
+    from .sdr_color import display_transfer, SDR_TAGS
     transform = '' if native else (
         f"zscale=matrixin={colors['matrix']}:primariesin={colors['primaries']}:"
-        f"transferin={colors['transfer']}:rangein={'full' if colors['range']=='pc' else 'limited'}:"
-        'matrix=bt709:primaries=bt709:transfer=bt709:range=limited:dither=error_diffusion,format=yuv420p,')
+        f"transferin={display_transfer(colors['transfer'])}:rangein={'full' if colors['range']=='pc' else 'limited'}:"
+        'matrix=bt709:primaries=bt709:transfer=iec61966-2-1:range=limited:dither=error_diffusion,format=yuv420p,'
+        + SDR_TAGS + ',')
     graph = [f"[0:{video['index']}]sidedata=mode=delete:type=STEREO3D,"
              'sidedata=mode=delete:type=SPHERICAL,' + ('' if fields else conversion) + 'split[a][b]']
     for label, (x, y), eye in zip(('a', 'b'), positions, ('left', 'right')):

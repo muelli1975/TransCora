@@ -287,3 +287,22 @@ jobs:
           fi
           gh release upload "$tag" release-files/* --clobber
           gh release edit "$tag" --draft=false --latest
+
+  publish-color-update:
+    needs: [windows-portable, unix-packages]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && github.event.head_commit.message == 'Fix SDR color handling and refresh TransCora 1.1 packages'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: TransCora-Release-*
+          path: release-files
+          merge-multiple: true
+      - name: Refresh the authorized existing packages after all tests
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/publish_color_update.py --root release-files --config .github/color-update.json

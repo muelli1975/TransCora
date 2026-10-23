@@ -375,9 +375,8 @@ def graph_prefix(info, graph, options=None):
         prefix = []
         for side,video in zip(('left','right'),desc['videos']):
             colors,_=color_spec(video)
-            rgb=(f"zscale=matrixin={colors['matrix']}:primariesin={colors['primaries']}:"
-                 f"transferin={colors['transfer']}:rangein={'full' if colors['range']=='pc' else 'limited'}:"
-                 "matrix=gbr:primaries=bt709:transfer=iec61966-2-1:range=full,format=gbrp16,")
+            from .sdr_color import rgb_input
+            rgb = rgb_input(colors) + ","
             # Convert clocks while frame durations still belong to each decoded track.
             # Older hstack versions discard EOF duration needed by a following fps filter.
             timing = dict(video, _start_offset=info['video'].get('_start_offset', 0))
