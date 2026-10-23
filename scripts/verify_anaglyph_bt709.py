@@ -33,9 +33,9 @@ def decode(path):
         "scale=in_color_matrix=bt709:in_range=limited:out_range=full",
         "-pix_fmt","rgb24","-f","rawvideo","pipe:1"))
 
-def encode(source,graph,path):
+def encode(source,graph,path,lossless=False):
     ff("-i",source,"-filter_complex",graph,"-map","[v]","-frames:v","1",
-       "-c:v","libx264","-preset","slow","-crf","18","-pix_fmt","yuv444p",
+       "-c:v","libx264","-preset","slow",*(["-qp","0"] if lossless else ["-crf","18"]),"-pix_fmt","yuv444p",
        "-colorspace","bt709","-color_primaries","bt709","-color_trc","bt709","-color_range","tv",path)
     v=probe(path)
     assert [v.get(k) for k in ("color_space","color_primaries","color_transfer","color_range")]==["bt709","bt709","bt709","tv"]
@@ -89,13 +89,25 @@ with tempfile.TemporaryDirectory() as temp:
         assert old_graph!=graph
         encode(source,old_graph,old_file)
         reference_decoded=decode(ref_file)
+        ref_lossless=root/(key+"-batch-lossless.mp4")
+        new_lossless=root/(key+"-published-lossless.mp4")
+        encode(source,reference_out,ref_lossless,lossless=True)
+        encode(source,graph,new_lossless,lossless=True)
+        reference_lossless_decoded=decode(ref_lossless)
+        published_lossless_decoded=decode(new_lossless)
         report.append(dict(method=key,mode=method["pipeline_type"],
                            working_rgb_max_error=difference(actual_raw,reference_raw),
+                           lossless_mp4_max_error=difference(published_lossless_decoded,reference_lossless_decoded),
+                           reference_codec_max_error=difference(reference_decoded,reference_lossless_decoded),
+                           published_codec_max_error=difference(decode(new_file),published_lossless_decoded),
                            published_mp4_max_error=difference(decode(new_file),reference_decoded),
                            previous_mp4_max_error=difference(decode(old_file),reference_decoded)))
 Path("anaglyph-bt709-verification.json").write_text(json.dumps(report,indent=2),encoding="utf-8")
 print(json.dumps(report,indent=2),flush=True)
 assert len(report)==17
 assert all(x["working_rgb_max_error"]<=3 for x in report), "Working RGB differs from Batch"
-assert all(x["published_mp4_max_error"]<=3 for x in report), "Decoded MP4 differs from Batch policy"
+assert all(x["lossless_mp4_max_error"]<=3 for x in report), "Lossless MP4 differs from Batch policy"
+# A separate CRF18 encode may amplify a one-code-value RGB rounding difference.
+# Keep the same five-code-value colour-patch envelope as the SDR regression tests.
+assert all(x["published_mp4_max_error"]<=5 for x in report), "CRF18 MP4 exceeds colour-patch envelope"
 print("PASS: all 17 methods, actual limited BT.709 video input, RGB and encoded/decoded MP4.")
