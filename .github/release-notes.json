@@ -1,0 +1,11 @@
+{
+  "repository": "muelli1975/TransCora",
+  "releases": [
+    {
+      "id": 411672025,
+      "tag": "v1.1",
+      "body": "# TransCora 1.1\n\n- Add proportional fitting, black bars and centred cropping for 1080p/2160p output.\n- Add separate left/right video tracks in MP4 and MKV, with stereo control previews.\n- Expand input support to row-interleaved and frame-sequential video, SDR HEIC/HEIF images, Spatial Photos and stereo MV-HEVC.\n- Add batch completion controls, including pause after the current file and optional application close or computer shutdown.\n\n## Installation\n\nExtract the complete package for your system into a writable folder and start TransCora. Keep the supplied tools and application files together.\n\nWindows includes the required video tools and supports Blu-ray 3D output. Linux and macOS require an external FFmpeg installation; see the [platform requirements](https://github.com/muelli1975/TransCora#portable-builds-and-source).\n\n## Downloads and SHA-256\n\n| File | SHA-256 |\n| --- | --- |\n| [TransCora_1.1_Windows_x64.zip](https://github.com/muelli1975/TransCora/releases/download/v1.1/TransCora_1.1_Windows_x64.zip) | `4932a71d5243c0eebdf38fd5a6b33abbf561c6808c407531459f64f0a2b44ee4` |\n| [TransCora_1.1_Linux_x64.tar.gz](https://github.com/muelli1975/TransCora/releases/download/v1.1/TransCora_1.1_Linux_x64.tar.gz) | `d1fc6dd9a285326466693ef74a715cf84026dd90c2310c5f24f652c6d27e9b80` |\n| [TransCora_1.1_macOS_AppleSilicon.tar.gz](https://github.com/muelli1975/TransCora/releases/download/v1.1/TransCora_1.1_macOS_AppleSilicon.tar.gz) | `a9486a50bd73cdca50448ed8e1638abab2e87945f05abbbe74854bef97c13f32` |\n",
+      "expected_body_sha256": "2a7c8250c8f5e3bdb74a4680b88317202385df935d83e692777c3ffd104ca36b"
+    }
+  ]
+}
