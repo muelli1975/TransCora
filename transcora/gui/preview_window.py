@@ -4,7 +4,6 @@ import math
 import tkinter as tk
 from tkinter import ttk
 
-from transcora.gui.native import schedule_dark_titlebar
 from transcora.gui.slider import Timeline
 from transcora.gui.image_view import ImageView
 
@@ -20,7 +19,6 @@ class PreviewWindow:
         self.dialog.configure(background="#181818")
         self.dialog.geometry("820x600")
         self.dialog.minsize(500, 400)
-        schedule_dark_titlebar(self.dialog)
         frame = ttk.Frame(self.dialog, padding=12)
         frame.pack(fill="both", expand=True)
         frame.columnconfigure(0, weight=1)

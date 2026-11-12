@@ -26,7 +26,7 @@ from transcora.core.model import Job, LAYOUTS, PROFILES, TARGETS, Options, VIDEO
 from transcora.core.naming import effective_suffix, suffix_choices, reserve_output, filename_layout, fps_suffix, default_disc_title, suffix_label, suffix_value, suffix_player
 from transcora.core.storage import load_list, save_list, write_json, new_run_log, delete_run_logs, load_presets, save_presets, validate_preset_name
 from transcora.core.toolchain import Toolchain
-from transcora.gui.native import schedule_dark_titlebar
+from transcora.gui.native import install_tk_titlebars
 from transcora.gui.preview_window import PreviewWindow
 from transcora.gui.theme import checkbox, set_control_state, apply_theme, GOLD_LIGHT, MUTED, TEXT, PANEL_BG, APP_BG, SECONDARY_BG
 
@@ -83,7 +83,7 @@ class Window:
         self.root.geometry(f'860x{height}')
         root.after_idle(self.settings_area.layout)
         root.after_idle(self.images.settings_area.layout)
-        schedule_dark_titlebar(root)
+        install_tk_titlebars(root)
         root.protocol("WM_DELETE_WINDOW", self.close)
         root.after(100, self.poll)
 
@@ -492,7 +492,6 @@ class Window:
         self.audio_dialog.resizable(False, False)
         self.audio_dialog.protocol('WM_DELETE_WINDOW', self.close_audio_options)
         self.audio_dialog.bind('<Escape>', lambda e: self.close_audio_options())
-        schedule_dark_titlebar(self.audio_dialog)
         audio_fields = ttk.Frame(self.audio_dialog, padding=12)
         audio_fields.pack(fill='both', expand=True)
         for col in (0, 1, 2):
@@ -608,7 +607,6 @@ class Window:
         dialog = tk.Toplevel(self.root, background=APP_BG)
         dialog.title(title)
         dialog.transient(self.root)
-        schedule_dark_titlebar(dialog)
         frame = ttk.Frame(dialog, padding=12)
         frame.pack(fill='both', expand=True)
         ttk.Label(frame, text='Name der Voreinstellung').pack(anchor='w')
@@ -1511,7 +1509,6 @@ class Window:
         dialog = tk.Toplevel(self.root)
         dialog.title("TransCora · Log")
         dialog.configure(background=APP_BG)
-        schedule_dark_titlebar(dialog)
         holder = ttk.Frame(dialog, padding=8)
         holder.pack(fill='both', expand=True)
         holder.columnconfigure(0, weight=1)

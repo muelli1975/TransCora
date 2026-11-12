@@ -19,7 +19,6 @@ from transcora.core.toolchain import Toolchain
 from transcora.core.journal import Journal, Completion, request, restore, processing_text
 from transcora.core.batch_pause import BatchPause
 from .theme import checkbox, set_control_state, GOLD_LIGHT, MUTED, SECONDARY_BG, TEXT, APP_BG
-from .native import schedule_dark_titlebar
 from .localization import TextVar
 from .settings_area import SettingsArea, section, CurrentFile
 from .file_list import FileListSorter, remove_entries, completed_button
@@ -492,7 +491,7 @@ class ImagePanel:
     def show_details(self):
         selected = self.selected()
         if not selected: return
-        dialog = tk.Toplevel(self.root); dialog.title('Bilddetails'); dialog.geometry('720x420'); schedule_dark_titlebar(dialog)
+        dialog = tk.Toplevel(self.root); dialog.title('Bilddetails'); dialog.geometry('720x420')
         text = tk.Text(dialog, wrap='word', background=SECONDARY_BG, foreground=TEXT, insertbackground=TEXT)
         scroll = ttk.Scrollbar(dialog, command=text.yview); scroll.pack(side='right', fill='y')
         text.pack(fill='both', expand=True); text.configure(yscrollcommand=scroll.set)
@@ -665,7 +664,7 @@ class ImagePanel:
                     dialog = tk.Toplevel(self.root, background=SECONDARY_BG)
                     self.preview_dialog = dialog
                     dialog.title('Bildkontrolle · L/R-Reihenfolge und Details prüfen')
-                    dialog.geometry('820x600'); dialog.minsize(500, 360); schedule_dark_titlebar(dialog)
+                    dialog.geometry('820x600'); dialog.minsize(500, 360)
                     viewer = ImageView(dialog, self.owner.localizer)
                     viewer.pack(fill='both', expand=True, padx=10, pady=10)
                     viewer.set_images(data)
