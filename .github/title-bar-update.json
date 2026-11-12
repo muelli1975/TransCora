@@ -1,0 +1,22 @@
+{
+  "repository": "muelli1975/TransCora",
+  "tag": "v1.1",
+  "branch": "main",
+  "previous_tag": "6b19180c7fc47f6128d934304a2ff95417117245",
+  "release_id": 411672025,
+  "assets": {
+    "TransCora_1.1_Linux_x64.tar.gz": "sha256:d1fc6dd9a285326466693ef74a715cf84026dd90c2310c5f24f652c6d27e9b80",
+    "TransCora_1.1_Linux_x64.tar.gz.sha256": "sha256:1f48ba365250000d2a0cadeaeae7d84c553e748962ddaa2a92af1a9edf26fd88",
+    "TransCora_1.1_macOS_AppleSilicon.tar.gz": "sha256:a9486a50bd73cdca50448ed8e1638abab2e87945f05abbbe74854bef97c13f32",
+    "TransCora_1.1_macOS_AppleSilicon.tar.gz.sha256": "sha256:8cce5781843a81b2916969c7dd42e723b3f011d1566ca3cd4fb7f9183f269b77",
+    "TransCora_1.1_Windows_x64.zip": "sha256:4932a71d5243c0eebdf38fd5a6b33abbf561c6808c407531459f64f0a2b44ee4",
+    "TransCora_1.1_Windows_x64.zip.sha256": "sha256:8774e3da0767d0b3bc3b17e5caf1920a0ba3156db368c0668cd9448ed56e8128"
+  },
+  "replace": [
+    "TransCora_1.1_macOS_AppleSilicon.tar.gz",
+    "TransCora_1.1_macOS_AppleSilicon.tar.gz.sha256",
+    "TransCora_1.1_Windows_x64.zip",
+    "TransCora_1.1_Windows_x64.zip.sha256"
+  ],
+  "release_note": "### Title bar maintenance update\n\n- Use a fixed dark title bar on Windows 11 and the native Dark Aqua appearance on macOS."
+}
