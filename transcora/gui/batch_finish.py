@@ -9,7 +9,6 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 
 from .localization import TextVar
-from .native import schedule_dark_titlebar
 from .theme import APP_BG
 
 
@@ -87,7 +86,6 @@ class BatchFinish:
         dialog.title(self.owner.t('Computer herunterfahren'))
         dialog.transient(self.owner.root)
         dialog.resizable(False, False)
-        schedule_dark_titlebar(dialog)
         body = ttk.Frame(dialog, padding=16)
         body.pack(fill='both', expand=True)
         self.note = ttk.Label(body, wraplength=380)
