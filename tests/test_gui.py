@@ -874,21 +874,33 @@ class GuiTests(unittest.TestCase):
         self.window.add_paths([Path('slideshow_full_sbs.mp4')])
         self.window.tree.selection_set(self.window.jobs[0].id)
         self.window.selection_changed()
-        # The CI desktop can be shorter than a normal desktop. Test the client
-        # area independently, then check the bounded small-window view too.
-        # Tk's default maximum follows the physical desktop on Windows.
+        # Aqua enforces the work area of the CI desktop. On short displays
+        # exercise the scrollable viewport; keep the full-size check elsewhere.
+        screen_height = self.root.winfo_screenheight()
+        short_aqua_desktop = (self.root.tk.call('tk', 'windowingsystem') == 'aqua'
+                              and screen_height < 940)
+        height = min(860, max(680, screen_height - 80)) if short_aqua_desktop else 860
+        normal_geometry = f'860x{height}'
         self.root.maxsize(2000,2000)
-        self.root.geometry('860x860'); self.root.update()
-        self.assertEqual(self.root.winfo_height(),860)
+        self.root.geometry(normal_geometry); self.root.update()
+        if short_aqua_desktop:
+            self.assertLessEqual(self.root.winfo_height(), height)
+            self.assertGreaterEqual(self.root.winfo_height(), 680)
+        else:
+            self.assertEqual(self.root.winfo_height(),860)
         for language in ('de','en'):
             self.window.language=language; self.window.apply_language()
             for target in ('anaglyph','row_interleaved','bd3d'):
                 self.window.variables['target'].set(self.window.t(TARGETS[target]))
                 self.window.option_changed('target'); self.root.update()
                 area=self.window.settings_area
-                self.assertLessEqual(area.body.winfo_reqheight(),area.canvas.winfo_height())
-                self.assertFalse(area.scroll.winfo_ismapped())
+                content_overflows = area.body.winfo_reqheight() > area.canvas.winfo_height()
+                if not short_aqua_desktop:
+                    self.assertFalse(content_overflows)
+                self.assertEqual(bool(area.scroll.winfo_ismapped()), content_overflows)
                 self.assertGreaterEqual(self.window.tree.winfo_height(),140)
+                self.assertLessEqual(self.window.start_button.winfo_rooty()+self.window.start_button.winfo_height(),
+                                     self.root.winfo_rooty()+self.root.winfo_height())
             self.assertFalse(self.window.combos['bd_bitrate_mbps'].winfo_ismapped())
             self.assertFalse(self.window.advanced_audio_button.winfo_ismapped())
             self.window.toggle_advanced(); self.root.update()
@@ -900,7 +912,7 @@ class GuiTests(unittest.TestCase):
             for widget in (self.window.combos['bd_bitrate_mbps'],self.window.advanced_audio_button):
                 self.assertLessEqual(widget.winfo_rootx()+widget.winfo_width(),
                                      area.canvas.winfo_rootx()+area.canvas.winfo_width())
-            self.window.close_advanced(); self.root.geometry('860x860'); self.root.update()
+            self.window.close_advanced(); self.root.geometry(normal_geometry); self.root.update()
 
     def test_language_and_wheel_preserve_bd_bitrate_and_per_file_settings(self):
         from transcora.core.model import BD_BITRATES, TARGETS

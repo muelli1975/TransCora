@@ -58,6 +58,7 @@ jobs:
         run: python scripts/build_mvc_decoder.py
 
   windows-portable:
+    if: github.event_name != 'push' || github.event.head_commit.message != 'Publish checked TransCora title bars'
     needs: linux-tests
     runs-on: windows-latest
     timeout-minutes: 40
@@ -339,4 +340,39 @@ jobs:
       - name: Update the existing release with the checked Windows and macOS packages
         env:
           GH_TOKEN: ${{ github.token }}
+        run: python scripts/publish_title_bar_update.py --root release-files --config .github/title-bar-update.json
+
+  publish-checked-title-bars:
+    needs: unix-packages
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.event.head_commit.message == 'Publish checked TransCora title bars'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      actions: read
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      WINDOWS_RUN: '43215771616'
+      WINDOWS_SOURCE: 'd54caedd2b8bc238c860fd720907db2878f82f4c'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify the Windows build and unchanged application sources
+        run: |
+          test "$(gh api repos/$GITHUB_REPOSITORY/actions/runs/$WINDOWS_RUN --jq .head_sha)" = "$WINDOWS_SOURCE"
+          test "$(gh api repos/$GITHUB_REPOSITORY/actions/runs/$WINDOWS_RUN/jobs --jq '.jobs[] | select(.name == "windows-portable") | .conclusion')" = success
+          git diff --exit-code "$WINDOWS_SOURCE" "$GITHUB_SHA" -- . ':!.github/workflows/build.yml' ':!tests/test_gui.py'
+      - uses: actions/download-artifact@v4
+        with:
+          name: TransCora-Release-Windows
+          run-id: ${{ env.WINDOWS_RUN }}
+          github-token: ${{ github.token }}
+          path: release-files
+      - uses: actions/download-artifact@v4
+        with:
+          name: TransCora-Release-macOS_AppleSilicon
+          path: release-files
+      - name: Publish the checked Windows and macOS downloads
         run: python scripts/publish_title_bar_update.py --root release-files --config .github/title-bar-update.json
