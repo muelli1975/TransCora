@@ -23,10 +23,10 @@ MV-HEVC bleibt eine Eingabe zum Dekodieren; Version 1.1 enthält keinen zusätzl
 
 ## Schnellstart
 
-1. Öffne **Videos** oder **Bilder** und füge Dateien oder einen Ordner hinzu. Aktiviere bei Bedarf **Unterordner mitverarbeiten**.
-2. Markiere die gewünschten Dateien. Änderungen gelten für die markierten Einträge; ohne Auswahl bilden sie die Vorgabe für neue Dateien.
-3. Wähle Quelllayout und Ziel. Mit **L/R tauschen** korrigierst du eine vertauschte Halbbildreihenfolge.
-4. Wähle Größe und Ausgabeordner. **Kontrollbild** zeigt das Ergebnis vor der Kodierung, wahlweise ans Fenster angepasst oder in einer verschiebbaren 1:1-Pixelansicht.
+1. **Videos** oder **Bilder** öffnen und Dateien oder einen Ordner hinzufügen. Bei Bedarf **Unterordner mitverarbeiten** aktivieren.
+2. Die gewünschten Dateien markieren. Änderungen gelten für die markierten Einträge; ohne Auswahl bilden sie die Vorgabe für neue Dateien.
+3. Quelllayout und Ziel wählen. **L/R tauschen** korrigiert eine vertauschte Halbbildreihenfolge.
+4. Größe und Ausgabeordner wählen. **Kontrollbild** zeigt das Ergebnis vor der Kodierung, wahlweise ans Fenster angepasst oder in einer verschiebbaren 1:1-Pixelansicht.
 5. **Testen** prüft den Stapel; **Start** verarbeitet ihn. Fortschritt, Dauer und Quellbildrate erscheinen im Fenster.
 
 Standardmäßig landen Ergebnisse im Ordner `output` neben dem Programm. Bei Ordnerstapeln bleiben relative Unterordner erhalten. Vorhandene Dateien erhalten einen nummerierten Alternativnamen. Ein fehlerhafter Eintrag hält die übrigen gültigen Dateien nicht auf. **Abbrechen** beendet die aktuelle Verarbeitung; bereits fertige Dateien bleiben erhalten.
@@ -35,19 +35,19 @@ Bei Videos zeigt der Status die geschätzte Restzeit für **Datei** und **Stapel
 
 Fotos und Videos verwenden dieselben Bereiche **Quelle**, **Ausgabe**, **Format** und **Speichern**. Unter **Ausgabegröße** stehen die Maße direkt beim Größenmenü. Videomaße beziehen sich auf das gesamte Ausgabebild; BD-3D und Dual zeigen die Maße je Halbbild. Bilder lassen sich proportional nach langer oder kurzer Seite skalieren.
 
-**Erweitert** klappt zusätzliche Einstellungen im Fenster auf. **Standardeinstellungen** stellt die Vorgaben für neue Dateien wieder her; bestehende Einträge behalten ihre Einstellungen. Bei kleinen Fenstern scrollen die Einstellungen, während Dateiliste, Informationsfeld und Verarbeitungsschaltflächen Platz behalten. Wähle den Ausgabeordner mit **Auswählen**.
+**Erweitert** klappt zusätzliche Einstellungen im Fenster auf. **Standardeinstellungen** stellt die Vorgaben für neue Dateien wieder her; bestehende Einträge behalten ihre Einstellungen. Bei kleinen Fenstern scrollen die Einstellungen, während Dateiliste, Informationsfeld und Verarbeitungsschaltflächen Platz behalten. Den Ausgabeordner mit **Auswählen** festlegen.
 
 Die aktuelle Datei bleibt beim Fortschritt sichtbar, auch wenn der Verarbeitungsschritt wechselt. Lange Dateinamen werden passend zur Fensterbreite in der Mitte gekürzt.
 
-Klicke auf einen Spaltenkopf, um die Dateiliste auf- oder absteigend zu sortieren. Bildrate und Dauer werden numerisch sortiert; die sichtbare Reihenfolge gilt auch für den nächsten Verarbeitungslauf. Eingabe- und Ausgabeordner dürfen identisch sein. Beim rekursiven Import wird ein darunterliegender Ausgabe-Unterordner ausgelassen.
+Ein Klick auf einen Spaltenkopf sortiert die Dateiliste auf- oder absteigend. Bildrate und Dauer werden numerisch sortiert; die sichtbare Reihenfolge gilt auch für den nächsten Verarbeitungslauf. Eingabe- und Ausgabeordner dürfen identisch sein. Beim rekursiven Import wird ein darunterliegender Ausgabe-Unterordner ausgelassen.
 
 Fertige Aufträge zeigen **Bearbeitungszeit** hinter **Status**. **Fertige entfernen** neben **Standardeinstellungen** leert erfolgreiche Einträge aus der Liste. Entf markiert anschließend den nächsten sichtbaren Eintrag, am Listenende den vorherigen.
 
 Erfolgreiche Ausgaben stehen in **TransCora-Journal.json** im Ausgabeordner. Unveränderte Quellen, Einstellungen und Ergebnisdateien werden beim erneuten Hinzufügen wiedererkannt. Entfernen aus der Liste erhält das Journal; Löschen der Journaldatei setzt den gespeicherten Verlauf zurück. Alte Ausgaben ohne Nachweis werden nicht übernommen.
 
-Während eines Stapels wird **Start** zu **Nach Datei pausieren**. Erneutes Klicken hebt den Wunsch auf. Die aktuelle Datei wird fertiggestellt, danach wartet der Stapel; **Fortsetzen** setzt ihn fort. **Abbrechen** bleibt erreichbar. Bei Mono-Ausgabe wählst du das linke oder rechte Halbbild.
+Während eines Stapels wird **Start** zu **Nach Datei pausieren**. Erneutes Klicken hebt den Wunsch auf. Die aktuelle Datei wird fertiggestellt, danach wartet der Stapel; **Fortsetzen** setzt ihn fort. **Abbrechen** bleibt erreichbar. Bei Mono-Ausgabe das linke oder rechte Halbbild wählen.
 
-**Nach dem Stapel** steht direkt über den Stapelbuttons bei Videos und Bildern. Wähle **Nichts tun**, **TransCora beenden** oder **Computer herunterfahren**. Die Auswahl bleibt während des Laufs änderbar und wird nicht gespeichert. Eine Aktion erfolgt erst nach einem vollständig erfolgreichen Verarbeitungslauf mit gespeicherten Ergebnissen und Abschlussjournal; bei Fehlern, blockierten Dateien oder Abbruch bleibt TransCora geöffnet. Vor dem Herunterfahren erscheint ein abbrechbarer 30-Sekunden-Countdown. Das Betriebssystem kann das Herunterfahren wegen fehlender Berechtigungen oder anderer Anwendungen ablehnen.
+**Nach dem Stapel** steht direkt über den Stapelbuttons bei Videos und Bildern. **Nichts tun**, **TransCora beenden** oder **Computer herunterfahren** wählen. Die Auswahl bleibt während des Laufs änderbar und wird nicht gespeichert. Eine Aktion erfolgt erst nach einem vollständig erfolgreichen Verarbeitungslauf mit gespeicherten Ergebnissen und Abschlussjournal; bei Fehlern, blockierten Dateien oder Abbruch bleibt TransCora geöffnet. Vor dem Herunterfahren erscheint ein abbrechbarer 30-Sekunden-Countdown. Das Betriebssystem kann das Herunterfahren wegen fehlender Berechtigungen oder anderer Anwendungen ablehnen.
 
 ## Videoausgaben
 
@@ -63,18 +63,18 @@ Während eines Stapels wird **Start** zu **Nach Datei pausieren**. Erneutes Klic
 | Zeilenverschachtelt | Direkte Ausgabe für einen passenden Polfilter-Monitor |
 | BD-3D | Blu-ray-3D-ISO oder AVC/MVC-M2TS: 1080p mit 23,976 fps oder 720p mit 50/59,94 fps je Halbbild |
 
-**MP4 ist voreingestellt; MKV bleibt wählbar**, auch für Kreuzblick. MKV erhält die passende Stereo-Kennzeichnung. Kreuzblick-MP4 behält die R/L-Anordnung ohne irreführenden L/R-Marker. Die Player-Unterstützung unterscheidet sich; prüfe die erste Ausgabe auf dem vorgesehenen Gerät.
+**MP4 ist voreingestellt; MKV bleibt wählbar**, auch für Kreuzblick. MKV erhält die passende Stereo-Kennzeichnung. Kreuzblick-MP4 behält die R/L-Anordnung ohne irreführenden L/R-Marker. Die Player-Unterstützung unterscheidet sich. Die erste Ausgabe auf dem vorgesehenen Gerät prüfen.
 
 
-Dual-Eingaben enthalten zwei gleich große Videospuren. `-dual` kennzeichnet sie für die automatische Erkennung; sonst wähle das Quelllayout **Dual** ausdrücklich. Eindeutige Spurtitel Left/Right bestimmen die Zuordnung, sonst gilt erste Spur links, zweite rechts. Zeitlich abweichende Halbbilder führen zu einer Meldung statt einer unvollständigen Stereoausgabe. MP4 ist voreingestellt, MKV bleibt wählbar.
+Dual-Eingaben enthalten zwei gleich große Videospuren. `-dual` kennzeichnet sie für die automatische Erkennung; andernfalls das Quelllayout **Dual** ausdrücklich auswählen. Eindeutige Spurtitel Left/Right bestimmen die Zuordnung, sonst gilt erste Spur links, zweite rechts. Zeitlich abweichende Halbbilder führen zu einer Meldung statt einer unvollständigen Stereoausgabe. MP4 ist voreingestellt, MKV bleibt wählbar.
 
-Für BD-3D und Dual zeigt das Kontrollbild beide Halbbilder als Parallelblick, Kreuzblick oder Rot/Cyan-Anaglyph. Prüfe die räumliche Tiefe; ist sie umgekehrt, ändere **L/R tauschen**. Die Kontrollansicht verändert keine Ausgabeoptionen.
+Für BD-3D und Dual zeigt das Kontrollbild beide Halbbilder als Parallelblick, Kreuzblick oder Rot/Cyan-Anaglyph. Die räumliche Tiefe prüfen. Bei umgekehrter Tiefe die Einstellung **L/R tauschen** ändern. Die Kontrollansicht verändert keine Ausgabeoptionen.
 
 Das Menü für Dateinamenszusätze nennt die zugehörigen Player in Klammern: Kodi, Bino bzw. Bino/Stereoscopic Player. Die Klammern erscheinen nur im Menü. Kodi und Bino verwenden eigene Kennungen; zusammengesetzte Vorschläge wie `.3D.HTAB-tbh` entfallen. Bestehende Namen werden weiterhin erkannt.
 
 ### Auflösung und Kreuzblick
 
-Wähle **Original**, **1080p**, **2160p** oder **Benutzerdefiniert**. Automatisch erhält bei vollständigen Layouts die rekonstruierte Quellgröße und verwendet bei Half-Layouts 1080p. Frei eingegebene Breite und Höhe bezeichnen bei gepackten Layouts das **gesamte Ausgabebild**, bei Dual die Maße **je Halbbild**. Das Seitenverhältnis bleibt erhalten; falls nötig entstehen Ränder.
+**Original**, **1080p**, **2160p** oder **Benutzerdefiniert** wählen. Automatisch erhält bei vollständigen Layouts die rekonstruierte Quellgröße und verwendet bei Half-Layouts 1080p. Frei eingegebene Breite und Höhe bezeichnen bei gepackten Layouts das **gesamte Ausgabebild**, bei Dual die Maße **je Halbbild**. Das Seitenverhältnis bleibt erhalten; falls nötig entstehen Ränder.
 
 | Beispiel | Gesamtes Bild | Gespeicherte Pixel je Halbbild |
 | --- | --- | --- |
@@ -87,23 +87,23 @@ Kreuzblick bleibt in jeder Größe Full-SBS: Beide Bilder werden proportional ve
 
 ### Bildrate, Qualität und Ton
 
-Normalerweise bleibt die Bildrate unverändert. Mit **Zielbildrate wählen** kannst du einen Wert eintragen, beispielsweise 23,976, 25, 30, 50, 59,94 oder 60 fps. Auflösung, Stereoformat und Bildrate lassen sich im selben Export ändern. Die Laufzeit bleibt erhalten; vollständige Stereobilder werden ausgelassen oder wiederholt, ohne künstliche Bewegungsinterpolation.
+Normalerweise bleibt die Bildrate unverändert. Mit **Zielbildrate wählen** lässt sich ein Wert eintragen, beispielsweise 23,976, 25, 30, 50, 59,94 oder 60 fps. Auflösung, Stereoformat und Bildrate lassen sich im selben Export ändern. Die Laufzeit bleibt erhalten; vollständige Stereobilder werden ausgelassen oder wiederholt, ohne künstliche Bewegungsinterpolation.
 
 Zeitlich interlaced aufgenommene Videos werden progressiv ausgegeben, mit erhaltener Halbbildzeit: Aus 25 verschachtelten Vollbildern mit 50 Halbbildern werden beispielsweise 50 progressive Bilder pro Sekunde. Eine gewählte Zielbildrate kann diese Bildfolge anschließend anpassen.
 
-Unter **Erweitert** wählst du H.264 oder H.265 (MKV), CRF-Qualität oder eine Zielbitrate. Anaglyphen bieten 4:4:4-Farbqualität und optional 4:2:0 für Player, die dies benötigen. Zeilenverschachtelte Videos verwenden 4:4:4, damit die Zeilen der Halbbilder getrennt bleiben.
+Unter **Erweitert** lassen sich H.264 oder H.265 (MKV) und CRF-Qualität oder eine Zielbitrate einstellen. Anaglyphen bieten 4:4:4-Farbqualität und optional 4:2:0 für Player, die dies benötigen. Zeilenverschachtelte Videos verwenden 4:4:4, damit die Zeilen der Halbbilder getrennt bleiben.
 
-**Tonoptionen** übernehmen alle Spuren, ausgewählte Spuren oder keinen Ton. Du kannst Originalton beibehalten, nach AAC wandeln oder auf Stereo heruntermischen. Bei BD-3D stehen die Tonoptionen und die Bitrate unter **Erweitert**, getrennt nach Video und Audio. BD-3D verwendet LPCM; unter **Ausgabegröße je Halbbild** wählst du 1080p/23,976 oder 720p/50 beziehungsweise 720p/59,94. Die 720p-Modi bieten flüssigere Bewegung bei geeigneten Quellen, mit geringerer räumlicher Auflösung. Bildpaare werden bei Bedarf ausgelassen oder wiederholt, ohne Bewegungsinterpolation; Laufzeit und Ton bleiben erhalten (nur 24 → 23,976 wird um 0,1 % verlangsamt). Die gemeinsame AVC/MVC-Zielbitrate ist zwischen 20 und 40 Mbit/s wählbar, mit 40 Mbit/s als Werkseinstellung.
+**Tonoptionen** übernehmen alle Spuren, ausgewählte Spuren oder keinen Ton. Der Originalton lässt sich beibehalten, nach AAC wandeln oder auf Stereo heruntermischen. Bei BD-3D stehen die Tonoptionen und die Bitrate unter **Erweitert**, getrennt nach Video und Audio. BD-3D verwendet LPCM. Unter **Ausgabegröße je Halbbild** stehen 1080p/23,976, 720p/50 und 720p/59,94 zur Wahl. Die 720p-Modi bieten flüssigere Bewegung bei geeigneten Quellen, mit geringerer räumlicher Auflösung. Bildpaare werden bei Bedarf ausgelassen oder wiederholt, ohne Bewegungsinterpolation; Laufzeit und Ton bleiben erhalten (nur 24 → 23,976 wird um 0,1 % verlangsamt). Die gemeinsame AVC/MVC-Zielbitrate ist zwischen 20 und 40 Mbit/s wählbar, mit 40 Mbit/s als Werkseinstellung.
 
 ## Polfilter-Monitore
 
-Wähle bei Bildern oder Videos **Zeilenverschachtelt**. Trage die native Monitorbreite und -höhe ein, zunächst 1920 × 1080, und bestimme das Halbbild für die erste Bildschirmzeile. Die Zeilen des linken und rechten Halbbilds wechseln sich ab.
+Bei Bildern oder Videos **Zeilenverschachtelt** wählen. Die native Monitorbreite und -höhe eintragen und das Halbbild für die erste Bildschirmzeile festlegen. Voreingestellt sind 1920 × 1080. Die Zeilen des linken und rechten Halbbilds wechseln sich ab.
 
-Zeige das Ergebnis bildschirmfüllend in exakt nativer Auflösung, ohne Skalierung oder weitere Stereo-Umwandlung. Ist die Tiefe vertauscht, ändere das Halbbild für die erste Zeile. Für Bilder empfiehlt sich verlustfreies PNG. Ein vorhandenes Half-OU-/abq-Bild mit 1920 × 1080 enthält bereits 1920 × 540 Pixel je Halbbild und lässt sich für einen Full-HD-Monitor direkt verschachteln.
+Das Ergebnis bildschirmfüllend in exakt nativer Auflösung anzeigen, ohne Skalierung oder weitere Stereo-Umwandlung. Bei vertauschter Tiefe das Halbbild für die erste Zeile wechseln. Für Bilder empfiehlt sich verlustfreies PNG. Ein vorhandenes Half-OU-/abq-Bild mit 1920 × 1080 enthält bereits 1920 × 540 Pixel je Halbbild und lässt sich für einen Full-HD-Monitor direkt verschachteln.
 
 ## Bilder und MPO
 
-Öffne JPEG/JPS, PNG/PNS, TIFF, BMP, WebP und MPO mit zwei Halbbildern. Wandle in SBS, Over/Under, Anaglyphen, einzelne Halbbilder oder Zeilenverschachtelung um. Speichere JPEG, PNG, TIFF oder verlustfreies WebP. Bildgrößen: Original, 1080p, 2160p, 2048 Pixel an der langen Seite sowie frei wählbare lange/kurze Seite.
+Als Eingabe eignen sich JPEG/JPS, PNG/PNS, TIFF, BMP, WebP und MPO mit zwei Halbbildern. Die Umwandlung unterstützt SBS, Over/Under, Anaglyphen, einzelne Halbbilder und Zeilenverschachtelung. Als Ausgabeformate stehen JPEG, PNG, TIFF und verlustfreies WebP zur Wahl. Bildgrößen: Original, 1080p, 2160p, 2048 Pixel an der langen Seite sowie frei wählbare lange/kurze Seite.
 
 Bei **1080p** und **2160p** bietet **Bildanpassung** die Auswahl **Proportional skalieren** (bisheriger Standard), **Mit schwarzen Balken auffüllen** oder **Bildfüllend zuschneiden**. Die beiden neuen Modi erzeugen exakt 1920 × 1080 beziehungsweise 3840 × 2160 Pixel (je Datei beim Teilen der Halbbilder). Beide Halbbilder erhalten in ihren Wiedergabeproportionen die gleichen Ränder oder einen mittigen Beschnitt, bevor sie zusammengesetzt werden. Das Kontrollbild verwendet dieselbe Anpassung und dieselben Exporteinstellungen.
 
@@ -113,17 +113,17 @@ Bei Bildwandlungen werden Orientierung und Farbprofile angewendet. Die optionale
 
 ## Quellen, Listen und Voreinstellungen
 
-Gepacktes Full-/Half-SBS und Full-/Half-OU werden unterstützt. Die automatische Erkennung nutzt Stereo-Metadaten oder eindeutige Dateikürzel. Bei uneindeutigen Quellen wählst du das Layout selbst. Übliche Player-Kürzel sind `-lr`, `-rl`, `-lrh`, `-rlh`, `-ab`, `-ba`, `-abq` und `-baq`.
+Gepacktes Full-/Half-SBS und Full-/Half-OU werden unterstützt. Die automatische Erkennung nutzt Stereo-Metadaten oder eindeutige Dateikürzel. Bei uneindeutigen Quellen das Layout manuell wählen. Übliche Player-Kürzel sind `-lr`, `-rl`, `-lrh`, `-rlh`, `-ab`, `-ba`, `-abq` und `-baq`.
 
 Windows liest außerdem unverschlüsseltes MVC/Blu-ray 3D und SDR-MV-HEVC. Bei einer Blu-ray-ISO wird die Haupt-Stereo-Playlist gewählt. Das Programm entfernt keinen Kopierschutz. HDR-Wandlung, animierte/mehrseitige Bilder und die Wandlung von 16-Bit-Bildern gehören nicht zu Version 1.1.
 
-Speichere **Listen**, um einen Stapel mit seinen Einstellungen je Datei fortzusetzen. Listen enthalten Pfade und Einstellungen, nicht die Medien selbst. **Voreinstellungen** speichern wiederverwendbare Wandlungsoptionen. Sprache und gewählte Ordner werden lokal gemerkt.
+Zum späteren Fortsetzen eines Stapels mit seinen Einstellungen je Datei **Listen** speichern. Listen enthalten Pfade und Einstellungen, nicht die Medien selbst. **Voreinstellungen** speichern wiederverwendbare Wandlungsoptionen. Sprache und gewählte Ordner werden lokal gemerkt.
 
-Tastatur: **Strg+O** fügt Dateien hinzu; **Strg+A** markiert die Liste; **Strg+Klick** einzelne Einträge; **Umschalt+Klick** einen Bereich; **Entf** entfernt markierte Einträge; **Esc** bricht die aktive Verarbeitung ab. Unter macOS verwendest du **Command** zum Öffnen, Markieren aller Dateien und zur Einzelauswahl.
+Tastatur: **Strg+O** fügt Dateien hinzu; **Strg+A** markiert die Liste; **Strg+Klick** einzelne Einträge; **Umschalt+Klick** einen Bereich; **Entf** entfernt markierte Einträge; **Esc** bricht die aktive Verarbeitung ab. Unter macOS gilt **Command** zum Öffnen, Markieren aller Dateien und zur Einzelauswahl.
 
 ## Portable Pakete und Quellcode
 
-Lade ein Paket unter [Releases](https://github.com/muelli1975/TransCora/releases/latest) herunter und entpacke das komplette Archiv in einen beschreibbaren Ordner.
+Ein Paket unter [Releases](https://github.com/muelli1975/TransCora/releases/latest) herunterladen und das komplette Archiv in einen beschreibbaren Ordner entpacken.
 
 | System | Paket | Start |
 | --- | --- | --- |
@@ -133,7 +133,7 @@ Lade ein Paket unter [Releases](https://github.com/muelli1975/TransCora/releases
 
 Windows enthält Python, FFmpeg und die BD-3D-Werkzeuge. Linux und macOS enthalten die Programmlaufzeit und Bildwerkzeuge; **FFmpeg einschließlich ffprobe und System-Perl müssen separat installiert sein**. Unter Ubuntu/Debian: `sudo apt install ffmpeg perl`. Mit Homebrew unter macOS: `brew install ffmpeg@7`. Das macOS-Paket ist ad-hoc signiert und nicht notarisiert.
 
-Halte den gesamten Programmordner zusammen. Eine eigene Python-Installation ist für diese Pakete nicht nötig. BD-3D-Kodierung ist im Windows-Paket verfügbar. Das Linux-Paket enthält zusätzlich den MVC-Decoder; das Apple-Silicon-Paket unterstützt derzeit gepacktes Stereo und normale Videos, ohne MVC-Decoder.
+Den gesamten Programmordner zusammenhalten. Eine eigene Python-Installation ist für diese Pakete nicht nötig. BD-3D-Kodierung ist im Windows-Paket verfügbar. Das Linux-Paket enthält zusätzlich den MVC-Decoder; das Apple-Silicon-Paket unterstützt derzeit gepacktes Stereo und normale Videos, ohne MVC-Decoder.
 
 Die Pakete enthalten den zugehörigen Programmquellcode. Bauanleitung: [BUILD.md](BUILD.md). Ausführliche Formathinweise: [technische Referenz](docs/TECHNICAL_REFERENCE.md).
 
