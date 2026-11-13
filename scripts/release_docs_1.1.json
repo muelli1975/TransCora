@@ -1,0 +1,26 @@
+{
+  "repository": "muelli1975/TransCora",
+  "tag": "v1.1",
+  "branch": "main",
+  "previous_tag": "7e159237fc5834852a532efbbc8a290fd0f7e9c9",
+  "release_id": 411672025,
+  "assets": {
+    "TransCora_1.1_Linux_x64.tar.gz": "sha256:d1fc6dd9a285326466693ef74a715cf84026dd90c2310c5f24f652c6d27e9b80",
+    "TransCora_1.1_Linux_x64.tar.gz.sha256": "sha256:1f48ba365250000d2a0cadeaeae7d84c553e748962ddaa2a92af1a9edf26fd88",
+    "TransCora_1.1_macOS_AppleSilicon.tar.gz": "sha256:4ba1a9bec9738353749dd1a302459a7186c22a2871339ad283b95bbd4392d6b0",
+    "TransCora_1.1_macOS_AppleSilicon.tar.gz.sha256": "sha256:62319435d75931accb92ced7127067252e18f5dc41f3d2266d512368227b0442",
+    "TransCora_1.1_Windows_x64.zip": "sha256:905078973b65dd4d7d336725f06030b16fcd3db05cf7a5a1ec5340e951274640",
+    "TransCora_1.1_Windows_x64.zip.sha256": "sha256:2eb139eed616ff8f3bfd792929b2784dfbb67262c279c652548042dfb495f691"
+  },
+  "replace": [
+    "TransCora_1.1_Linux_x64.tar.gz",
+    "TransCora_1.1_Linux_x64.tar.gz.sha256",
+    "TransCora_1.1_macOS_AppleSilicon.tar.gz",
+    "TransCora_1.1_macOS_AppleSilicon.tar.gz.sha256",
+    "TransCora_1.1_Windows_x64.zip",
+    "TransCora_1.1_Windows_x64.zip.sha256"
+  ],
+  "body_replacements": {
+    "Extract the complete package for your system into a writable folder and start TransCora. Keep the supplied tools and application files together.": "The complete package for the operating system can be extracted to a writable folder. TransCora starts from that folder, which also contains the supplied tools and application files."
+  }
+}

@@ -97,6 +97,9 @@ def main():
             tag_moved = True
         # Keep the existing release prose. Only refresh existing hash/source references.
         body = old_body
+        for old, new in config.get('body_replacements', {}).items():
+            assert old in body or new in body, ('Release note text changed', old)
+            body = body.replace(old, new)
         for name, item in files.items():
             body = body.replace(assets[name]['digest'].split(':')[-1], item['digest'].split(':')[-1])
         body = body.replace(old_tag, sha)

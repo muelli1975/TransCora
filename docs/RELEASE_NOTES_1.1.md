@@ -10,6 +10,6 @@
 
 ## Installation
 
-Extract the complete package for your system into a writable folder and start TransCora. Keep the supplied tools and application files together.
+The complete package for the operating system can be extracted to a writable folder. TransCora starts from that folder, which also contains the supplied tools and application files.
 
 Windows includes the required video tools and supports Blu-ray 3D output. Linux and macOS require an external FFmpeg installation; see the [platform requirements](https://github.com/muelli1975/TransCora#portable-builds-and-source).
