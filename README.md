@@ -23,7 +23,7 @@ MV-HEVC remains a decoding input; version 1.1 contains no additional MV-HEVC enc
 ## Quick start
 
 1. Open **Videos** or **Images** and add files or a folder. Enable **Include subfolders** if needed.
-2. Select the files you want to process. Changes apply to the selected entries; without a selection, they set the defaults for new files.
+2. Select the files to process. Changes apply to the selected entries; without a selection, they set the defaults for new files.
 3. Choose the source layout and output. Use **Swap L/R** if the half-images are reversed.
 4. Choose the size and output folder. Use **Preview** to check the result before encoding; the preview has a fit view and a scrollable 1:1 pixel view.
 5. Use **Test** to check the batch or **Start** to process it. Progress, duration and source frame rate are shown in the window.
