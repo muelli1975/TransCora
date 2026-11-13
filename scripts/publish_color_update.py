@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -112,9 +113,24 @@ def main():
         for name, item in files.items():
             assert final_assets[name]['digest'] == item['digest'] and final_assets[name]['size'] == item['size']
             if name in config['replace']:
-                with urllib.request.urlopen(final_assets[name]['browser_download_url'], timeout=300) as stream:
-                    downloaded = 'sha256:' + hashlib.file_digest(stream, 'sha256').hexdigest()
-                assert downloaded == item['digest'], ('Final public download differs', name)
+                # The public URL can briefly redirect to the former asset after renaming.
+                url = final_assets[name]['browser_download_url']
+                for attempt in range(8):
+                    if attempt:
+                        time.sleep(10)
+                    query = urllib.parse.urlencode({'verify': item['digest'], 'attempt': attempt})
+                    req = urllib.request.Request(url + '?' + query, headers={'Cache-Control': 'no-cache'})
+                    try:
+                        with urllib.request.urlopen(req, timeout=300) as stream:
+                            downloaded = 'sha256:' + hashlib.file_digest(stream, 'sha256').hexdigest()
+                    except urllib.error.HTTPError as error:
+                        if error.code not in (404, 429, 500, 502, 503, 504):
+                            raise
+                        continue
+                    if downloaded == item['digest']:
+                        break
+                else:
+                    raise RuntimeError(f'Final public download differs: {name}')
     except BaseException:
         # Restore the previous names and source link if promotion failed.
         for name in reversed(promoted):

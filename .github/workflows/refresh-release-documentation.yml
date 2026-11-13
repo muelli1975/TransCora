@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - scripts/release_docs_1.1.json
+      - scripts/publish_color_update.py
 
 permissions:
   contents: read
